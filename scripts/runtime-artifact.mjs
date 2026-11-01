@@ -3,7 +3,8 @@ import {join,resolve} from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 export const digest=(value)=>createHash('sha256').update(value).digest('hex');
 export function validateManifest(m) {
- if(!m||typeof m!=='object'||m.protocolMajor!==1||m.nodeMajor!==24||m.entrypoint!=='runtime.mjs'||!/^[a-f0-9]{40}$/.test(m.sourceCommit)||!/^[a-f0-9]{64}$/.test(m.schemaHash)||!/^[a-f0-9]{64}$/.test(m.artifactSha256)) throw new Error('INVALID_RUNTIME_MANIFEST');
+ if(m?.dirty!==false)throw new Error('DIRTY_SOURCE_ARTIFACT');
+ if(!m||typeof m!=='object'||m.protocolMajor!==1||m.nodeMajor!==24||typeof m.packageVersion!=='string'||!/^v?24\.\d+\.\d+$/.test(m.toolchain?.node)||m.entrypoint!=='runtime.mjs'||!/^[a-f0-9]{40}$/.test(m.sourceCommit)||!/^[a-f0-9]{64}$/.test(m.schemaHash)||!/^[a-f0-9]{64}$/.test(m.artifactSha256)) throw new Error('INVALID_RUNTIME_MANIFEST');
  return m;
 }
 export async function installRuntime(from,destination) {
@@ -19,7 +20,7 @@ export async function installRuntime(from,destination) {
  await writeFile(join(directory,'runtime.mjs'),bytes);
  await writeFile(join(directory,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
  await mkdir(join(root,'config'),{recursive:true});
- const lock={sourceCommit:manifest.sourceCommit,schemaHash:manifest.schemaHash,protocolMajor:manifest.protocolMajor,nodeMajor:manifest.nodeMajor,artifactSha256:manifest.artifactSha256,entrypoint:manifest.entrypoint};
+ const lock={dirty:false,packageVersion:manifest.packageVersion,toolchain:{node:manifest.toolchain.node},sourceCommit:manifest.sourceCommit,schemaHash:manifest.schemaHash,protocolMajor:manifest.protocolMajor,nodeMajor:manifest.nodeMajor,artifactSha256:manifest.artifactSha256,entrypoint:manifest.entrypoint};
  const tmp=join(root,'config',`.source-lock-${randomUUID()}.json`);
  await writeFile(tmp,JSON.stringify(lock,null,2)+'\n');
  await rename(tmp,join(root,'config','source-runtime.lock.json'));

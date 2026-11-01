@@ -1,0 +1,13 @@
+{
+  "dirty": false,
+  "packageVersion": "0.1.0",
+  "toolchain": {
+    "node": "v24.22.2"
+  },
+  "sourceCommit": "87e6ccb2410f96df8034b56309395570892b52b8",
+  "schemaHash": "4fcdf0bf1cd93bacf891a5429f0e593a2049e12c584f4e6c967b1a6bb4454d91",
+  "protocolMajor": 1,
+  "nodeMajor": 24,
+  "artifactSha256": "9765afa83ea16fc43f031f06d0a98256d1bc3747d67977e8bae93f947756f175",
+  "entrypoint": "runtime.mjs"
+}
