@@ -30,6 +30,13 @@ Ngày: 2026-11-01. Đây là bản bàn giao **vertical slice S01 + giao diện 
 4. Dùng polling và explicit simulation clock cho S01; report ghi sse:false, seed chỉ ghi provenance của scenario cố định. Chi phí: chưa kiểm thử streaming, stochastic dynamics hay độ trễ native.
 5. Profile service có footprint minh họa 0,55×0,60m; static clearance dùng đường tròn ngoại tiếp bảo thủ. Valetudo chưa có footprint/khối lượng đo thì giữ unknown. Chi phí: có thể loại bỏ một điểm thực tế đi được, và vẫn cần đo robot thật.
 
+## Vị trí bàn giao
+
+- App: thư mục `lab/`, branch `feat/robot-lab`.
+- Runtime source: `source/.worktrees/robot-lab-runtime/`, branch `feat/robot-lab-runtime`, commit `56133dd`.
+- Source checkout W05/W06 vẫn ở nhánh của phiên phát triển hiện tại; chưa merge runtime vào nhánh đó. Thay đổi runtime là package/schemas/tests/exporter riêng; owner W06 cần review và tích hợp theo revision mới, rồi re-pin artifact.
+- Lab đã cài artifact local trong `.runtime/`; chạy `pnpm check:source` để kiểm. Không cần đọc worktree source để chạy artifact đã cài.
+
 ## Nguyên tắc bằng chứng
 
 BUSINESS SIM nghĩa là source đã thực thi nghiệp vụ trên adapter giả lập. Report có source commit, journal và attempts thực; arrival không tự tăng số món đã giao. Hash chứng minh tính toàn vẹn nội dung, không chứng minh an toàn hay độ tin cậy của người tạo. Candidate đính kèm tham chiếu report trust:unverified; source vẫn phải kiểm admission và commissioning.

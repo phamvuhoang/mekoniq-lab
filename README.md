@@ -39,7 +39,7 @@ Runtime chỉ bind `127.0.0.1:4176`; Vite proxy cùng origin. Không dùng cổn
 
 ### Cài hoặc cập nhật runtime
 
-Phần bổ sung source nằm trên branch **feat/robot-lab-runtime**, dựa trên baseline sạch `e999273`. Checkout W05/W06 đang làm dở được giữ riêng. Tại một checkout sạch của branch runtime, dùng Node 24 và dependencies source rồi chạy:
+Phần bổ sung source nằm trên branch **feat/robot-lab-runtime**, dựa trên baseline sạch `e999273`. Checkout W05/W06 đang làm dở được giữ riêng. Worktree runtime local nằm tại `../source/.worktrees/robot-lab-runtime/`; branch được lưu trong Git của source. Tại một checkout sạch của branch runtime, dùng Node 24 và dependencies source rồi chạy:
 
 ```sh
 node scripts/export-lab-runtime.mjs /tmp/mekoniq-source-runtime-artifact

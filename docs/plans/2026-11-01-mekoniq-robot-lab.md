@@ -1,5 +1,7 @@
 # MEKONIQ Robot Lab Implementation Plan
 
+> Cập nhật thực thi 2026-11-01: bản Lab và vertical slice S01 đã được hiện thực. Xem [tiến độ theo task](../implementation/progress.md) và [hướng dẫn chạy](../../README.md). Nội dung dưới đây giữ nguyên checklist nghiệm thu của plan; phần còn thiếu không được đánh PASS.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` to implement this plan task-by-task. Use `subagent-driven-development` only when parallel agent execution is explicitly selected. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Xây Lab thiết kế và kiểm chứng robot giao món, giữ giao diện MEKONIQ, dùng cùng mission/contract/executor với `source`, rồi nghiệm thu cấu hình trên robot thật.
