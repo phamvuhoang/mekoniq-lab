@@ -1,6 +1,6 @@
 import type {LabProject,RestaurantWorld,RobotDesign} from '../shared/types';
 import {validateProject} from '../project/schema';
-import {catalogProvenance} from '../design/catalog';
+import {catalogProvenance,footprintForDesign} from '../design/catalog';
 import {deploymentReadiness,type ReadinessItem} from './readiness';
 
 export interface EvidenceReference {id:string;mode:string;hash:string;sourceCommit:string|null;trust:'unverified';}
@@ -22,16 +22,18 @@ export interface DeploymentBundle {
 const modes=new Set(['preview','business_sim','protocol_sim','gazebo_sil','shadow','hardware_test','replay']);
 const allowedPayload=new Set(['design','profileCandidate','venueLayout','world','bindingDrafts','evidenceRefs']);
 const forbiddenKeys=new Set(['missions','missionqueue','queue','credentials','password','privatekey','secret','token','accesstoken','refreshtoken','grants','controlepoch','robotip','endpoint','receipts','paymentreceipts']);
-function guardJson(value:unknown,depth=0):void {
+const credentialKeys=new Set(['credentials','password','privatekey','secret','token','accesstoken','refreshtoken']);
+function guardJson(value:unknown,depth=0,reportContext=false):void {
   if (depth>40) throw new Error('BUNDLE_TOO_DEEP');
   if (typeof value==='number'&&!Number.isFinite(value)) throw new Error('NONFINITE_BUNDLE_INPUT');
   if (value===undefined||typeof value==='function'||typeof value==='symbol'||typeof value==='bigint') throw new Error('NON_JSON_BUNDLE_INPUT');
   if (!value||typeof value!=='object') return;
-  if (Array.isArray(value)) {if (value.length>1000) throw new Error('BUNDLE_OBJECT_LIMIT');for (const item of value) guardJson(item,depth+1);return;}
+  if (Array.isArray(value)) {if (value.length>(reportContext ? 100000 : 1000)) throw new Error('BUNDLE_OBJECT_LIMIT');for (const item of value) guardJson(item,depth+1,reportContext);return;}
   for (const [key,item] of Object.entries(value)) {
-    if (forbiddenKeys.has(key.toLowerCase().replace(/[_-]/g,''))) throw new Error('FORBIDDEN_DEPLOYMENT_FIELD');
+    const normalized=key.toLowerCase().replace(/[_-]/g,'');
+    if ((reportContext ? credentialKeys : forbiddenKeys).has(normalized)) throw new Error('FORBIDDEN_DEPLOYMENT_FIELD');
     if (key==='validation'&&item!=='simulated'&&item!=='integration_tested') throw new Error('UNTRUSTED_VALIDATION_CLAIM');
-    guardJson(item,depth+1);
+    guardJson(item,depth+1,reportContext);
   }
 }
 /** Canonical JSON keeps hashes independent of object insertion order. Arrays preserve their order. */
@@ -64,20 +66,29 @@ async function withChecksums(files:Record<string,string>):Promise<Record<string,
 /** Exporting a draft never grants a robot capability or changes source validation. */
 export async function buildBundle(project:LabProject,reports:readonly unknown[]=[]):Promise<DeploymentBundle> {
   const checked=validateProject(project);
-  guardJson(reports);
+  guardJson(reports,0,true);
   const evidenceRefs:EvidenceReference[]=[];
   for (const value of reports) {
     if (!value||typeof value!=='object'||Array.isArray(value)) throw new Error('INVALID_REPORT_REFERENCE');
     const report=value as Record<string,unknown>;
-    if (typeof report.id!=='string'||!report.id||report.id.length>200||typeof report.mode!=='string'||!modes.has(report.mode)) throw new Error('INVALID_REPORT_REFERENCE');
-    evidenceRefs.push({id:report.id,mode:report.mode,hash:await contentHash(value),sourceCommit:typeof report.sourceCommit==='string' ? report.sourceCommit : null,trust:'unverified'});
+    const snapshot=report.snapshot;
+    if (snapshot!==undefined&&(!snapshot||typeof snapshot!=='object'||Array.isArray(snapshot))) throw new Error('INVALID_REPORT_REFERENCE');
+    const run=snapshot as Record<string,unknown>|undefined;
+    const id=run ? run.id : report.id;
+    if (typeof id!=='string'||!id||id.length>200||/[\u0000-\u001f]/.test(id)||typeof report.mode!=='string'||!modes.has(report.mode)) throw new Error('INVALID_REPORT_REFERENCE');
+    if (run?.mode!==undefined&&run.mode!==report.mode) throw new Error('REPORT_MODE_MISMATCH');
+    if (report.id!==undefined&&report.id!==id) throw new Error('REPORT_ID_MISMATCH');
+    if (report.sourceCommit!==undefined&&(typeof report.sourceCommit!=='string'||!report.sourceCommit||report.sourceCommit.length>200||/[\u0000-\u001f]/.test(report.sourceCommit))) throw new Error('INVALID_REPORT_REFERENCE');
+    if (run?.sourceCommit!==undefined&&run.sourceCommit!==report.sourceCommit) throw new Error('REPORT_SOURCE_MISMATCH');
+    evidenceRefs.push({id,mode:report.mode,hash:await contentHash(value),sourceCommit:typeof report.sourceCommit==='string' ? report.sourceCommit : null,trust:'unverified'});
   }
   const payload:DeploymentPayload={
     design:checked.design,
-    profileCandidate:{id:`${checked.design.id}-candidate`,revision:checked.design.revision,validation:'simulated',provenance:'illustrative',chassis:checked.design.chassis,footprint:checked.design.chassis==='service' ? {widthM:0.55,lengthM:0.6} : null,payloadIntentKg:checked.design.payloadKg,measuredPayloadLimitKg:null,nativeCapabilitiesVerified:false},
+    profileCandidate:{id:`${checked.design.id}-candidate`,revision:checked.design.revision,validation:'simulated',provenance:'illustrative',chassis:checked.design.chassis,footprint:footprintForDesign(checked.design),payloadIntentKg:checked.design.payloadKg,measuredPayloadLimitKg:null,nativeCapabilitiesVerified:false},
     venueLayout:{tables:checked.world.points.filter(p=>p.kind==='table').map(({id,name})=>({id,name})),stations:checked.world.points.filter(p=>p.kind!=='table').map(({id,name,kind})=>({id,name,kind}))},
     world:checked.world,bindingDrafts:[],evidenceRefs
   };
+  guardJson(payload);
   const hashes={design:await contentHash(payload.design),world:await contentHash(payload.world),candidate:await contentHash(payload)};
   const header:Omit<DeploymentBundle,'files'>={schemaVersion:1,id:`${checked.id}-r${checked.revision}`,projectId:checked.id,projectRevision:checked.revision,createdAt:new Date().toISOString(),status:'draft',hashes,payload,readiness:deploymentReadiness(checked,evidenceRefs.length)};
   return {...header,files:await withChecksums(documents(header))};

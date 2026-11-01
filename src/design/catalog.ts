@@ -10,6 +10,11 @@ export interface ComponentConstraint {
   sensorInputs?:number;requiredSensorInputs?:number;occluded?:boolean;
 }
 export const catalogProvenance=Object.freeze({id:fixture.id,revision:fixture.revision,provenance:'illustrative',notice:fixture.notice});
+export function footprintForDesign(design:RobotDesign):{widthM:number;lengthM:number}|null {
+  if (design.chassis!=='service') return null;
+  const base=fixture.items.find(item=>item.id==='base')!;
+  return {widthM:base.widthM,lengthM:base.lengthM};
+}
 export function capabilitiesFor(design:RobotDesign) {
   return {editableDrive:design.chassis==='service',editableBattery:design.chassis==='service',editableSensor:design.chassis==='service',editableTrays:true,payloadVerified:false,nativeSpeedControl:false,hardwareValidation:'not_run' as const};
 }
