@@ -191,3 +191,83 @@ test("all three locales fit tablet and desktop, with explicit unmeasured Valetud
     "—",
   );
 });
+
+async function importProject(page: import('@playwright/test').Page, project: unknown) {
+  await page.getByRole('link',{name:'Deployment',exact:true}).click();
+  await page.locator('#import-project').setInputFiles({name:'project.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(project))});
+}
+async function currentProject(page: import('@playwright/test').Page) {
+  const download=page.waitForEvent('download');
+  await page.locator('[data-action="export-project"]').click();
+  const {readFile}=await import('node:fs/promises');
+  return JSON.parse(await readFile((await (await download).path())!,'utf8'));
+}
+for(const history of ['import','undo','redo'] as const)test(`active imported project survives reload after ${history}`,async({page})=>{
+  await page.goto('/');await page.getByRole('button',{name:'EN',exact:true}).click();
+  await page.getByRole('button',{name:'2 trays',exact:true}).click();
+  const original=await currentProject(page),imported={...original,id:'import-review',revision:12,design:{...original.design,trays:4}};
+  await importProject(page,imported);await expect(page.locator('.notice')).toContainText('Project imported.');
+  if(history!=='import')await page.getByRole('button',{name:'Undo',exact:true}).click();
+  if(history==='redo')await page.getByRole('button',{name:'Redo',exact:true}).click();
+  const expected=await currentProject(page);
+  expect(expected.id).toBe(history==='undo'?original.id:imported.id);
+  await page.reload();
+  expect(await currentProject(page)).toEqual(expected);
+  expect(await page.evaluate(()=>localStorage.getItem('mekoniq-active-project'))).toBe(expected.id);
+});
+
+test('failed huge numeric import keeps the usable current and persisted project',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');await page.getByRole('button',{name:'EN',exact:true}).click();
+  await page.getByRole('button',{name:'2 trays',exact:true}).click();
+  const original=await currentProject(page);
+  // Import from Deployment so a regressed validator fails the state assertion before any mesh allocation.
+  for(const bad of [
+    {...original,design:{...original.design,trays:4294967296}},
+    {...original,design:{...original.design,trays:Number.MAX_SAFE_INTEGER}},
+    {...original,world:{...original.world,width:1e20}},
+    {...original,world:{...original.world,height:Number.MAX_SAFE_INTEGER}},
+  ]) {
+    await importProject(page,bad);
+    await expect(page.locator('.notice')).toContainText('INVALID_PROJECT');
+    expect(await currentProject(page)).toEqual(original);
+  }
+  await page.reload();expect(await currentProject(page)).toEqual(original);expect(errors).toEqual([]);
+});
+
+test('empty imported world remains editable through add, undo and redo',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');await page.getByRole('button',{name:'EN',exact:true}).click();
+  const original=await currentProject(page);
+  await importProject(page,{...original,world:{...original.world,points:[],obstacles:[]}});
+  await expect(page.locator('.notice')).toContainText('Project imported.');
+  await page.getByRole('link',{name:'Restaurant',exact:true}).click();
+  await expect(page.locator('.world-inspector')).toContainText('Add a point to start editing.');
+  await page.getByRole('button',{name:'Add',exact:true}).click();
+  await page.locator('input[name="x"]').fill('4.2');await page.getByRole('button',{name:'Update coordinates',exact:true}).click();
+  await expect(page.locator('input[name="x"]')).toHaveValue('4.2');
+  await page.getByRole('button',{name:'Undo',exact:true}).click();
+  await page.getByRole('button',{name:'Undo',exact:true}).click();
+  await expect(page.locator('#point-form')).toHaveCount(0);
+  await page.getByRole('button',{name:'Redo',exact:true}).click();
+  await page.locator('input[name="x"]').fill('3.7');await page.getByRole('button',{name:'Update coordinates',exact:true}).click();
+  await expect(page.locator('input[name="x"]')).toHaveValue('3.7');expect(errors).toEqual([]);
+});
+
+test('changed imported point IDs edit the displayed selection through undo and redo',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');await page.getByRole('button',{name:'EN',exact:true}).click();
+  const original=await currentProject(page),point={id:'new-point',name:'Imported point',kind:'table',x:2,y:3};
+  await importProject(page,{...original,world:{...original.world,points:[point],obstacles:[]}});
+  await expect(page.locator('.notice')).toContainText('Project imported.');
+  await page.getByRole('link',{name:'Restaurant',exact:true}).click();
+  await expect(page.locator('#world-object')).toHaveValue('new-point');
+  await page.locator('input[name="x"]').fill('4.2');await page.getByRole('button',{name:'Update coordinates',exact:true}).click();
+  expect((await currentProject(page)).world.points).toEqual([{...point,x:4.2}]);
+  await page.getByRole('button',{name:'Undo',exact:true}).click();
+  await page.getByRole('button',{name:'Undo',exact:true}).click();
+  await expect(page.locator('#world-object')).toHaveValue('table-1');
+  await page.getByRole('button',{name:'Redo',exact:true}).click();
+  await page.locator('input[name="x"]').fill('3.7');await page.getByRole('button',{name:'Update coordinates',exact:true}).click();
+  expect((await currentProject(page)).world.points).toEqual([{...point,x:3.7}]);expect(errors).toEqual([]);
+});

@@ -1,5 +1,7 @@
 import type {LabProject} from '../shared/types';
 export const MAX_PROJECT_BYTES=5*1024*1024;
+export const MAX_TRAYS=10;
+export const MAX_WORLD_SIZE=1000;
 function invalid(field:string):never {throw new Error(`INVALID_PROJECT:${field}`);}
 function object(value:unknown,keys:readonly string[],field:string):Record<string,unknown> {
   if (!value||typeof value!=='object'||Array.isArray(value)) invalid(field);
@@ -21,9 +23,11 @@ export function validateProject(value:unknown):LabProject {
   if (!['service','valetudo'].includes(String(design.chassis))) invalid('design.chassis');
   if (!['lidar','depth'].includes(String(design.sensor))) invalid('design.sensor');
   for (const field of ['trays','batteryAh','payloadKg']) number(design[field],`design.${field}`);
-  if (!Number.isSafeInteger(design.trays)) invalid('design.trays');
+  if (!Number.isSafeInteger(design.trays)||Number(design.trays)<1||Number(design.trays)>MAX_TRAYS) invalid('design.trays');
+  for (const field of ['batteryAh','payloadKg']) if (Number(design[field])<0||Number(design[field])>1000) invalid(`design.${field}`);
   const world=object(project.world,['id','revision','width','height','points','obstacles'],'world');
   text(world.id,'world.id');revision(world.revision,'world.revision');number(world.width,'world.width',true);number(world.height,'world.height',true);
+  for (const field of ['width','height']) if (Number(world[field])>MAX_WORLD_SIZE) invalid(`world.${field}`);
   if (!Array.isArray(world.points)||!Array.isArray(world.obstacles)||world.points.length+world.obstacles.length>200) invalid('world.objects');
   const ids=new Set<string>();
   for (const value of world.points) {

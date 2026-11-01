@@ -1,6 +1,7 @@
 import type { LabProject, Locale, RunSnapshot, RunEvent } from "./shared/types";
 import { defaultProject } from "./project/default";
 import { ProjectStore } from "./project/store";
+import { MAX_WORLD_SIZE } from "./project/schema";
 import { summarizeDesign } from "./design/catalog";
 import { validateWorld } from "./world/validation";
 import { summarizeReport, openReplay } from "./reports/metrics";
@@ -95,7 +96,7 @@ export class LabApp {
       const saved = await this.store.load(
         localStorage.getItem("mekoniq-active-project") || this.project.id,
       );
-      if (saved) this.project = saved;
+      if (saved) this.selectProject(saved);
     } catch {
       this.notice = tr(
         "Bộ nhớ trình duyệt không khả dụng; vẫn có thể xuất dự án.",
@@ -121,24 +122,41 @@ export class LabApp {
     }
     this.render();
   }
-  private change(edit: (p: LabProject) => void) {
-    this.history.push(structuredClone(this.project));
-    this.future = [];
-    edit(this.project);
-    this.project.revision++;
-    this.project.updatedAt = new Date().toISOString();
+  private normalizeWorldSelection() {
+    if (!this.project.world.points.some((point) => point.id === this.worldSelected))
+      this.worldSelected = this.project.world.points[0]?.id ?? "";
+  }
+  private selectProject(project: LabProject) {
+    this.project = project;
+    this.normalizeWorldSelection();
     try {
-      localStorage.setItem("mekoniq-active-project", this.project.id);
+      localStorage.setItem("mekoniq-active-project", project.id);
     } catch {
-      /* IndexedDB remains the primary store. */
+      this.notice = tr(
+        "Bộ nhớ trình duyệt không khả dụng; vẫn có thể xuất dự án.",
+        "ブラウザ保存を利用できません。エクスポートできます。",
+        "Browser storage is unavailable; project export remains available.",
+      );
     }
+  }
+  private saveProject() {
     void this.store.save(this.project).catch(() => {
       this.notice = tr(
         "Không thể lưu tự động. Hãy xuất dự án.",
         "自動保存できません。エクスポートしてください。",
         "Autosave unavailable. Export your project.",
       );
+      this.render();
     });
+  }
+  private change(edit: (p: LabProject) => void) {
+    this.history.push(structuredClone(this.project));
+    this.future = [];
+    edit(this.project);
+    this.project.revision++;
+    this.project.updatedAt = new Date().toISOString();
+    this.selectProject(this.project);
+    this.saveProject();
     this.render();
   }
   private header() {
@@ -434,7 +452,7 @@ export class LabApp {
 </pattern>
 </defs>
 <rect width="${w.width * 70}" height="${w.height * 70}" fill="#101e25" stroke="#4a626a" stroke-width="3"/>
-<rect width="${w.width * 70}" height="${w.height * 70}" fill="url(#map-grid)"/>${Array.from({ length: w.width + 1 }, (_, n) => `<text x="${n * 70}" y="-9" text-anchor="middle" fill="#a2b8bf" font-size="11">${n} m</text>`).join("")}${w.obstacles
+<rect width="${w.width * 70}" height="${w.height * 70}" fill="url(#map-grid)"/>${Array.from({ length: Math.min(MAX_WORLD_SIZE, Math.max(0, Number.isFinite(w.width) ? Math.floor(w.width) : 0)) + 1 }, (_, n) => `<text x="${n * 70}" y="-9" text-anchor="middle" fill="#a2b8bf" font-size="11">${n} m</text>`).join("")}${w.obstacles
       .map(
         (o) => `<g>
 <rect x="${o.x * 70}" y="${(w.height - o.y - o.height) * 70}" width="${o.width * 70}" height="${o.height * 70}" rx="8" fill="#29414b" stroke="#617b83"/>
@@ -474,7 +492,7 @@ export class LabApp {
   private restaurant() {
     const p =
       this.project.world.points.find((x) => x.id === this.worldSelected) ??
-      this.project.world.points[0]!;
+      this.project.world.points[0];
     const issues = validateWorld(this.project.world);
     return `${this.run ? `<div class="notice editor-run-notice" role="status">${icon("info", 17)}<span>${tr("Đang sửa bản nháp. Lần chạy hiện tại giữ mặt bằng đã ghi; vùng sửa không hiển thị telemetry robot.", "ドラフトを編集中。現在の実行は記録済みレイアウトを使用します。編集画面に実機観測は重ねません。", "Editing a draft. The active run keeps its recorded layout; robot telemetry is hidden in this editor.")}</span></div>` : ""}<div class="world-grid">
 <section class="panel map-panel">
@@ -494,7 +512,7 @@ export class LabApp {
 <section class="panel world-inspector">
 <div class="panel-heading">
 <h2>${tr("Đối tượng", "オブジェクト", "Objects")}</h2>${btn(tr("Thêm", "追加", "Add"), "add-table", "plus", "quiet")}</div>
-<label class="field-label" for="world-object">${tr("Chọn đối tượng", "対象を選択", "Selected object")}</label>
+${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượng", "対象を選択", "Selected object")}</label>
 <select id="world-object">${this.project.world.points.map((x) => `<option value="${esc(x.id)}" ${x.id === p.id ? "selected" : ""}>${esc(x.name)} · ${x.kind}</option>`).join("")}</select>
 <form id="point-form">
 <label class="field-label" for="point-name">${tr("Tên", "名前", "Name")}</label>
@@ -506,7 +524,7 @@ export class LabApp {
 </label>
 </div>
 <button class="button primary full" type="submit">${icon("check", 17)}${tr("Cập nhật tọa độ", "座標を更新", "Update coordinates")}</button>
-</form>
+</form>` : `<p class="empty-inline">${tr("Thêm điểm để bắt đầu chỉnh sửa.", "地点を追加して編集を始めてください。", "Add a point to start editing.")}</p>`}
 <div class="config-note">${icon("info", 17)}<span>${tr("Điểm bàn giao ở cạnh bàn. Thay đổi mặt bằng làm cũ bằng chứng và map binding.", "受渡地点はテーブルの外側。変更すると検証結果とマップ紐付けが古くなります。", "Handoff points sit beside tables. Layout changes invalidate prior evidence and map bindings.")}</span>
 </div>
 <h3>${tr("Kiểm tra hình học", "形状チェック", "Geometry checks")}</h3>${issues.length ? issues.map((i) => `<p class="issue-text">${esc(i.message)}</p>`).join("") : `<p class="check-text">${icon("check", 16)}${tr("Không có lỗi hình học đã biết", "既知の形状エラーなし", "No known geometry issues")}</p>`}<p class="field-help">${tr("Hình học minh họa. Không phải map SLAM hoặc kiểm chứng tránh vật cản.", "参考形状。SLAMマップや障害物回避の検証ではありません。", "Illustrative geometry. This is not a SLAM map or obstacle avoidance validation.")}</p>
@@ -869,6 +887,7 @@ export class LabApp {
     }
   }
   private render() {
+    this.normalizeWorldSelection();
     const generation = ++this.renderGeneration;
     this.viewer?.dispose();
     this.viewer = null;
@@ -966,7 +985,7 @@ export class LabApp {
         const prev = this.history.pop();
         if (prev) {
           this.future.push(structuredClone(this.project));
-          this.project = {
+          this.selectProject({
             ...prev,
             revision: this.project.revision + 1,
             updatedAt: new Date().toISOString(),
@@ -975,15 +994,15 @@ export class LabApp {
               revision: this.project.design.revision + 1,
             },
             world: { ...prev.world, revision: this.project.world.revision + 1 },
-          };
-          void this.store.save(this.project);
+          });
+          this.saveProject();
           this.render();
         }
       } else if (a === "redo") {
         const next = this.future.pop();
         if (next) {
           this.history.push(structuredClone(this.project));
-          this.project = {
+          this.selectProject({
             ...next,
             revision: this.project.revision + 1,
             updatedAt: new Date().toISOString(),
@@ -992,8 +1011,8 @@ export class LabApp {
               revision: this.project.design.revision + 1,
             },
             world: { ...next.world, revision: this.project.world.revision + 1 },
-          };
-          void this.store.save(this.project);
+          });
+          this.saveProject();
           this.render();
         }
       } else if (a === "export-project")
@@ -1090,13 +1109,13 @@ export class LabApp {
         void this.operation(async () => {
           const next = await this.store.import(await file.text());
           this.history.push(structuredClone(this.project));
-          this.project = next;
           this.future = [];
           this.notice = tr(
             "Đã nhập dự án.",
             "プロジェクトを読み込みました。",
             "Project imported.",
           );
+          this.selectProject(next);
         });
       } else if (input.dataset.design) {
         const key = input.dataset.design;
@@ -1164,10 +1183,10 @@ export class LabApp {
         const f = new FormData(form);
         const x = Number(f.get("x")),
           y = Number(f.get("y"));
+        const selectedId = this.worldSelected;
+        if (!this.project.world.points.some((point) => point.id === selectedId)) return;
         this.change((p) => {
-          const point = p.world.points.find(
-            (a) => a.id === this.worldSelected,
-          )!;
+          const point = p.world.points.find((point) => point.id === selectedId)!;
           point.x = x;
           point.y = y;
           point.name = String(f.get("name"));

@@ -40,3 +40,8 @@ describe('IndexedDB project storage', () => {
     await store.close();
   });
 });
+
+it('refuses numeric amplification before replacing a usable stored project',async()=>{
+  const store=new ProjectStore(`bounded-${crypto.randomUUID()}`),p=defaultProject();await store.save(p);
+  try{for(const bad of [{...p,design:{...p.design,trays:Number.MAX_SAFE_INTEGER}},{...p,world:{...p.world,width:1e20}}])await expect(store.import(JSON.stringify(bad))).rejects.toThrow();expect(await store.load(p.id)).toEqual(p);}finally{await store.close();}
+});

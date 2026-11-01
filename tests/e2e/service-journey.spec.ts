@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { summarizeReport, openReplay } from "../../src/reports/metrics";
 test("paired source runtime drives arrival then human load and handoff", async ({
   page,
 }) => {
@@ -34,11 +35,16 @@ test("paired source runtime drives arrival then human load and handoff", async (
   let snap = await invoke("step");
   expect(snap.status).toBe("awaiting_load");
   expect(snap.served).toBe("0");
+  await invoke("step");
+  await invoke("step");
   snap = await invoke("confirm");
   expect(snap.loaded).toBe(true);
   snap = await invoke("step");
   expect(snap.status).toBe("awaiting_handoff");
   expect(snap.served).toBe("0");
+  await invoke("step");
+  await invoke("step");
+  await invoke("step");
   snap = await invoke("confirm");
   expect(snap.served).toBe("1");
   snap = await invoke("step");
@@ -104,6 +110,28 @@ test("paired source runtime drives arrival then human load and handoff", async (
       .filter((e: { type: string }) => e.type === "robot.execute")
       .reduce((n: number, e: { attempts: number }) => n + e.attempts, 0),
   ).toBe(3);
+  expect(summarizeReport(evidence)).toMatchObject({elapsedMs:8000,travelMs:3000,humanWaitMs:5000,served:'1',executeAttempts:3});
+  const sequences=evidence.journal.map((entry:{sequence:string})=>BigInt(entry.sequence));
+  expect(sequences.length).toBeGreaterThan(10);
+  for(let i=1;i<sequences.length;i++)expect(sequences[i]).toBeGreaterThan(sequences[i-1]);
+  expect(evidence.snapshot.events[0].type).toBe('SessionOpened');
+  const view=openReplay(evidence);
+  expect(view.seek(8000)).toEqual(evidence.snapshot.events);
+  expect(view.seek(1000).some(event=>event.type==='CargoLoaded')).toBe(false);
+  await expect(page.getByText('Invalid report; metrics cannot be derived.',{exact:true})).toHaveCount(0);
+  await expect(page.locator('.report-metrics .metric').filter({hasText:'Travel time'}).locator('strong')).toHaveText('3.0 s');
+  await expect(page.locator('.report-metrics .metric').filter({hasText:'Human confirmation wait'}).locator('strong')).toHaveText('5.0 s');
+  await expect(page.locator('.report-metrics .metric').filter({hasText:'Execute attempts'}).locator('strong')).toHaveText('3');
+  const actions:string[]=[];
+  page.on('request',request=>{if(request.url().endsWith(`/runs/${run.id}/actions`))actions.push(request.url());});
+  await page.getByRole('button',{name:'Read-only replay',exact:true}).click();
+  expect(await page.locator('.event-list li strong').allTextContents()).toEqual(evidence.snapshot.events.map((event:{type:string})=>event.type));
+  await page.locator('#replay-index').fill('0');
+  await expect(page.locator('.event-list li strong')).toHaveText('SessionOpened');
+  expect(actions).toEqual([]);
+  const reportDownload=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Export report',exact:true}).click();
+  expect(JSON.parse(await readFile((await (await reportDownload).path())!,'utf8'))).toEqual(evidence);
   await page.screenshot({
     path: "/tmp/mekoniq-lab-source-run.png",
     fullPage: true,

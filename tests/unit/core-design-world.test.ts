@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { defaultProject } from '../../src/project/default';
 import { summarizeDesign, validateDesign, capabilitiesFor } from '../../src/design/catalog';
+import { robotSvg } from '../../src/viewer/fallback';
 import { validateProject } from '../../src/project/schema';
 import { validateWorld } from '../../src/world/validation';
 import { worldToScreen, screenToWorld } from '../../src/world/coordinates';
@@ -62,5 +63,23 @@ describe('world geometry and import boundary', () => {
     expect(()=>validateProject({...project,secret:'no'})).toThrow();
     expect(()=>validateProject({...project,design:{...project.design,batteryAh:Infinity}})).toThrow();
     expect(()=>validateProject({...project,world:{...project.world,points:Array.from({length:201},(_,i)=>({...project.world.points[0],id:`p-${i}`}))}})).toThrow();
+  });
+});
+
+describe('bounded project geometry',()=>{
+  it.each([4294967296,Number.MAX_SAFE_INTEGER])('rejects computationally unbounded tray count %s',trays=>{
+    const p=defaultProject();expect(()=>validateProject({...p,design:{...p.design,trays}})).toThrow(/design.trays/);
+  });
+  it.each([1001,1e20,Number.MAX_SAFE_INTEGER])('rejects computationally unbounded world size %s',size=>{
+    const p=defaultProject();for(const field of ['width','height'])expect(()=>validateProject({...p,world:{...p.world,[field]:size}})).toThrow(/world/);
+  });
+  it('retains bounded incomplete engineering drafts within source numeric limits',()=>{
+    const p=defaultProject();const draft={...p,design:{...p.design,trays:10,batteryAh:0,payloadKg:1000},world:{...p.world,width:1000,height:1000,points:[]}};
+    expect(validateProject(draft)).toEqual(draft);expect(validateDesign(draft.design).map(i=>i.code)).toContain('TRAY_RANGE');
+    for(const [field,value]of [['trays',0],['batteryAh',-1],['batteryAh',1001],['payloadKg',-1],['payloadKg',1001]] as const)expect(()=>validateProject({...p,design:{...p.design,[field]:value}})).toThrow();
+  });
+  it('bounds fallback geometry even when called outside project validation',()=>{
+    const svg=robotSvg(4294967296,'trays');expect(svg.match(/<g transform=/g)).toHaveLength(10);expect(svg.length).toBeLessThan(10000);
+    for(const trays of [NaN,Infinity,-1])expect(robotSvg(trays,'trays')).not.toMatch(/NaN|Infinity/);
   });
 });

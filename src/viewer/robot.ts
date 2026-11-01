@@ -1,3 +1,4 @@
+import { MAX_TRAYS } from '../project/schema';
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { RobotDesign } from "../shared/types";
@@ -13,6 +14,7 @@ export function mountRobot(
   onSelect: (id: string) => void,
   onFallback: () => void,
 ): Viewer | null {
+  const trays = Number.isFinite(design.trays) ? Math.min(MAX_TRAYS, Math.max(0, Math.floor(design.trays))) : 0;
   let disposed = false;
   let renderer: THREE.WebGLRenderer;
   try {
@@ -157,7 +159,7 @@ export function mountRobot(
         z,
         1,
       );
-  for (let i = 0; i < design.trays; i++) {
+  for (let i = 0; i < trays; i++) {
     const y = 0.5 + i * 0.31;
     mesh(
       new THREE.BoxGeometry(0.79, 0.034, 0.56),
@@ -217,7 +219,7 @@ export function mountRobot(
       );
     }
   }
-  const top = 0.5 + (design.trays - 1) * 0.31;
+  const top = 0.5 + (trays - 1) * 0.31;
   mesh(
     new THREE.BoxGeometry(0.065, 0.27, 0.055),
     white,
@@ -225,7 +227,7 @@ export function mountRobot(
     0,
     top + 0.2,
     -0.15,
-    design.trays + 2,
+    trays + 2,
   );
   const tablet = mesh(
     new THREE.BoxGeometry(0.3, 0.2, 0.028),
@@ -234,7 +236,7 @@ export function mountRobot(
     0,
     top + 0.35,
     -0.11,
-    design.trays + 2,
+    trays + 2,
   );
   tablet.rotation.x = -0.3;
   const screen = mesh(
@@ -244,7 +246,7 @@ export function mountRobot(
     0,
     top + 0.35,
     -0.09,
-    design.trays + 2,
+    trays + 2,
   );
   screen.rotation.x = -0.3;
   mesh(
