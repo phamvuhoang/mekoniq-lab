@@ -1,0 +1,2 @@
+import {defineConfig} from '@playwright/test';
+export default defineConfig({testDir:'tests/e2e',timeout:30000,fullyParallel:false,use:{baseURL:'http://127.0.0.1:4175',headless:true,launchOptions:{executablePath:process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'},screenshot:'only-on-failure'},webServer:{command:'pnpm dev',url:'http://127.0.0.1:4175',reuseExistingServer:!process.env.CI,timeout:30000}});
