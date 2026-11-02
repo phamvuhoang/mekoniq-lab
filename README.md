@@ -39,7 +39,7 @@ Runtime chỉ bind `127.0.0.1:4176`; Vite proxy cùng origin. Không dùng cổn
 
 ### Cài hoặc cập nhật runtime
 
-Phần bổ sung source nằm trên branch **feat/robot-lab-runtime**, dựa trên baseline sạch `e999273`. Checkout W05/W06 đang làm dở được giữ riêng. Worktree runtime local nằm tại `../source/.worktrees/robot-lab-runtime/`; branch được lưu trong Git của source. Tại một checkout sạch của branch runtime, dùng Node 24 và dependencies source rồi chạy:
+Từ 2026-11-02, runtime Lab đã được tích hợp vào **source/main**, cùng code W05/W06 sau merge `5ea8db8`. Worktree runtime riêng đã được xóa. Dùng Node 24, dependencies của source và một checkout sạch tại `../source/`, rồi chạy:
 
 ```sh
 node scripts/export-lab-runtime.mjs /tmp/mekoniq-source-runtime-artifact
@@ -52,7 +52,7 @@ node scripts/import-runtime.mjs /tmp/mekoniq-source-runtime-artifact
 pnpm check:source
 ```
 
-Importer kiểm SHA-256, Node major và metadata; từ chối artifact build từ source bẩn. Kiểm thử lại sau mỗi lần thay source và review thay đổi lock. Runtime đóng gói chạy độc lập, không đọc source đang được chỉnh sửa ở bên cạnh. Xem thêm `source/packages/lab-runtime/README.md` trên branch runtime.
+Importer kiểm SHA-256, Node major và metadata; từ chối artifact build từ source bẩn. Kiểm thử lại sau mỗi lần thay source và review thay đổi lock. Runtime đóng gói chạy độc lập, không đọc source đang được chỉnh sửa ở bên cạnh. Xem thêm [README runtime source](../source/packages/lab-runtime/README.md) và [bằng chứng cập nhật main](docs/implementation/evidence/2026-11-02-source-main.md).
 
 ## Kiểm thử
 
@@ -71,7 +71,7 @@ pnpm build
 
 Đã có vertical slice source và giao diện MVP; **chưa đạt toàn bộ ma trận G1**. S01 là scenario chạy được; polling có sẵn, SSE và các scenario khác chưa triển khai. Candidate chỉ là draft, không chứa quyền điều khiển, credentials hay hàng đợi mission; readiness không tự nâng thành đã nghiệm thu.
 
-Valetudo protocol/Android executor, ROS 2/Nav2/Gazebo, import/apply cấu hình vào source và robot thật là các mốc tiếp theo, phụ thuộc W06 và commissioning. Pha chế/nấu ăn hiện là roadmap. Xem [tiến độ và giới hạn cụ thể](docs/implementation/progress.md) trước khi dùng kết quả cho quyết định kỹ thuật.
+Code W05/W06, gồm adapter Valetudo, Android executor và ROS 2/Nav2/Gazebo, đã có trong source/main. Lab hiện vẫn chỉ mở S01 business simulation; nối các backend native, import/apply candidate và nghiệm thu robot thật là các mốc tiếp theo. Pha chế/nấu ăn hiện là roadmap. Xem [tiến độ và giới hạn cụ thể](docs/implementation/progress.md) trước khi dùng kết quả cho quyết định kỹ thuật.
 
 ## Tài liệu
 
