@@ -1,4 +1,5 @@
 // Single geometry source for viewer, collision and footprint. Copy of source/packages/lab-runtime/src/v2/assets.ts (identical apart from the type import).
+// TODO(interim-copy): replace with the pinned source artifact or a generated import; until then tests/integration/lab-v2-model.test.ts in source fails on any drift from the source file.
 import type {AssetRevision} from '../shared/types';
 import {buildFrameGraph,qrotate,ModelError,type FrameGraph,type Pose,type Vec3} from './frames';
 import {hashJson} from './hash';

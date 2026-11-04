@@ -1,4 +1,5 @@
 // Pure frame/unit math. Verbatim copy of source/packages/lab-runtime/src/v2/frames.ts (no imports; keep both identical, the golden tests in both repos pin the behaviour).
+// TODO(interim-copy): replace with the pinned source artifact or a generated import; until then tests/integration/lab-v2-model.test.ts in source fails on any drift from the source file.
 // Lengths (3 / 4) match the generated contract types, which are plain number[]; every entry point checks them at runtime.
 export type Vec3=readonly number[];
 export type Quat=readonly number[];

@@ -1,4 +1,5 @@
 // Synchronous SHA-256 over RFC 8785 canonical JSON, the browser twin of source/.../v2/hash.ts.
+// TODO(interim-copy): browser twin of source hashJson; replace with the pinned source artifact. Parity is pinned by the byte-for-byte fixture check in tests/integration/lab-v2-model.test.ts (source) and project-v2-migration.test.ts (lab).
 // Synchronous on purpose: IndexedDB transactions must not wait on crypto.subtle between requests.
 const primes:number[]=[];for(let n=2;primes.length<64;n++)if(primes.every(p=>n%p))primes.push(n);
 const frac=(x:number)=>Math.floor((x-Math.floor(x))*2**32);
