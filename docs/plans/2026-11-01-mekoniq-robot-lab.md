@@ -1,6 +1,6 @@
 # MEKONIQ Robot Lab Implementation Plan
 
-> Cập nhật thực thi 2026-11-01: bản Lab và vertical slice S01 đã được hiện thực. Xem [tiến độ theo task](../implementation/progress.md) và [hướng dẫn chạy](../../README.md). Nội dung dưới đây giữ nguyên checklist nghiệm thu của plan; phần còn thiếu không được đánh PASS.
+> Cập nhật thực thi 2026-11-04: bản Lab và vertical slice S01 đã được hiện thực, runtime đã re-pin source/main W00–W11 (`a078777`). Xem [tiến độ theo task](../implementation/progress.md), [bằng chứng cập nhật](../implementation/evidence/2026-11-04-source-w11.md) và [hướng dẫn chạy](../../README.md). Nội dung dưới đây giữ nguyên checklist nghiệm thu của plan; phần còn thiếu không được đánh PASS. Các mô tả W05/W06 đang phát triển bên dưới là bối cảnh khi lập plan, không phải trạng thái source hiện tại.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` to implement this plan task-by-task. Use `subagent-driven-development` only when parallel agent execution is explicitly selected. Steps use checkbox (`- [ ]`) syntax for tracking.
 

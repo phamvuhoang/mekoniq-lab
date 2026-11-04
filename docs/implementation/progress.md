@@ -1,6 +1,18 @@
 # Robot Lab — tiến độ thực hiện
 
-Cập nhật: 2026-11-02. W05/W06 và runtime Lab đã được tích hợp vào source/main; các worktree cũ đã được xóa. Đây là bản bàn giao **vertical slice S01 + giao diện Lab**, không phải tuyên bố hoàn tất toàn bộ plan L00–L11.
+Cập nhật: 2026-11-04. Lab đã re-pin runtime từ `a2f271c` (W06) lên `a078777` trên source/main, chứa W00–W11 và các sửa lỗi sau review. Đây là bản bàn giao **vertical slice S01 + giao diện Lab**, không phải tuyên bố hoàn tất toàn bộ plan L00–L11 hay nghiệm thu production W11.
+
+## Đối chiếu source W07–W11 với Lab
+
+| Wave source | Code đã có trong source/main | Phạm vi Lab hiện tại |
+|---|---|---|
+| W07 | Kho, công thức/tiêu hao, mua hàng, kiểm kê, nhân sự/báo cáo | S01 không cấu hình hoặc kiểm chứng các luồng này |
+| W08 | Khuyến mãi/voucher, CRM/loyalty, đặt bàn, buffet/combo/cân nhập tay | Chưa có scenario Lab tương ứng |
+| W09 | Menu chuỗi, báo cáo/quyền dùng chung, online order sandbox, SDK/Node-RED bridge | Lab không kết nối cloud/provider/Node-RED |
+| W10 | Khung provider, payment/e-invoice/channel, adapter VDA 5050 và vendor SDK | Backend Lab vẫn chỉ `business_sim`; conformance emulator không là nghiệm thu thiết bị/provider |
+| W11 | Kiểm tra security/load, backup/restore, release/rollback, dispatcher cutover và hồ sơ UAT | Cập nhật runtime không triển khai production hoặc chuyển quyền robot; UAT/cutover còn `blocked_external` |
+
+Nguồn đối chiếu: [index W00–W11](../../../source/docs/superpowers/plans/2026-10-30-plan-index.json), [Gate D](../../../source/docs/implementation/gates/D-full-scope.md), [W11-T05](../../../source/docs/implementation/evidence/W11-T05.md). `applicationImplemented` không đồng nghĩa các gate đã được chấp nhận. L07/L08 vẫn phụ thuộc phần robot W06; các số wave là nguồn sở hữu chức năng, không phải giới hạn revision runtime.
 
 ## Phần đã hiện thực
 
@@ -24,7 +36,7 @@ Cập nhật: 2026-11-02. W05/W06 và runtime Lab đã được tích hợp vào
 
 ## Quyết định triển khai
 
-1. Ban đầu dùng worktree riêng để giữ checkout W05 đang làm dở. Đã giải quyết ngày 2026-11-02: tích hợp runtime vào source/main có W05/W06, re-pin artifact và xóa worktree. Artifact vẫn chỉ chứng minh revision đã pin; cập nhật source tiếp theo cần build/test lại.
+1. Ban đầu dùng worktree riêng để giữ checkout W05 đang làm dở. Ngày 2026-11-02 đã tích hợp runtime vào source/main và xóa worktree; ngày 2026-11-04 đã re-pin lên W00–W11 qua clone sạch của committed main. Artifact vẫn chỉ chứng minh revision đã pin; cập nhật source tiếp theo cần build/test lại.
 2. Hoàn thành giao diện và S01 trước; các backend native tiếp tục thuộc source/W06. Chi phí: Lab hiện không kiểm chứng navigation/robot thật và không đáp ứng toàn bộ ma trận G1.
 3. Semantic point của bàn là **điểm robot bàn giao**, furniture là hình học riêng; source giữ nguyên tọa độ, không trừ thêm offset 0,8m. Chi phí: khi nhập layout theo tâm bàn phải chuyển đổi có chủ đích.
 4. Dùng polling và explicit simulation clock cho S01; report ghi sse:false, seed chỉ ghi provenance của scenario cố định. Chi phí: chưa kiểm thử streaming, stochastic dynamics hay độ trễ native.
@@ -33,9 +45,9 @@ Cập nhật: 2026-11-02. W05/W06 và runtime Lab đã được tích hợp vào
 ## Vị trí bàn giao
 
 - App: thư mục `lab/`, branch `feat/robot-lab`.
-- Runtime source: `source/packages/lab-runtime/`, branch `main`, commit `a2f271c`.
+- Runtime source: `source/packages/lab-runtime/`, branch `main`; artifact pin commit `a07877718196ffc88832044fad97b027cedd53f4`. Giá trị máy đọc nằm trong [runtime lock](../../config/source-runtime.lock.json).
 - Worktree source riêng và worktree Lab tạm đã xóa; mỗi repository chỉ còn checkout chính. Journal/ghi chú local cũ được giữ trong `lab/runs/worktree-archive-2026-11-02/` (ignored).
-- Đã cập nhật fixture map binding và danh tính observer theo W06; không sửa hay nới kiểm tra production. Chưa push các commit local này.
+- Fixture map binding và danh tính observer W06 vẫn tương thích W11; lần cập nhật này không cần sửa logic runtime hoặc nới kiểm tra production.
 - Lab đã cài artifact local trong `.runtime/`; chạy `pnpm check:source` để kiểm. Không cần đọc worktree source để chạy artifact đã cài.
 
 ## Nguyên tắc bằng chứng
@@ -44,4 +56,4 @@ BUSINESS SIM nghĩa là source đã thực thi nghiệp vụ trên adapter giả
 
 Khi dự án thay đổi, run giữ world của thời điểm tạo; báo cáo được gắn revision cũ. Replay chỉ đọc dữ liệu, không tạo lệnh. Khởi động lại khi kết quả chuyển động không rõ giữ needs_attention/unknown, không tự gửi lại.
 
-Xem [bằng chứng cập nhật main](evidence/2026-11-02-source-main.md), [kiểm thử bản đầu](evidence/2026-11-01-web-mvp.md), [README chạy local](../../README.md) và [plan gốc](../plans/2026-11-01-mekoniq-robot-lab.md). Các checkbox plan gốc không được đánh hoàn tất chỉ vì một phần của task đã có file.
+Xem [bằng chứng cập nhật W11](evidence/2026-11-04-source-w11.md), [lần tích hợp W06](evidence/2026-11-02-source-main.md), [kiểm thử bản đầu](evidence/2026-11-01-web-mvp.md), [README chạy local](../../README.md) và [plan gốc](../plans/2026-11-01-mekoniq-robot-lab.md). Các checkbox plan gốc không được đánh hoàn tất chỉ vì một phần của task đã có file.

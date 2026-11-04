@@ -1,6 +1,6 @@
 # Mekoniq Robot Lab — Source Integration Contract
 
-Ngày: 2026-11-01 · v0.1 · Hợp đồng đề xuất; các API `/lab/v1` và package `lab-runtime` dưới đây **chưa tồn tại**.
+Ngày gốc: 2026-11-01 · v0.1. Đối chiếu thực thi: 2026-11-04, runtime đã pin source/main W00–W11 (`a078777`). Package `lab-runtime` và API `/lab/v1` đã có cho S01 `business_sim`; phần mở rộng trong spec chưa mặc nhiên được triển khai. API thực tế, giới hạn và HTTP 501 cho SSE nằm trong [README runtime](../../../source/packages/lab-runtime/README.md); xem [tiến độ](../implementation/progress.md) cho các phần còn thiếu.
 
 Spec gốc: [Robot Lab](2026-11-01-mekoniq-robot-lab.md). Đây là ranh giới thực thi của spec đó, không tạo một production orchestrator mới.
 
@@ -12,7 +12,7 @@ Spec gốc: [Robot Lab](2026-11-01-mekoniq-robot-lab.md). Đây là ranh giới 
 | `lab/src/world`, `lab/src/viewer` | Editor, scene, render observed state | Quyết định mission complete từ tọa độ canvas |
 | `lab/src/runtime` | Client gateway, mode/readiness, reconnect/snapshot | Gọi MQTT/ROS/REST robot trực tiếp |
 | `source/packages/contracts` | Wire/schema + compatibility, generated types | Để schema copy trong Lab tự trôi |
-| `source/packages/lab-runtime` — đề xuất | Dev-only harness dùng domain/journal thật, clocks, runners và nguồn observation đã chọn | Đăng ký seed/fault trong release API |
+| `source/packages/lab-runtime` | Dev-only harness dùng domain/journal thật, clocks, runners và nguồn observation đã chọn | Đăng ký seed/fault trong release API |
 | `source/packages/domain` | Order/KDS/allocations/mission/admission/ownership | Logic chuyển động vật lý |
 | `source/packages/robot-adapters` | Manifest/capabilities, map conversion, normalize evidence | Nhiều writer cùng robot |
 | Android executor hoặc ROS agent W06 | Durable native journal, validate, phát goal, reconcile | Dùng UI timer để bảo đảm dừng |
@@ -66,9 +66,9 @@ Chỉ evidence backend tạo được accepted/completed/cancelled. UI pose chan
 
 ## 3. Versioning giữa hai Git repository
 
-Lab ghi `config/source-runtime.lock.json` có: source commit đầy đủ, dirty=false, contract schema hash, runtime artifact SHA-256, runtime package version, supported protocol major, toolchain versions. Runtime build từ checkout sạch đã được người sở hữu W05/W06 chốt. Không copy `tests/support` hay `packages/domain/src` vào Lab.
+Lab ghi `config/source-runtime.lock.json` có: source commit đầy đủ, dirty=false, contract schema hash, runtime artifact SHA-256, runtime package version, supported protocol major, toolchain versions. Runtime build từ revision đã commit trong checkout sạch của source/main và được kiểm thử lại trước khi cập nhật lock. Không copy `tests/support` hay `packages/domain/src` vào Lab.
 
-Package đề xuất `@mekoniq/lab-runtime` được build/pack tại source, gồm Node CLI và schema/type public cần thiết; Lab cài artifact local đã kiểm checksum. Gateway thuộc package này. Tránh path `file:../source/...` trỏ working tree không khóa revision. Thư mục `.runtime/` và `runs/` trong Lab bị ignore, version lock được commit.
+Package `@mekoniq/lab-runtime` được export tại source thành Node CLI bundle, manifest và public schemas; Lab cài runtime bundle/manifest local đã kiểm checksum. Gateway thuộc package này. Tránh path `file:../source/...` trỏ working tree không khóa revision. Thư mục `.runtime/` và `runs/` trong Lab bị ignore, version lock được theo dõi trong Git.
 
 Mỗi handshake trả protocol/schema/source revision. Khác major hoặc hash không tương thích: `CONTRACT_MISMATCH`, chỉ đọc report, chặn run mới. CI của Lab test với artifact pin; PR source thay contract phải chạy consumer conformance hoặc phát release artifact mới trước khi cập nhật lock Lab.
 
@@ -189,16 +189,18 @@ Quy trình:
 
 Rollback: chỉ cấu hình đã biết tương thích với release/schema hiện tại; dừng và reconcile active native goals, giải quyết cargo/reservations, explicit ownership handoff; không restore journal/grant cũ để có lại quyền. Lưu previous config revision, không replay motion. Nếu không xác định robot đang chạy gì thì giữ blocked và xử lý trực tiếp.
 
-## 8. W05/W06 dependency và các gap cần giải quyết
+## 8. Phụ thuộc source và các gap cần giải quyết
+
+Runtime hiện dùng source W00–W11. W05/W06 trong bảng là wave sở hữu nghiệp vụ/robot; các chức năng W07–W11 và giới hạn tích hợp Lab được đối chiếu tại [tiến độ hiện tại](../implementation/progress.md).
 
 | Lab cần | Source owner | Kiểm trước tích hợp |
 |---|---|---|
-| Business journey | W03/W04, W05 khi có POS mở rộng | Existing tests local pass; không cần toàn W05 cho R0 |
-| Admission/profile/map + load units | W06-T01 | Scheduler hiện chỉ simulator; source-owned schema/constraints |
+| Business journey | W03/W04, W05 POS | S01 đã chạy với registry hiện tại; các journey mở rộng cần scenario riêng |
+| Admission/profile/map + load units | W06-T01 | Admission native đã có ở source; Lab vẫn chỉ đăng ký simulator, cần ánh xạ candidate/profile và đơn vị tải |
 | Valetudo + native Android | W06-T02 | REST/MQTT version; persistent executor; lifecycle và crash |
 | ROS durable ownership | W06-T03 | Wire dùng ISO expiry; crash/native UUID query có giới hạn |
 | Nav2/Gazebo/world compiler hook | W06-T04 | Real launch/IDL, TF, namespace, `/clock`, model source |
 | Chassis measured + stop path | W06-T05 | Không dùng illustrative geometry/payload để nghiệm thu |
 | Trial import/pilot | W06-T06 + W05 + Gate A | Read-only export input; parity và source Gate B |
 
-Nếu W06 đã có API khác khi triển khai, cập nhật adapter facade/schema lock sau conformance; không mở một executor song song để tránh merge. Task source và task Lab có commit/evidence riêng, liên kết revision trong report. Các API source mới ở tài liệu này là đề xuất mở rộng cần review cùng người phụ trách W06, không được báo là đã có sẵn.
+Khi tích hợp backend tiếp theo, đối chiếu API thực tế trên revision source đã pin và cập nhật adapter facade/schema lock sau conformance; không mở một executor song song. Task source và task Lab có commit/evidence riêng, liên kết revision trong report. Các API mở rộng ngoài S01 trong tài liệu này vẫn cần triển khai và kiểm chứng; việc source có code W11 không chứng minh Lab đã mở các API đó.

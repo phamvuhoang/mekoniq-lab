@@ -39,11 +39,15 @@ Runtime chỉ bind `127.0.0.1:4176`; Vite proxy cùng origin. Không dùng cổn
 
 ### Cài hoặc cập nhật runtime
 
-Từ 2026-11-02, runtime Lab đã được tích hợp vào **source/main**, cùng code W05/W06 sau merge `5ea8db8`. Worktree runtime riêng đã được xóa. Dùng Node 24, dependencies của source và một checkout sạch tại `../source/`, rồi chạy:
+Ngày 2026-11-04, Lab được cập nhật từ baseline W06 `a2f271c` lên **source/main W00–W11**, commit `a07877718196ffc88832044fad97b027cedd53f4`. Protocol vẫn là v1, schema hash không đổi; artifact runtime đã đổi và được khóa lại. Runtime chỉ dùng revision trong lock, không tự theo HEAD của source.
+
+Dùng Node 24, dependencies của source và một checkout sạch. Chạy **từ thư mục source**:
 
 ```sh
 node scripts/export-lab-runtime.mjs /tmp/mekoniq-source-runtime-artifact
 ```
+
+Nếu `../source/` có thay đổi chưa commit, tạo clone tạm của committed `main` rồi cài dependencies bằng `pnpm install --frozen-lockfile` trong clone trước khi export; không dùng `--allow-dirty` cho artifact sẽ import. Clone chỉ chứa code đã commit, không bao gồm thay đổi đang làm dở.
 
 Từ `lab/`:
 
@@ -52,7 +56,7 @@ node scripts/import-runtime.mjs /tmp/mekoniq-source-runtime-artifact
 pnpm check:source
 ```
 
-Importer kiểm SHA-256, Node major và metadata; từ chối artifact build từ source bẩn. Kiểm thử lại sau mỗi lần thay source và review thay đổi lock. Runtime đóng gói chạy độc lập, không đọc source đang được chỉnh sửa ở bên cạnh. Xem thêm [README runtime source](../source/packages/lab-runtime/README.md) và [bằng chứng cập nhật main](docs/implementation/evidence/2026-11-02-source-main.md).
+Importer kiểm SHA-256, Node major và metadata; từ chối artifact build từ source bẩn. Sau mỗi lần đổi lock, chạy `pnpm test`, `pnpm build` và `pnpm test:runtime-e2e`. `pnpm check:source` kiểm tính toàn vẹn artifact đã pin, không kiểm đó có phải HEAD mới nhất hay không. Runtime đóng gói chạy độc lập, không đọc source đang được chỉnh sửa ở bên cạnh. Xem thêm [README runtime source](../source/packages/lab-runtime/README.md) và [bằng chứng cập nhật W11](docs/implementation/evidence/2026-11-04-source-w11.md).
 
 ## Kiểm thử
 
@@ -71,10 +75,11 @@ pnpm build
 
 Đã có vertical slice source và giao diện MVP; **chưa đạt toàn bộ ma trận G1**. S01 là scenario chạy được; polling có sẵn, SSE và các scenario khác chưa triển khai. Candidate chỉ là draft, không chứa quyền điều khiển, credentials hay hàng đợi mission; readiness không tự nâng thành đã nghiệm thu.
 
-Code W05/W06, gồm adapter Valetudo, Android executor và ROS 2/Nav2/Gazebo, đã có trong source/main. Lab hiện vẫn chỉ mở S01 business simulation; nối các backend native, import/apply candidate và nghiệm thu robot thật là các mốc tiếp theo. Pha chế/nấu ăn hiện là roadmap. Xem [tiến độ và giới hạn cụ thể](docs/implementation/progress.md) trước khi dùng kết quả cho quyết định kỹ thuật.
+Code W00–W11 đã có trong source/main, gồm POS, robot, kho/nhân sự, CRM/khuyến mãi/đặt bàn, chuỗi/tích hợp và công cụ release. Lab hiện vẫn chỉ mở S01 business simulation; các module mới không tự trở thành scenario hoặc backend Lab. Nối backend native, import/apply candidate và nghiệm thu robot thật là các mốc tiếp theo. W11 có code và kiểm chứng local; UAT, cutover và các gate triển khai thật vẫn chưa được nghiệm thu. Pha chế/nấu ăn hiện là roadmap. Xem [tiến độ và giới hạn cụ thể](docs/implementation/progress.md) trước khi dùng kết quả cho quyết định kỹ thuật.
 
 ## Tài liệu
 
+- [Giới thiệu Lab bằng hình ảnh — HTML tương tác, mở offline](../source/artifacts/robot-lab.html): 9 trang, Việt/Nhật/Anh; cấu hình robot, mặt bằng, S01, thử lỗi, replay và xuất draft.
 - [Khảo sát Drone Lab/OOMWOO và code nền](docs/research/2026-11-01-baseline-and-references.md).
 - [Spec sản phẩm, trải nghiệm, kiến trúc](docs/specs/2026-11-01-mekoniq-robot-lab.md).
 - [Hợp đồng source và đường tới robot thật](docs/specs/2026-11-01-source-integration.md).
