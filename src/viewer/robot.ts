@@ -2,6 +2,7 @@ import { MAX_TRAYS } from '../project/schema';
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { RobotDesign } from "../shared/types";
+import { compileAsset, serviceAmrAsset } from "../twin/model";
 export type Viewer = {
   dispose: () => void;
   explode: (value: number) => void;
@@ -14,7 +15,8 @@ export function mountRobot(
   onSelect: (id: string) => void,
   onFallback: () => void,
 ): Viewer | null {
-  const trays = Number.isFinite(design.trays) ? Math.min(MAX_TRAYS, Math.max(0, Math.floor(design.trays))) : 0;
+  // A valid project has 1..MAX_TRAYS trays; clamp so an out-of-range design still draws a coherent robot.
+  const trays = Number.isFinite(design.trays) ? Math.min(MAX_TRAYS, Math.max(1, Math.floor(design.trays))) : 1;
   let disposed = false;
   let renderer: THREE.WebGLRenderer;
   try {
@@ -100,177 +102,60 @@ export function mountRobot(
     group.add(m);
     return m;
   }
-  mesh(
-    new THREE.CylinderGeometry(0.46, 0.43, 0.24, 64),
-    white,
-    "chassis",
-    0,
-    0.2,
-    0,
-    0,
-  );
-  mesh(
-    new THREE.CylinderGeometry(0.465, 0.465, 0.045, 64),
-    dark,
-    "chassis",
-    0,
-    0.3,
-    0,
-    0,
-  );
-  mesh(
-    new THREE.CylinderGeometry(0.435, 0.44, 0.035, 64),
-    lime,
-    "chassis",
-    0,
-    0.12,
-    0,
-    0,
-  );
-  for (const x of [-0.43, 0.43]) {
-    const w = mesh(
-      new THREE.CylinderGeometry(0.11, 0.11, 0.06, 24),
-      rubber,
-      "drive",
-      x,
-      0.14,
-      0,
-      0,
-    );
+  // Dimensions come from the compiled asset revision (single geometry source, shared with collision); the viewer holds no body size of its own.
+  // Asset frame: x forward, y left, z up. Scene: x right, y up, z forward.
+  const model = compileAsset(serviceAmrAsset({ ...design, chassis: "service", trays }));
+  const shape = (frameId: string) => model.visual.shapes.find((sh) => sh.frameId === frameId)!;
+  const sizeOf = (frameId: string) => (shape(frameId) as unknown as { sizeM: number[] }).sizeM;
+  const at = (frameId: string) => { const p = shape(frameId).pose.position; return { x: -p[1]!, y: p[2]!, z: p[0]! }; };
+  const box = (frameId: string, color: THREE.Material, id: string, layer: number, size = sizeOf(frameId), dy = 0) => {
+    const p = at(frameId);
+    return mesh(new THREE.BoxGeometry(size[1], size[2], size[0]), color, id, p.x, p.y + dy, p.z, layer);
+  };
+  const [bodyL, bodyW, bodyH] = sizeOf("chassis"), bodyP = at("chassis"), bodyTop = bodyP.y + bodyH! / 2;
+  box("chassis", white, "chassis", 0);
+  mesh(new THREE.BoxGeometry(bodyW, 0.02, bodyL), dark, "chassis", bodyP.x, bodyTop, bodyP.z, 0);
+  mesh(new THREE.BoxGeometry(bodyW! + 0.006, 0.03, bodyL! + 0.006), lime, "chassis", bodyP.x, bodyP.y - bodyH! / 2 + 0.03, bodyP.z, 0);
+  const wheelR = sizeOf("drive")[2]! * 0.75, driveP = at("drive");
+  for (const x of [-1, 1]) {
+    const w = mesh(new THREE.CylinderGeometry(wheelR, wheelR, 0.06, 24), rubber, "drive", x * (bodyW! / 2 - 0.03), driveP.y, driveP.z, 0);
     w.rotation.z = Math.PI / 2;
   }
-  mesh(
-    new THREE.BoxGeometry(0.29, 0.12, 0.21),
-    dark,
-    "battery",
-    0,
-    0.37,
-    -0.04,
-    1,
-  );
-  for (const x of [-0.31, 0.31])
-    for (const z of [-0.18, 0.18])
-      mesh(
-        new THREE.CylinderGeometry(0.021, 0.021, 1.15, 12),
-        white,
-        "trays",
-        x,
-        0.92,
-        z,
-        1,
-      );
-  for (let i = 0; i < trays; i++) {
-    const y = 0.5 + i * 0.31;
-    mesh(
-      new THREE.BoxGeometry(0.79, 0.034, 0.56),
-      dark,
-      "trays",
-      0,
-      y,
-      0,
-      2 + i,
-    );
-    mesh(
-      new THREE.BoxGeometry(0.75, 0.009, 0.52),
-      white,
-      "trays",
-      0,
-      y + 0.023,
-      0,
-      2 + i,
-    );
-    for (const x of [-0.38, 0.38])
-      mesh(
-        new THREE.BoxGeometry(0.018, 0.055, 0.55),
-        dark,
-        "trays",
-        x,
-        y + 0.03,
-        0,
-        2 + i,
-      );
-    mesh(
-      new THREE.BoxGeometry(0.75, 0.055, 0.018),
-      dark,
-      "trays",
-      0,
-      y + 0.03,
-      -0.27,
-      2 + i,
-    );
-    if (i === 1) {
-      mesh(
-        new THREE.CylinderGeometry(0.09, 0.07, 0.013, 32),
-        white,
-        "trays",
-        0.17,
-        y + 0.045,
-        0.02,
-        2 + i,
-      );
-      mesh(
-        new THREE.CylinderGeometry(0.055, 0.035, 0.06, 32),
-        lime,
-        "trays",
-        0.17,
-        y + 0.07,
-        0.02,
-        2 + i,
-      );
+  box("battery", dark, "battery", 1);
+  const [trayL, trayW] = sizeOf("tray_1"), topTray = at(`tray_${trays}`);
+  for (const x of [-1, 1])
+    for (const z of [-1, 1]) {
+      const h = topTray.y + 0.15 - bodyTop;
+      mesh(new THREE.CylinderGeometry(0.021, 0.021, h, 12), white, "trays", x * (trayW! / 2 - 0.02), bodyTop + h / 2, z * (trayL! / 2 - 0.02), 1);
+    }
+  for (let i = 1; i <= trays; i++) {
+    const p = at(`tray_${i}`), layer = 1 + i;
+    box(`tray_${i}`, dark, "trays", layer);
+    mesh(new THREE.BoxGeometry(trayW! - 0.04, 0.009, trayL! - 0.04), white, "trays", p.x, p.y + 0.023, p.z, layer);
+    for (const x of [-1, 1]) mesh(new THREE.BoxGeometry(0.018, 0.055, trayL! - 0.01), dark, "trays", p.x + x * (trayW! / 2 - 0.01), p.y + 0.03, p.z, layer);
+    mesh(new THREE.BoxGeometry(trayW! - 0.04, 0.055, 0.018), dark, "trays", p.x, p.y + 0.03, p.z - (trayL! / 2 - 0.01), layer);
+    if (i === 2) {
+      // Decorative cup, kept inside the tray rectangle.
+      const cx = p.x + trayW! / 2 - 0.13;
+      mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.013, 32), white, "trays", cx, p.y + 0.045, p.z + 0.02, layer);
+      mesh(new THREE.CylinderGeometry(0.055, 0.035, 0.06, 32), lime, "trays", cx, p.y + 0.07, p.z + 0.02, layer);
     }
   }
-  const top = 0.5 + (trays - 1) * 0.31;
-  mesh(
-    new THREE.BoxGeometry(0.065, 0.27, 0.055),
-    white,
-    "tablet",
-    0,
-    top + 0.2,
-    -0.15,
-    trays + 2,
-  );
-  const tablet = mesh(
-    new THREE.BoxGeometry(0.3, 0.2, 0.028),
-    dark,
-    "tablet",
-    0,
-    top + 0.35,
-    -0.11,
-    trays + 2,
-  );
+  const [tabL, tabW, tabT] = sizeOf("tablet"), tab = at("tablet"), standH = tab.y - (topTray.y + 0.02);
+  mesh(new THREE.BoxGeometry(0.04, standH, 0.04), white, "tablet", tab.x, topTray.y + 0.02 + standH / 2, tab.z - 0.04, trays + 2);
+  const tablet = mesh(new THREE.BoxGeometry(tabW, tabL, tabT), dark, "tablet", tab.x, tab.y, tab.z, trays + 2);
   tablet.rotation.x = -0.3;
-  const screen = mesh(
-    new THREE.BoxGeometry(0.26, 0.155, 0.005),
-    lime,
-    "tablet",
-    0,
-    top + 0.35,
-    -0.09,
-    trays + 2,
-  );
+  const screen = mesh(new THREE.BoxGeometry(tabW! - 0.04, tabL! - 0.04, 0.005), lime, "tablet", tab.x, tab.y, tab.z + 0.02, trays + 2);
   screen.rotation.x = -0.3;
-  mesh(
-    design.sensor === "lidar"
-      ? new THREE.CylinderGeometry(0.09, 0.09, 0.07, 32)
-      : new THREE.BoxGeometry(0.2, 0.075, 0.07),
-    dark,
-    "sensor",
-    0,
-    0.38,
-    0.3,
-    1,
-  );
-  mesh(
-    design.sensor === "lidar"
-      ? new THREE.CylinderGeometry(0.091, 0.091, 0.012, 32)
-      : new THREE.BoxGeometry(0.15, 0.018, 0.075),
-    lime,
-    "sensor",
-    0,
-    0.405,
-    0.3,
-    1,
-  );
+  const sensorShape = shape("sensor"), sp = at("sensor");
+  if (sensorShape.kind === "cylinder") {
+    mesh(new THREE.CylinderGeometry(sensorShape.radiusM, sensorShape.radiusM, sensorShape.heightM, 32), dark, "sensor", sp.x, sp.y, sp.z, 1);
+    mesh(new THREE.CylinderGeometry(sensorShape.radiusM + 0.001, sensorShape.radiusM + 0.001, 0.012, 32), lime, "sensor", sp.x, sp.y + sensorShape.heightM / 2, sp.z, 1);
+  } else if (sensorShape.kind === "box") {
+    const [l, w, h] = sensorShape.sizeM;
+    mesh(new THREE.BoxGeometry(w, h, l), dark, "sensor", sp.x, sp.y, sp.z, 1);
+    mesh(new THREE.BoxGeometry(w! * 0.8, 0.018, l!), lime, "sensor", sp.x, sp.y + h! / 2, sp.z, 1);
+  }
   const floor = new THREE.Mesh(
     new THREE.CircleGeometry(1.55, 80),
     new THREE.MeshStandardMaterial({
@@ -287,18 +172,22 @@ export function mountRobot(
   const grid = new THREE.GridHelper(5, 25, 0x3e565c, 0x263d43);
   grid.position.y = 0.012;
   scene.add(grid);
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.68, 0.686, 80),
-    new THREE.MeshBasicMaterial({
-      color: 0xb4f375,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.4,
-    }),
-  );
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.02;
-  scene.add(ring);
+  // Collision footprint from the same asset (service only; a Valetudo footprint is unknown and is not drawn).
+  const footprint = design.chassis === "service" ? model.collision.footprint : null;
+  if (footprint) {
+    const [x0, y0] = footprint.min, [x1, y1] = footprint.max;
+    const corners = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([ax, ay]) => new THREE.Vector3(-ay!, 0.02, ax));
+    const outline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(corners), new THREE.LineBasicMaterial({ color: 0xb4f375, transparent: true, opacity: 0.9, depthTest: false }));
+    outline.name = "collision-footprint";
+    outline.renderOrder = 2; // drawn over the mesh so the collision outline stays comparable with the visual
+    scene.add(outline);
+    const r = model.collision.radiusM!;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(r, r + 0.006, 80), new THREE.MeshBasicMaterial({ color: 0xb4f375, side: THREE.DoubleSide, transparent: true, opacity: 0.35, depthTest: false }));
+    ring.renderOrder = 2;
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.02;
+    scene.add(ring);
+  }
   const render = () => renderer.render(scene, camera);
   const resize = () => {
     const { width, height } = host.getBoundingClientRect();

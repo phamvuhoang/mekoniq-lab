@@ -1,4 +1,4 @@
-import type {LabProject} from '../shared/types';
+import type {LabProject,LabProjectV2} from '../shared/types';
 export const MAX_PROJECT_BYTES=5*1024*1024;
 export const MAX_TRAYS=10;
 export const MAX_WORLD_SIZE=1000;
@@ -45,4 +45,42 @@ export function validateProject(value:unknown):LabProject {
   }
   if (new TextEncoder().encode(JSON.stringify(value)).length>MAX_PROJECT_BYTES) invalid('size');
   return structuredClone(value) as LabProject;
+}
+const ID=/^[A-Za-z0-9_.:-]{1,200}$/,HASH=/^[0-9a-f]{64}$/,KINDS=['table','kitchen','parking','dock','coffee_pickup'];
+function id(value:unknown,field:string):void {if (typeof value!=='string'||!ID.test(value)) invalid(field);}
+function hash(value:unknown,field:string):void {if (typeof value!=='string'||!HASH.test(value)) invalid(field);}
+function list(value:unknown,field:string,max=200):unknown[] {if (!Array.isArray(value)||value.length>max) invalid(field);return value as unknown[];}
+function vec(value:unknown,length:number,field:string):void {if (!Array.isArray(value)||value.length!==length||!value.every(Number.isFinite)) invalid(field);}
+/** Structural v2 check on the Lab side; the source runtime stays the authoritative validator (JSON Schema). Rejects unknown members, so a bad migration cannot be stored. */
+export function validateProjectV2(value:unknown):LabProjectV2 {
+  const project=object(value,['schemaVersion','id','name','revision','updatedAt','entities','world'],'root');
+  if (project.schemaVersion!==2) invalid('schemaVersion');
+  id(project.id,'id');text(project.name,'name');revision(project.revision,'revision');
+  if (typeof project.updatedAt!=='string'||!Number.isFinite(Date.parse(project.updatedAt))) invalid('updatedAt');
+  const ids=new Set<string>();
+  for (const e of list(project.entities,'entities')) {
+    const entity=e&&typeof e==='object'&&!Array.isArray(e)&&'recipeRefs' in e ? object(e,['id','kind','assetRef','recipeRefs'],'entity') : object(e,['id','kind','assetRef'],'entity');
+    id(entity.id,'entity.id');if (ids.has(entity.id as string)||!['amr','arm','coffee_machine','cup_station'].includes(String(entity.kind))) invalid('entity');
+    ids.add(entity.id as string);
+    const ref=object(entity.assetRef,['id','revision','contentHash'],'entity.assetRef');id(ref.id,'assetRef.id');revision(ref.revision,'assetRef.revision');hash(ref.contentHash,'assetRef.contentHash');
+  }
+  const hasHandoff=!!value&&typeof value==='object'&&'handoffPoints' in ((value as {world?:object}).world??{});
+  const world=object(project.world,hasHandoff?['id','revision','width','height','points','handoffPoints','obstacles']:['id','revision','width','height','points','obstacles'],'world');
+  id(world.id,'world.id');revision(world.revision,'world.revision');number(world.width,'world.width',true);number(world.height,'world.height',true);
+  for (const field of ['width','height']) if (Number(world[field])>MAX_WORLD_SIZE) invalid(`world.${field}`);
+  const points=new Set<string>();
+  for (const p of list(world.points,'world.points')) {
+    const point=object(p,['id','name','kind','x','y'],'world.point');id(point.id,'point.id');text(point.name,'point.name');number(point.x,'point.x');number(point.y,'point.y');
+    if (!KINDS.includes(String(point.kind))||points.has(point.id as string)) invalid('point');
+    points.add(point.id as string);
+  }
+  if (hasHandoff) for (const h of list(world.handoffPoints,'world.handoffPoints')) {
+    const handoff=object(h,['id','name','kind','position','yawRad'],'world.handoff');id(handoff.id,'handoff.id');text(handoff.name,'handoff.name');vec(handoff.position,3,'handoff.position');
+    if (!KINDS.includes(String(handoff.kind))||(handoff.yawRad!==null&&!Number.isFinite(handoff.yawRad))) invalid('handoff');
+  }
+  for (const o of list(world.obstacles,'world.obstacles')) {
+    const obstacle=object(o,['id','x','y','width','height'],'world.obstacle');id(obstacle.id,'obstacle.id');number(obstacle.x,'obstacle.x');number(obstacle.y,'obstacle.y');number(obstacle.width,'obstacle.width',true);number(obstacle.height,'obstacle.height',true);
+  }
+  if (new TextEncoder().encode(JSON.stringify(value)).length>MAX_PROJECT_BYTES) invalid('size');
+  return structuredClone(value) as LabProjectV2;
 }
