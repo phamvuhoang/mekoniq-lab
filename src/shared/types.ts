@@ -10,7 +10,8 @@ export interface DesignSummary {lines:BomLine[];totalMinor:string|null;missingId
 export type RunStatus='ready'|'running'|'awaiting_load'|'awaiting_handoff'|'completed'|'cancelled'|'needs_attention';
 export interface RunEvent {type:string;at:string;[key:string]:unknown;}
 export interface RunSnapshot {id:string;mode:'business_sim';status:RunStatus;stage:'idle'|'to_kitchen'|'load'|'to_table'|'handoff'|'to_parking'|'finished';revision:number;robotPosition:{x:number;y:number};target:{x:number;y:number}|null;served:string;loaded:boolean;events:RunEvent[];elapsedMs:number;sourceCommit:string;scenarioId:string;seed:number;[key:string]:unknown;}
-// Lab v2 wire shapes. Hand-mirrored from source/packages/contracts/generated/lab-v2.ts (the Lab consumes the source artifact, not its TS); the source test validates the Lab twin fixtures against the real schemas.
+// TODO(interim-copy): the v2 types below are hand-mirrored from source/packages/contracts/generated/lab-v2.ts (the Lab consumes the source artifact, not its TS); replace with the pinned artifact or a generated import.
+// Guarding: the v1 types above (LabProject, RobotDesign, WorldPoint, Obstacle, RestaurantWorld) are compared structurally with source LabProjectV1 by source tests/integration/lab-v2-model.test.ts. AssetRevision and LabProjectV2 are NOT text-guarded; only the source test that validates the Lab twin fixtures against the real schemas and hashes covers them, indirectly.
 export type PointKindV2=WorldPoint['kind']|'coffee_pickup';
 export interface AssetRevision {schemaVersion:2;id:string;revision:number;contentHash:string;hashAlgorithm:'sha256-canonical-json-v1';kind:'amr'|'arm'|'coffee_machine'|'fixture'|'cup'|'sensor'|'tool';
  visual:{contentHash:string;mediaType:string}|null;collision:{contentHash:string;mediaType:string}|null;
