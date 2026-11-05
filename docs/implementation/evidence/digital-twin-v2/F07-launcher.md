@@ -1,5 +1,7 @@
 # F07 — Mock launcher, install và runtime artifact: bằng chứng
 
+> **Bằng chứng lịch sử của pin `2be6d15`.** Các kết quả và mục chưa chạy bên dưới mô tả lần kiểm đầu tiên. Gói offline, runtime pin và kiểm chứng Plan 01 hiện tại nằm trong [mock-report](mock-report.md), [bản ghi release](plan01-offline-release.json) và [remediation](../../../reviews/2026-11-05-plan-01-remediation.md). Không dùng số đo khởi động ấm này làm bằng chứng cho cold boot hoặc máy mới.
+
 Ngày chạy: 2026-11-05 (UTC 02:10–02:30). Người chạy: agent (không phải người dùng thật).
 
 ## Host

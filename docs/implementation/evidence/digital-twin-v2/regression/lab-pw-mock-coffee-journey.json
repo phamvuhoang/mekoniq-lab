@@ -121,12 +121,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 3987,
+                  "duration": 13737,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:02:13.174Z",
+                  "startTime": "2026-11-05T10:24:04.185Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -136,7 +136,7 @@
           ],
           "id": "4c701c0e9ece12eaa3b2-b653d0b32b0ce0de69ef",
           "file": "coffee-journey.spec.ts",
-          "line": 6,
+          "line": 7,
           "column": 1
         }
       ]
@@ -144,8 +144,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-05T04:02:12.922Z",
-    "duration": 4843.597000000001,
+    "startTime": "2026-11-05T10:24:03.939Z",
+    "duration": 14678.729,
     "expected": 1,
     "skipped": 0,
     "unexpected": 0,

@@ -4,7 +4,6 @@
       "node",
       "<workspace>/lab/node_modules/@playwright/test/cli.js",
       "test",
-      "--",
       "ui.spec.ts"
     ],
     "configFile": "<workspace>/lab/playwright.config.ts",
@@ -19,7 +18,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 5
+      "actualWorkers": 1
     },
     "preserveOutput": "always",
     "projects": [
@@ -28,7 +27,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "",
         "name": "",
@@ -48,7 +47,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "name": "",
         "testDir": "<workspace>/lab/tests/e2e",
@@ -101,524 +100,6 @@
   },
   "suites": [
     {
-      "title": "coffee-journey.spec.ts",
-      "file": "coffee-journey.spec.ts",
-      "column": 0,
-      "line": 0,
-      "specs": [
-        {
-          "title": "missing cup: visible reason and entity, confirmed reconcile, corrected run completes",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 30000,
-              "annotations": [
-                {
-                  "type": "skip",
-                  "description": "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.",
-                  "location": {
-                    "file": "<workspace>/lab/tests/e2e/coffee-journey.spec.ts",
-                    "line": 7,
-                    "column": 8
-                  }
-                }
-              ],
-              "expectedStatus": "skipped",
-              "projectId": "",
-              "projectName": "",
-              "results": [
-                {
-                  "workerIndex": 0,
-                  "parallelIndex": 0,
-                  "status": "skipped",
-                  "duration": 1699,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-11-05T04:01:13.779Z",
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.",
-                      "location": {
-                        "file": "<workspace>/lab/tests/e2e/coffee-journey.spec.ts",
-                        "line": 7,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "4c701c0e9ece12eaa3b2-b653d0b32b0ce0de69ef",
-          "file": "coffee-journey.spec.ts",
-          "line": 6,
-          "column": 1
-        }
-      ]
-    },
-    {
-      "title": "service-journey.spec.ts",
-      "file": "service-journey.spec.ts",
-      "column": 0,
-      "line": 0,
-      "specs": [
-        {
-          "title": "paired source runtime drives arrival then human load and handoff",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 30000,
-              "annotations": [
-                {
-                  "type": "skip",
-                  "description": "Start pinned source runtime and supply its one-time token.",
-                  "location": {
-                    "file": "<workspace>/lab/tests/e2e/service-journey.spec.ts",
-                    "line": 7,
-                    "column": 8
-                  }
-                }
-              ],
-              "expectedStatus": "skipped",
-              "projectId": "",
-              "projectName": "",
-              "results": [
-                {
-                  "workerIndex": 1,
-                  "parallelIndex": 1,
-                  "status": "skipped",
-                  "duration": 1127,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-11-05T04:01:13.780Z",
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "Start pinned source runtime and supply its one-time token.",
-                      "location": {
-                        "file": "<workspace>/lab/tests/e2e/service-journey.spec.ts",
-                        "line": 7,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "7fc56955a59661d25617-f7f76226c267c2a845dc",
-          "file": "service-journey.spec.ts",
-          "line": 4,
-          "column": 1
-        }
-      ]
-    },
-    {
-      "title": "twin-recovery.spec.ts",
-      "file": "twin-recovery.spec.ts",
-      "column": 0,
-      "line": 0,
-      "specs": [
-        {
-          "title": "telemetry stream, stale/frozen states, reconnect, read-only replay, compare, export and a lost session",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 30000,
-              "annotations": [
-                {
-                  "type": "skip",
-                  "description": "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.",
-                  "location": {
-                    "file": "<workspace>/lab/tests/e2e/twin-recovery.spec.ts",
-                    "line": 17,
-                    "column": 8
-                  }
-                }
-              ],
-              "expectedStatus": "skipped",
-              "projectId": "",
-              "projectName": "",
-              "results": [
-                {
-                  "workerIndex": 2,
-                  "parallelIndex": 2,
-                  "status": "skipped",
-                  "duration": 3,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-11-05T04:01:13.777Z",
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.",
-                      "location": {
-                        "file": "<workspace>/lab/tests/e2e/twin-recovery.spec.ts",
-                        "line": 17,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "attachments": []
-                }
-              ],
-              "status": "skipped"
-            }
-          ],
-          "id": "86a52955080195856443-00730b3879bd270c2dc3",
-          "file": "twin-recovery.spec.ts",
-          "line": 16,
-          "column": 1
-        }
-      ]
-    },
-    {
-      "title": "twin-workspace.spec.ts",
-      "file": "twin-workspace.spec.ts",
-      "column": 0,
-      "line": 0,
-      "specs": [
-        {
-          "title": "WebGL disabled and reduced motion fall back to a 2D twin with the same controls",
-          "ok": true,
-          "tags": [],
-          "tests": [
-            {
-              "timeout": 30000,
-              "annotations": [],
-              "expectedStatus": "passed",
-              "projectId": "",
-              "projectName": "",
-              "results": [
-                {
-                  "workerIndex": 3,
-                  "parallelIndex": 3,
-                  "status": "passed",
-                  "duration": 2100,
-                  "errors": [],
-                  "stdout": [],
-                  "stderr": [],
-                  "retry": 0,
-                  "startTime": "2026-11-05T04:01:13.780Z",
-                  "annotations": [],
-                  "attachments": []
-                }
-              ],
-              "status": "expected"
-            }
-          ],
-          "id": "d1b86ea3867c6276c950-5011b9435fc2857cfc22",
-          "file": "twin-workspace.spec.ts",
-          "line": 8,
-          "column": 1
-        }
-      ],
-      "suites": [
-        {
-          "title": "paired source runtime",
-          "file": "twin-workspace.spec.ts",
-          "line": 32,
-          "column": 15,
-          "specs": [
-            {
-              "title": "coffee preset runs on the mock backend with a locked, visible identity",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 120000,
-                  "annotations": [
-                    {
-                      "type": "serial",
-                      "location": {
-                        "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                        "line": 32,
-                        "column": 15
-                      }
-                    },
-                    {
-                      "type": "skip",
-                      "description": "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.",
-                      "location": {
-                        "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                        "line": 33,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "",
-                  "projectName": "",
-                  "results": [
-                    {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 0,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-05T04:01:22.301Z",
-                      "annotations": [
-                        {
-                          "type": "serial",
-                          "location": {
-                            "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                            "line": 32,
-                            "column": 15
-                          }
-                        },
-                        {
-                          "type": "skip",
-                          "description": "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.",
-                          "location": {
-                            "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                            "line": 33,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "d1b86ea3867c6276c950-742ff68ee145ccd20704",
-              "file": "twin-workspace.spec.ts",
-              "line": 39,
-              "column": 3
-            },
-            {
-              "title": "layers, legend and one shared selection survive a 3D to 2D switch",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 120000,
-                  "annotations": [
-                    {
-                      "type": "serial",
-                      "location": {
-                        "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                        "line": 32,
-                        "column": 15
-                      }
-                    },
-                    {
-                      "type": "skip",
-                      "description": "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.",
-                      "location": {
-                        "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                        "line": 33,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "",
-                  "projectName": "",
-                  "results": [
-                    {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 0,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-05T04:01:22.302Z",
-                      "annotations": [
-                        {
-                          "type": "serial",
-                          "location": {
-                            "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                            "line": 32,
-                            "column": 15
-                          }
-                        },
-                        {
-                          "type": "skip",
-                          "description": "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.",
-                          "location": {
-                            "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                            "line": 33,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "d1b86ea3867c6276c950-0f4615246d4ee0934c2e",
-              "file": "twin-workspace.spec.ts",
-              "line": 58,
-              "column": 3
-            },
-            {
-              "title": "engineering panel shows units, observed versus commanded and data age",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 120000,
-                  "annotations": [
-                    {
-                      "type": "serial",
-                      "location": {
-                        "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                        "line": 32,
-                        "column": 15
-                      }
-                    },
-                    {
-                      "type": "skip",
-                      "description": "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.",
-                      "location": {
-                        "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                        "line": 33,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "",
-                  "projectName": "",
-                  "results": [
-                    {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 0,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-05T04:01:22.302Z",
-                      "annotations": [
-                        {
-                          "type": "serial",
-                          "location": {
-                            "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                            "line": 32,
-                            "column": 15
-                          }
-                        },
-                        {
-                          "type": "skip",
-                          "description": "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.",
-                          "location": {
-                            "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                            "line": 33,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "d1b86ea3867c6276c950-e87d26f9fae862c305f4",
-              "file": "twin-workspace.spec.ts",
-              "line": 85,
-              "column": 3
-            },
-            {
-              "title": "mobile layout is operable with the keyboard only",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 120000,
-                  "annotations": [
-                    {
-                      "type": "serial",
-                      "location": {
-                        "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                        "line": 32,
-                        "column": 15
-                      }
-                    },
-                    {
-                      "type": "skip",
-                      "description": "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.",
-                      "location": {
-                        "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                        "line": 33,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "",
-                  "projectName": "",
-                  "results": [
-                    {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 0,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-11-05T04:01:22.302Z",
-                      "annotations": [
-                        {
-                          "type": "serial",
-                          "location": {
-                            "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                            "line": 32,
-                            "column": 15
-                          }
-                        },
-                        {
-                          "type": "skip",
-                          "description": "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.",
-                          "location": {
-                            "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                            "line": 33,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "d1b86ea3867c6276c950-fb7ce15c8e8890b6449f",
-              "file": "twin-workspace.spec.ts",
-              "line": 113,
-              "column": 3
-            }
-          ]
-        }
-      ]
-    },
-    {
       "title": "ui.spec.ts",
       "file": "ui.spec.ts",
       "column": 0,
@@ -637,15 +118,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 4,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2061,
+                  "duration": 1365,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:01:13.778Z",
+                  "startTime": "2026-11-05T10:22:52.246Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -671,15 +152,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 4,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1320,
+                  "duration": 1248,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:01:22.256Z",
+                  "startTime": "2026-11-05T10:22:55.734Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -705,15 +186,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 4,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 486,
+                  "duration": 509,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:01:23.586Z",
+                  "startTime": "2026-11-05T10:22:56.988Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -739,15 +220,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 4,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 893,
+                  "duration": 912,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:01:24.106Z",
+                  "startTime": "2026-11-05T10:22:57.506Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -773,15 +254,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 4,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 827,
+                  "duration": 826,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:01:25.007Z",
+                  "startTime": "2026-11-05T10:22:58.425Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -807,15 +288,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 4,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 983,
+                  "duration": 1119,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:01:25.841Z",
+                  "startTime": "2026-11-05T10:22:59.256Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -841,15 +322,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 4,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 891,
+                  "duration": 690,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:01:26.831Z",
+                  "startTime": "2026-11-05T10:23:00.386Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -875,15 +356,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 4,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 697,
+                  "duration": 763,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:01:27.729Z",
+                  "startTime": "2026-11-05T10:23:01.084Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -909,15 +390,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 4,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1072,
+                  "duration": 822,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:01:28.433Z",
+                  "startTime": "2026-11-05T10:23:01.853Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -943,15 +424,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 4,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1148,
+                  "duration": 989,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:01:29.517Z",
+                  "startTime": "2026-11-05T10:23:02.692Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -977,15 +458,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 4,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 838,
+                  "duration": 947,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:01:30.677Z",
+                  "startTime": "2026-11-05T10:23:03.688Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1011,15 +492,15 @@
               "projectName": "",
               "results": [
                 {
-                  "workerIndex": 4,
-                  "parallelIndex": 4,
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 797,
+                  "duration": 924,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:01:31.523Z",
+                  "startTime": "2026-11-05T10:23:04.644Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -1037,10 +518,10 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-05T04:01:12.966Z",
-    "duration": 19611.127,
-    "expected": 13,
-    "skipped": 7,
+    "startTime": "2026-11-05T10:22:51.591Z",
+    "duration": 14258.004,
+    "expected": 12,
+    "skipped": 0,
     "unexpected": 0,
     "flaky": 0
   }

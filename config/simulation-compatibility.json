@@ -1,9 +1,9 @@
 {
  "schemaVersion": 1,
- "purpose": "Frozen R-MOCK interfaces for plan 02 (simulation) and plan 03 (arm/hardware). A simulation/hardware provider must match these hashes or bump the provider interface version with a migration note. Freezing is not acceptance: R-MOCK is partially implemented and tested, not accepted (see gates and gMockBlockers).",
- "frozenAt": "2026-11-05",
+ "purpose": "Plan 01 software completion, tested on the recorded mock host; owner acceptance and external gates remain open. Provider interface revision 2 binds the updated cell observation, project and recipe contracts; a simulation/hardware provider must verify these hashes and supply its own evidence.",
+ "frozenAt": "2026-11-05T10:29:34.376Z",
  "gates": {
-  "R-MOCK": "partially_implemented_tested_not_accepted",
+  "R-MOCK": "software_complete_tested_not_accepted",
   "R-SIM": "blocked_external",
   "G-SIM-NAV": "blocked_external",
   "G-SIM-ARM": "blocked_external",
@@ -13,26 +13,26 @@
  "codeRevisions": {
   "source": {
    "branch": "feat/lab-digital-twin-v2",
-   "artifactCommit": "d473d87af4fa8481e2770976b3385aceff294b52",
-   "finalHead": "e15281409065a19669532dc1c659529d65b3959f",
+   "artifactCommit": "c1d1ea70e42937d421070674f07d00edc7c41245",
+   "finalHead": "c1d1ea70e42937d421070674f07d00edc7c41245",
    "dirty": false,
-   "pinNote": "commits after the pin are test-only; git diff d473d87..e152814 -- packages/ is empty (verified)",
+   "pinNote": "Artifact and regression use this exact committed source HEAD.",
    "packagesDiffAfterPin": "empty"
   },
   "lab": {
    "branch": "feat/robot-lab",
-   "baseCommit": "0c91b1e42fc1476bbc5de9956cd98105b1ca0703",
-   "note": "baseCommit is the lab HEAD this file was generated on; the commit that adds this file is its child"
+   "baseCommit": "aa70d65fdb72f16b64ee7002fbb05c15ee1e690f",
+   "note": "Regression code baseline; later evidence/documentation commits are allowed only by the explicit Lab code identity guard."
   },
   "artifact": {
-   "sha256": "115cf27168b0ab32579a96ee728c4bcdf52c99ac94d8355e6d0b7855c19aad57",
    "entrypoint": "runtime.mjs",
-   "schemaHash": "3b632d1ec0ef38dedef0a1e96b80109ebdda185cd713b47309924a48d3a3ed4e",
+   "schemaHash": "09a5a11b4b689628314ea1646eb6b683ffbb07f6dd6173a52935ddfa13579f48",
    "protocolMajors": [
     1,
     2
    ],
-   "nodeMajor": 24
+   "nodeMajor": 24,
+   "sha256": "21986126e1949d5f25d5af66952e664fa0c08cc3393de45287c8c64379f223f0"
   },
   "toolchain": {
    "node": "v24.22.2",
@@ -46,10 +46,10 @@
    "asset-revision.schema.json": "ff741ad719244d9f16cd971b9fc8dc4e9a9462270e130cfd6f89f679c741721d",
    "cell-command.schema.json": "45d327b86a8b7afd2cf482caf7a6cd552f8958fd597d9355866a17b6def8a7be",
    "cell-observation.schema.json": "cce31a49800cf9188ef0c478b7e172fde649e1c654b910201016d279e750c481",
-   "coffee-recipe.schema.json": "4ed8a8592c33bd85ae660e3e7a6bdb1e445cdfd47739e50ae3260fc12ba86de8",
-   "lab-action-v2.schema.json": "fe0cbc9429ab5f4f2bf73faefb6d4e23731715c82dda4f7a218252dcee1757e7",
+   "coffee-recipe.schema.json": "e9ff88cb242ea4dad6beeea5e75f33601b40a411590a88ce8a72c17f07a53873",
+   "lab-action-v2.schema.json": "f5b46205cca373193f27efc4433323333d6308857884be719dcbd12bb818cf1a",
    "lab-evidence-v2.schema.json": "b9ebf24647539f91a6b9d112210282f46f5d568a739be77603b9ff19ef1c77e3",
-   "lab-project-v2.schema.json": "823828e094b55652ab9691520bd9bcbd2f2eac6445d9337b581b72f99d3ecbb1",
+   "lab-project-v2.schema.json": "205ca36a12b6514218a263c10481ec9d2115c874b03c9bbd4dc61675e8aa9cd7",
    "lab-run-v2.schema.json": "eba3cff43425db498fde279deef316e74c9be459ba872d59ad52a934c654c800",
    "twin-sample-v2.schema.json": "84b86d2f33099860c82ece0da34a061f0eb669d96e78712165d12573eb53f525",
    "robot-command.schema.json": "9a39142ea1cbc4087dc04fc4af2204e6431e826d33d82321375b0206d985bc06",
@@ -60,9 +60,9 @@
   "note": "sha256 of file bytes under lab/fixtures (twins, recipes, catalog, worlds); all synthetic/illustrative",
   "files": {
    "fixtures/catalog/service-illustrative.json": "ae2c26a11647c2dce5e6615e561bfc1f29df9a4830a1f018aaf2f9297f70750a",
-   "fixtures/recipes/espresso.json": "bde84bccbd3d408c2296b731fd0d5e1cf8f3f8f2f51fdfd5ffafc67616c9016a",
-   "fixtures/recipes/iced-milk-coffee.json": "98419958d657d547826047e4886c53324d70b0970f32a56931d580d309dd30ce",
-   "fixtures/twins/coffee-cell-v2.json": "b30320715000f55d64c478efc4639623e6330af189f6fbe64d6d1464fef07f97",
+   "fixtures/recipes/espresso.json": "b45007dce32524b89882546e209883e9676a28ffac2e5b01d9913a7d96094879",
+   "fixtures/recipes/iced-milk-coffee.json": "a846d38fc3d0eace2832419e433fba29e482ebc9625a1d1e0d4bda31cacf8695",
+   "fixtures/twins/coffee-cell-v2.json": "63ff2f515a8f6b24d6d965c55e08ff4fc1a64c07cb4ceedf2b8b0cbc745b58e3",
    "fixtures/twins/negative-v2.json": "f80a1f71e1c54e8d8976f7c6e7f097b9bba86c011f0cac85b63e43f6eb82afdb",
    "fixtures/twins/restaurant-v2.json": "900ffaeec5fa0e669e180edb53f7a537c4a5897dcfd565fec6aefaf4b877b6ff",
    "fixtures/twins/v1-legacy.json": "aa8e23d559dbfa5a2389b7541e118bd893ea341a88e70f95e426ff45c264afb9",
@@ -70,15 +70,15 @@
   }
  },
  "providerInterface": {
-  "version": "lab-v2-provider/1",
-  "note": "Version label introduced by this freeze and bound to the contract file hashes below; any change to these files is a new provider interface version.",
+  "version": "lab-v2-provider/2",
+  "note": "Revision 2 adds versioned milk/quantity observation metadata, recipe policies and declared arm collision scene inputs. Retain legacy fields; native providers must explicitly report provenance/readiness and commission measured geometry. See docs/simulation-compatibility.md.",
   "robotAdapterContract": {
    "file": "source/packages/robot-adapters/src/contract.ts",
    "sha256": "71bf5f40c4dc3dd6d0d2c42e2cfe49ff304462e13c3816779b4c2b4b3e93b52f"
   },
   "cellAdapterContract": {
    "file": "source/packages/cell-adapters/src/contract.ts",
-   "sha256": "0e418ee3ca8dfbbee02f83e8fb2186cc51d6e016249bc906da15bf82f82d6d50"
+   "sha256": "130b0dfcc4cc8c9b3ec1884c9ee2686676d4e8db554b3ca07a4eb1ee7d7ab001"
   },
   "capabilityCatalog": {
    "file": "source/packages/lab-runtime/src/v2/capabilities.ts",
@@ -149,7 +149,7 @@
    },
    {
     "id": "mock_arm",
-    "version": "1",
+    "version": "2",
     "model": "mock_kinematic",
     "dynamics": false
    }
@@ -232,72 +232,65 @@
    "id": "BV01",
    "revision": 1,
    "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+  },
+  {
+   "id": "FD02-cups",
+   "revision": 1,
+   "hash": "4901f45a2e00d3b12f0b8ace7acf958ea516152a3ba17431e0730e53570532cb"
+  },
+  {
+   "id": "CAMPAIGN-FD02-FD07-BV01-BV03",
+   "revision": 1,
+   "hash": "9d279e9af90f19890f72e908d6ea1ee15e6d5df1d49852e5ae79f21c0b26891f"
   }
  ],
  "recipes": [
   {
    "id": "espresso",
-   "revision": 1,
-   "hash": "2fdaac68e5c91164a466ced01560600da2c8bd6a6a44071d9bba1297ff92aa82"
+   "revision": 2,
+   "hash": "79967849905e6a95f2b5f0cc19e1f449c6a40e5df7a2645b29e4fae3a2c5af96"
   },
   {
    "id": "iced-milk-coffee",
-   "revision": 1,
-   "hash": "ce3445ef75dc12e099ea505cc3b50a701ce41c9cda14bba4c6449f6a7856b905"
+   "revision": 2,
+   "hash": "455651aa0850a7547f14afce86da3ea9c6c926b2a5ff9466ed31aac18d71df72"
   }
  ],
  "evidence": {
   "report": "docs/implementation/evidence/digital-twin-v2/mock-report.md",
   "results": {
    "file": "docs/implementation/evidence/digital-twin-v2/F08-mock-acceptance.json",
-   "sha256": "bfb90ad17efcff0fcba183741fb29a360c06a952edce82228c5721fb6ccd4e1f"
+   "sha256": "1683c53841bc4aab6145f175cf1527924541ff068a39a5ba0eec53395578dd20"
   },
   "regression": {
    "file": "docs/implementation/evidence/digital-twin-v2/regression/manifest.json",
-   "sha256": "c96383c5982734e9e7bfb0560f9534279a7d5b083c1be99536b3971a1cecbc14",
+   "sha256": "a28613610a1c80864fdf4db3e4336af48ab11ef5c5d37c61c0d8d10c1bc3e788",
    "recorder": "scripts/record-regression.mjs --ci"
+  },
+  "offlineRelease": {
+   "file": "docs/implementation/evidence/digital-twin-v2/plan01-offline-release.json",
+   "sha256": "214be8151f6dd34910db6fe77841f6714d865a4219bddfb8d2e82c43506a7a7f"
   }
  },
  "handoff": [
-  "Plans 02/03 bind to the source domain/adapter contracts above; mock results are not physical evidence.",
-  "Do not use the old simulator 1000 ms completion timing or mock_kinematic durations as a physical cycle-time baseline.",
-  "ARM03 has no collision checker yet: G-SIM-ARM and R-SIM require one."
+  "Plans 02/03 bind to the provider/2 hashes above; mock evidence cannot establish physical safety or hardware acceptance.",
+  "Mock durations and S01 completion timing are not physical cycle-time baselines.",
+  "ARM03 uses conservative illustrative capsule sweeps with a declared map profile and current/static AMR proxies; native collision planning, calibration, dynamics, physical grip and stopping require separate evidence."
  ],
  "gMockBlockers": {
-  "note": "Mock-capable rows still NOT_IMPLEMENTED (G-MOCK blockers unless the owner waives them) and NEEDS_HUMAN items; see mock-report.md section 8.",
-  "notImplemented": [
-   "QA-02b",
-   "QA-09b",
-   "FD02-cups",
-   "BV02-capacity",
-   "BV04-outlier",
-   "BV06-capacity",
-   "BV07-timeout",
-   "BV08-milk-policy",
-   "CAMPAIGN-FD02+FD07+BV01+BV03",
-   "ARM05",
-   "SYS01-render",
-   "SYS02-reclaim",
-   "SYS03-reorder",
-   "UX-05-reset-speed",
-   "UX-18-speed",
-   "R-MOCK-offline-bundle",
-   "UI-perf-p95"
-  ],
-  "requiredByGMockOnlyWithChecker": [
-   "ARM03"
-  ],
+  "note": "All 18 former software gaps have executed evidence. Acceptance still requires owner review and the human/Linux gates below; unsupported physical fidelity remains explicit.",
+  "notImplemented": [],
+  "requiredByGMockOnlyWithChecker": [],
   "needsHuman": [
    "UX-01-time",
    "R-MOCK-fresh-macos",
    "R-MOCK-network-off",
-   "R-MOCK-cold-boot"
+   "R-MOCK-cold-boot",
+   "UI-perf-physical-tablet"
   ],
   "blockedExternal": [
    "R-MOCK-linux"
   ],
-  "openFindings": [
-   "source CI-equivalent gate: tests/integration/upgrade-recovery.test.ts \"backup verification finds corruption…\" failed in 2 of 4 full-suite runs on HEAD (passed 2/2 on base e3b616a; test and backup scripts unchanged since base); cause not proven (mock-report §5)"
-  ]
+  "openFindings": []
  }
 }

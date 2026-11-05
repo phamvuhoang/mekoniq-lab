@@ -1,12 +1,11 @@
 {
  "schema": "lab-v2-mock-acceptance/1",
- "generatedAt": "2026-11-05T04:16:57.270Z",
+ "generatedAt": "2026-11-05T10:29:34.376Z",
  "note": "Synthetic mock data only. pass = assertions executed: self rows in this run (records = run traces), source/lab rows = PASSED entries in the stored regression results (regression/manifest.json with sha256).",
  "counts": {
-  "pass": 78,
-  "not_run:NOT_IMPLEMENTED": 18,
+  "pass": 96,
   "not_run:UNSUPPORTED_FIDELITY": 4,
-  "not_run:NEEDS_HUMAN": 4,
+  "not_run:NEEDS_HUMAN": 5,
   "not_run:BLOCKED_EXTERNAL": 1
  },
  "rows": [
@@ -48,25 +47,27 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "2fbf00d6e6d6c8a22d31f4fcb467ee2d0a86d7f55183e97c2798acd9dbf0c2c3"
+     "digest": "62ac6f11d4034cf71a383bcf138d918dce8a19e29b975667daf36c0012ba6cd5"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
   {
    "id": "QA-02b",
    "level": "runner",
-   "expected": "run manifest holds design, recipe, adapter and config hashes plus calibration/profile revisions",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "RunReport.manifest has no design/recipe/adapter/config hash (recipe revision+hash sit on each coffee job, not in the manifest); the mock has no calibration/profile revision",
+   "expected": "run manifest holds design, recipe, adapter and config hashes plus explicit calibration/profile provenance",
+   "tests": [
+    "source:tests/integration/lab-v2-software-gaps.test.ts::coffee manifest locks every design, recipe, model, adapter and illustrative profile without implying calibration"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "QA-03",
@@ -92,7 +93,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "b3f4cb446324bcec5aa9f608fab02e34b09b95bdad97ef07988f38d1c23d6890"
+     "digest": "3a103aec97c13961f904695679181080b6c835685998543c7bc4864569ed6a0b"
     },
     "FD02-seed-1000": {
      "scenario": {
@@ -108,7 +109,7 @@
       "status": "completed",
       "served": "3"
      },
-     "digest": "adbc6d529e1a61afb22087c1fbe6fb38187c967fb5584907abffdfdbd7ba620c"
+     "digest": "a324d04ebeb8548b4c768e285518dba7361ed9f8cf2a5c7b704eb0dcd53de0c1"
     },
     "FD07@77": {
      "scenario": {
@@ -124,7 +125,7 @@
       "status": "completed",
       "served": "2"
      },
-     "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419"
+     "digest": "e9cd08ecc7348fd33835213bfe313cf3861af6a325c02e8d759d7858e05ef717"
     },
     "BV01@77": {
      "scenario": {
@@ -136,13 +137,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c"
+     "digest": "9aa5edd998a2cf2ef276139f03d9634154f90ba3202b074be516e9d742b6c377"
     },
     "FD03@77": {
      "scenario": {
@@ -158,7 +159,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0"
+     "digest": "cbf31878df01497d3e9b8aaac3c99b0ac32f27cf8e8262cd96d73a93f063cf9e"
     },
     "FD04-reopen@77": {
      "scenario": {
@@ -174,7 +175,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13"
+     "digest": "c56474ca5921dd496893c41254ed415201dc17d3ec7119801048d317625bb382"
     }
    },
    "storedResults": [],
@@ -188,7 +189,7 @@
     "self:SYS01 runner: step granularity, pauses and interleaved reads never change the canonical outcome"
    ],
    "status": "pass",
-   "note": "browser render rate / tab visibility not varied in a test: see SYS01-render",
+   "note": "browser render-rate/visibility evidence is linked separately under SYS01-render",
    "records": {
     "SYS01": {
      "scenario": {
@@ -204,7 +205,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "2fbf00d6e6d6c8a22d31f4fcb467ee2d0a86d7f55183e97c2798acd9dbf0c2c3"
+     "digest": "62ac6f11d4034cf71a383bcf138d918dce8a19e29b975667daf36c0012ba6cd5"
     }
    },
    "storedResults": [],
@@ -239,7 +240,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "91c62de4c7be3cf89e84a957f94157a6297b8fc1037a5cc828aeb658dd5c2a24"
+     "digest": "4d68042fb993b243f288819ff89d56de47d6b9811759b6e05c49e7ad5ed349b6"
     },
     "BV05-ack-dup": {
      "scenario": {
@@ -251,13 +252,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "1f392d30f1674ac613d2dc2ffb144afae26c009740690b0790ba2e5e7c1cb8cb"
+     "digest": "baee2cfdd654f54d47a59d4934f83b16ddb217828bde5f836c1bcbd7ab0430eb"
     },
     "BV05-reboot": {
      "scenario": {
@@ -269,13 +270,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "7989c2a5d9589d7971625275c2426efeae3662bd0fa2ff57666274e9d1d5b976"
+     "digest": "7ff99d59cf06bcb04277064011e418d9ae697c1b4bd6c362601268b102130273"
     },
     "FD04-blocked": {
      "scenario": {
@@ -291,7 +292,7 @@
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "a4e075ed70718f5cd468481a4812b3186c34df7f0f93e57523e3ad80e3aceac0"
+     "digest": "8fd3eb483f9ccbde4759877816254bf7ed4a02f29611b4c00cdea1e5c72d7e85"
     },
     "BV02-nocup": {
      "scenario": {
@@ -303,13 +304,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "running",
       "served": "0"
      },
-     "digest": "da52adf615d7921e5d047d7c16b5c49927c1acb608007f8232d5e5e027f7d4de"
+     "digest": "fae40e7662a4b2b52dcd814323f155bb382a8c2e6ce0ce59bf18232bd2094b82"
     },
     "SYS06-created": {
      "scenario": {
@@ -321,17 +322,17 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "ready",
       "served": "0"
      },
-     "digest": "1e35220de1f73d5571ab11c7820dd41439ab4de31c6db05f6d7d7921c99e4d9a"
+     "digest": "dd1144093abb8b36b76de7a6ebda888bfde62370c5629dba0ab3cfd58aa00f0b"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -357,17 +358,17 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "10e86d30fbb5f0d2cc476b126d76c323b80d00e834b84e9f8198356c0664292c"
+     "digest": "4cd5a9626386659bbc8f4e9236552206dc10764fc373792e52e76bc192f061cd"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json",
+    "regression/source-integration.json",
     "regression/lab-vitest.json"
    ],
    "actual": "assertions passed"
@@ -393,13 +394,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "ready",
       "served": "0"
      },
-     "digest": "1e35220de1f73d5571ab11c7820dd41439ab4de31c6db05f6d7d7921c99e4d9a"
+     "digest": "dd1144093abb8b36b76de7a6ebda888bfde62370c5629dba0ab3cfd58aa00f0b"
     }
    },
    "storedResults": [
@@ -428,13 +429,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "d9266c5757e93573450c7ad5629864029ea07cdaee66dcf42012a82569a79d4b"
+     "digest": "d49504cb582ffb76f8ee6c13ffd1cf6d368d2f88d9c001d8c83f3e0f8faa8284"
     },
     "Timing-FD01@11": {
      "scenario": {
@@ -450,11 +451,11 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "40862969c6efe7683cad2de5a9359e39c7ff0fdad189bdc4429ef9c6264197e1"
+     "digest": "be7c1156c10d94f6625f88b04630aff6ed6d911b64ae302a91d73a885b28cecc"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -476,14 +477,16 @@
   {
    "id": "QA-09b",
    "level": "lab",
-   "expected": "editing model/world/recipe/profile marks v2 run evidence stale by scope",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "v2 runs lock their inputs (UX-16) but no scope-based staleness marking of stored v2 evidence exists yet",
+   "expected": "editing model/world/recipe/profile marks immutable stored evidence stale by scope",
+   "tests": [
+    "lab:tests/unit/report-evidence.test.ts::saved reports remain immutable while geometry/world/recipe/profile edits stale only the corresponding scope"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/lab-vitest.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "QA-10",
@@ -499,7 +502,7 @@
    "records": {},
    "storedResults": [
     "regression/lab-vitest.json",
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -516,6 +519,7 @@
    "records": {},
    "storedResults": [
     "regression/lab-pw-twin-twin-recovery.json",
+    "regression/lab-pw-twin-twin-workspace.json",
     "regression/lab-pw-ui.json"
    ],
    "actual": "assertions passed"
@@ -543,13 +547,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "ready",
       "served": "0"
      },
-     "digest": "1e35220de1f73d5571ab11c7820dd41439ab4de31c6db05f6d7d7921c99e4d9a"
+     "digest": "dd1144093abb8b36b76de7a6ebda888bfde62370c5629dba0ab3cfd58aa00f0b"
     },
     "QA-06": {
      "scenario": {
@@ -561,17 +565,17 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "10e86d30fbb5f0d2cc476b126d76c323b80d00e834b84e9f8198356c0664292c"
+     "digest": "4cd5a9626386659bbc8f4e9236552206dc10764fc373792e52e76bc192f061cd"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json",
+    "regression/source-integration.json",
     "regression/lab-vitest.json"
    ],
    "actual": "assertions passed"
@@ -600,7 +604,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "c2f0d6d7cf4ff22c25d75bc734ae1d085dd971e6cb2d812c54270e74483e8305"
+     "digest": "3b07973805457d5fafe6eefcfea683f0d9a189ab6bf5d5fa6ec012a29cb9f628"
     },
     "FD01-seed-1000": {
      "scenario": {
@@ -616,7 +620,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "b3f4cb446324bcec5aa9f608fab02e34b09b95bdad97ef07988f38d1c23d6890"
+     "digest": "3a103aec97c13961f904695679181080b6c835685998543c7bc4864569ed6a0b"
     },
     "FD02-seed-1000": {
      "scenario": {
@@ -632,7 +636,7 @@
       "status": "completed",
       "served": "3"
      },
-     "digest": "adbc6d529e1a61afb22087c1fbe6fb38187c967fb5584907abffdfdbd7ba620c"
+     "digest": "a324d04ebeb8548b4c768e285518dba7361ed9f8cf2a5c7b704eb0dcd53de0c1"
     }
    },
    "storedResults": [],
@@ -662,7 +666,7 @@
       "status": "completed",
       "served": "3"
      },
-     "digest": "15b30c2e0e9517b667bdca4c303f96849ddd8b61240963ac3f339447e7dc48c5"
+     "digest": "cbc4180c4d59cb8113558a38d8175e40d67285d3c43dc1515e1f7a5bb756d154"
     },
     "FD01-seed-1000": {
      "scenario": {
@@ -678,7 +682,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "b3f4cb446324bcec5aa9f608fab02e34b09b95bdad97ef07988f38d1c23d6890"
+     "digest": "3a103aec97c13961f904695679181080b6c835685998543c7bc4864569ed6a0b"
     },
     "FD02-seed-1000": {
      "scenario": {
@@ -694,7 +698,7 @@
       "status": "completed",
       "served": "3"
      },
-     "digest": "adbc6d529e1a61afb22087c1fbe6fb38187c967fb5584907abffdfdbd7ba620c"
+     "digest": "a324d04ebeb8548b4c768e285518dba7361ed9f8cf2a5c7b704eb0dcd53de0c1"
     }
    },
    "storedResults": [],
@@ -703,14 +707,16 @@
   {
    "id": "FD02-cups",
    "level": "runner",
-   "expected": "food and coffee cups with their own ids mixed on one tray/mission",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "coffee missions carry one cup each; a mixed food+coffee batch is not modelled by the runner (cup ids stay separate per BV01)",
+   "expected": "food and identified coffee share a mission without mixing allocation custody",
+   "tests": [
+    "source:tests/integration/lab-v2-mixed.test.ts::FD02-cups carries food and its identified coffee cup on one mission, then serves each allocation once"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "FD03",
@@ -737,7 +743,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "9fc35b2da278492c6bde66619a46aafca7e3d230164defe4c7a48dc548159f7d"
+     "digest": "4b2e12cca4207c9cc16df6802d91f1ceaedeccd498df502be3f3ca5ae155655f"
     },
     "FD07@77": {
      "scenario": {
@@ -753,7 +759,7 @@
       "status": "completed",
       "served": "2"
      },
-     "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419"
+     "digest": "e9cd08ecc7348fd33835213bfe313cf3861af6a325c02e8d759d7858e05ef717"
     },
     "BV01@77": {
      "scenario": {
@@ -765,13 +771,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c"
+     "digest": "9aa5edd998a2cf2ef276139f03d9634154f90ba3202b074be516e9d742b6c377"
     },
     "FD03@77": {
      "scenario": {
@@ -787,7 +793,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0"
+     "digest": "cbf31878df01497d3e9b8aaac3c99b0ac32f27cf8e8262cd96d73a93f063cf9e"
     },
     "FD04-reopen@77": {
      "scenario": {
@@ -803,7 +809,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13"
+     "digest": "c56474ca5921dd496893c41254ed415201dc17d3ec7119801048d317625bb382"
     }
    },
    "storedResults": [],
@@ -844,7 +850,7 @@
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "8f676a51da3e40720fc32d8bacdd363b237243269bb0c9c75c0118377deb6eaa"
+     "digest": "58ff526e328ffd62f1731b6cd6214521ba5a390a1b149fa92621a260a1881371"
     }
    },
    "storedResults": [],
@@ -873,7 +879,7 @@
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "a4e075ed70718f5cd468481a4812b3186c34df7f0f93e57523e3ad80e3aceac0"
+     "digest": "8fd3eb483f9ccbde4759877816254bf7ed4a02f29611b4c00cdea1e5c72d7e85"
     }
    },
    "storedResults": [],
@@ -903,7 +909,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "484cd0e5ef638eebf88ea9ebeb72ca071e9cbc7556537431e2f053a25576ffde"
+     "digest": "5d889918db48b013c7459f88a12534387644696d65961f6c79fe823bceed529a"
     },
     "FD07@77": {
      "scenario": {
@@ -919,7 +925,7 @@
       "status": "completed",
       "served": "2"
      },
-     "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419"
+     "digest": "e9cd08ecc7348fd33835213bfe313cf3861af6a325c02e8d759d7858e05ef717"
     },
     "BV01@77": {
      "scenario": {
@@ -931,13 +937,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c"
+     "digest": "9aa5edd998a2cf2ef276139f03d9634154f90ba3202b074be516e9d742b6c377"
     },
     "FD03@77": {
      "scenario": {
@@ -953,7 +959,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0"
+     "digest": "cbf31878df01497d3e9b8aaac3c99b0ac32f27cf8e8262cd96d73a93f063cf9e"
     },
     "FD04-reopen@77": {
      "scenario": {
@@ -969,7 +975,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13"
+     "digest": "c56474ca5921dd496893c41254ed415201dc17d3ec7119801048d317625bb382"
     }
    },
    "storedResults": [],
@@ -998,7 +1004,7 @@
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "4d0832a4c1c070d3e0551af35c5e2a3488cc23ddcc46f9fb97a19fcc388f5acb"
+     "digest": "b9f5c09187471c743735e79da6f720986a873c14bb1f697cac8614818d311b3a"
     }
    },
    "storedResults": [],
@@ -1027,7 +1033,7 @@
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "30345ed1ad7744aea08e68338379d2bdc392ebfa9502430afe31ae05a7a27e37"
+     "digest": "be79e1f6f14041643f77500353e78ef6b9ce43a3ddebf714082e28f98f98cb43"
     }
    },
    "storedResults": [],
@@ -1056,7 +1062,7 @@
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "0a4e643b8466eaad73d58ddd2bfcedfa2c903c8431cdb859a1bd823336726775"
+     "digest": "962dfe3598a166854ce4b38acafd178939fa434e48fc7ee33081421039055a4b"
     }
    },
    "storedResults": [],
@@ -1085,7 +1091,7 @@
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "2e4ebcd13dea625d9cbe81bf325b9d0dd2caad290bb43f128d42919729a4368d"
+     "digest": "9936d3b7b04077553444f0ff464ef2e19474f9eea986e08d260fa37934d565fd"
     }
    },
    "storedResults": [],
@@ -1114,7 +1120,7 @@
       "status": "cancelled",
       "served": "0"
      },
-     "digest": "66c92353299a4bce5ec97f7edd82dca9091703a55a91d36d17c61310a445b44b"
+     "digest": "750abbb8003dba14db085645528d8dc6a80827a72538346b3744604b1e8cad21"
     }
    },
    "storedResults": [],
@@ -1131,7 +1137,7 @@
    "note": "domain level only: the Lab action schema has no retarget action, so no runner check",
    "records": {},
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -1160,7 +1166,7 @@
       "status": "completed",
       "served": "2"
      },
-     "digest": "0de1d09947109ad3cd0bc709b295c84af83843551f819884b6eb98e980b437db"
+     "digest": "9d7d4f6d1cada5b7966d363dce164758095a0cebf599d354bcd3f7a4145313d7"
     },
     "FD07@77": {
      "scenario": {
@@ -1176,7 +1182,7 @@
       "status": "completed",
       "served": "2"
      },
-     "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419"
+     "digest": "e9cd08ecc7348fd33835213bfe313cf3861af6a325c02e8d759d7858e05ef717"
     },
     "BV01@77": {
      "scenario": {
@@ -1188,13 +1194,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c"
+     "digest": "9aa5edd998a2cf2ef276139f03d9634154f90ba3202b074be516e9d742b6c377"
     },
     "FD03@77": {
      "scenario": {
@@ -1210,7 +1216,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0"
+     "digest": "cbf31878df01497d3e9b8aaac3c99b0ac32f27cf8e8262cd96d73a93f063cf9e"
     },
     "FD04-reopen@77": {
      "scenario": {
@@ -1226,7 +1232,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13"
+     "digest": "c56474ca5921dd496893c41254ed415201dc17d3ec7119801048d317625bb382"
     }
    },
    "storedResults": [],
@@ -1243,7 +1249,7 @@
    "note": "domain level only: the mock runner never produces an unknown zone reservation",
    "records": {},
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -1270,7 +1276,7 @@
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "167d59b130e31ae58463b7ad34012bc037dc7a26e624c240b401df5dd4dc852e"
+     "digest": "85a9534fc77d0501ced663235f8920fa6b0ddbf93d908b913ca88622a4787930"
     }
    },
    "storedResults": [],
@@ -1281,7 +1287,7 @@
    "level": "runner",
    "expected": "map revision change: next leg refused, pose stale, nothing served",
    "tests": [
-    "self:FD08 runner: map revision changes at a stop: the next leg is refused (MAP_MISMATCH) by the adapter, pose stale, nothing served"
+    "self:FD08 runner: map revision changes at a stop: MAP_CHANGED latches stale pose and blocks the next leg, nothing served"
    ],
    "status": "pass",
    "records": {
@@ -1299,7 +1305,7 @@
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "9d09f8261aa0ed3238e18291c32065abdc6fe0dde0904bbe0302dc3b822b1e2f"
+     "digest": "b772a2fb44af2acdd5d10e302b68e0c492b8e6ff9134a3f3e4ba8cbb8198b411"
     }
    },
    "storedResults": [],
@@ -1316,7 +1322,7 @@
    "note": "domain level: the Lab runner has no map-report/rebind action",
    "records": {},
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -1341,13 +1347,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "9b59e2998aff536574f72b13eb87d58026032a6ffe015e1094e21f4933ae93d5"
+     "digest": "9cfda98a693941cde4e0ecbfe028d48471877c6f8440295fc26e7e5061a1a2a2"
     },
     "FD07@77": {
      "scenario": {
@@ -1363,7 +1369,7 @@
       "status": "completed",
       "served": "2"
      },
-     "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419"
+     "digest": "e9cd08ecc7348fd33835213bfe313cf3861af6a325c02e8d759d7858e05ef717"
     },
     "BV01@77": {
      "scenario": {
@@ -1375,13 +1381,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c"
+     "digest": "9aa5edd998a2cf2ef276139f03d9634154f90ba3202b074be516e9d742b6c377"
     },
     "FD03@77": {
      "scenario": {
@@ -1397,7 +1403,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0"
+     "digest": "cbf31878df01497d3e9b8aaac3c99b0ac32f27cf8e8262cd96d73a93f063cf9e"
     },
     "FD04-reopen@77": {
      "scenario": {
@@ -1413,11 +1419,11 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13"
+     "digest": "c56474ca5921dd496893c41254ed415201dc17d3ec7119801048d317625bb382"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -1440,13 +1446,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "running",
       "served": "0"
      },
-     "digest": "da52adf615d7921e5d047d7c16b5c49927c1acb608007f8232d5e5e027f7d4de"
+     "digest": "fae40e7662a4b2b52dcd814323f155bb382a8c2e6ce0ce59bf18232bd2094b82"
     }
    },
    "storedResults": [],
@@ -1471,13 +1477,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "3e3cfc45d3c2d8a3c10444521d8c0796fa410aa3a2428fdda43fb489d26d7675"
+     "digest": "58cd124d733c73bb4a2f23d12f16ddf1bd22d63e9f80562951da618747a69b05"
     }
    },
    "storedResults": [],
@@ -1494,21 +1500,23 @@
    "note": "domain level (CUP_TYPE_MISMATCH, CUP_MISMATCH); no runner fault places a wrong cup",
    "records": {},
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
   {
    "id": "BV02-capacity",
    "level": "domain",
-   "expected": "cup capacity/headspace refused",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "recipes and cups carry no capacity/headspace model yet",
+   "expected": "cup capacity and headspace refuse overflow before reservation/effects",
+   "tests": [
+    "source:tests/integration/coffee-policy.test.ts::BV02/BV06 capacity model includes headspace and explicit ice displacement before reservation or effects"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "BV03-milk",
@@ -1529,13 +1537,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "1"
      },
-     "digest": "3d86fafc0702f51227ea4190712dbc492df05f1bc76b662d8d323875a4413575"
+     "digest": "05b55e3a5759f77d9634a3e5e3f55738f10109136373ccf11a2fb854afb8ebf0"
     }
    },
    "storedResults": [],
@@ -1561,13 +1569,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "1"
      },
-     "digest": "e17fc81ab02715e2d73e396ae0fda00809c2a8cee36c5fedacc65e0a856889c1"
+     "digest": "7a725a5431bda5a176662ad5d6de5bb8488ec8e6a7a64d5d4b67b563c6ae1e0c"
     },
     "BV03-ice-mid": {
      "scenario": {
@@ -1579,13 +1587,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "1"
      },
-     "digest": "a18aad51566252a18eb13625d4116f1d4c9417258650203c8326ab9078dd9c56"
+     "digest": "6285d2815b5c9c9b764f6dea8888e63f617109ec087ea069608328ed352510ac"
     }
    },
    "storedResults": [],
@@ -1611,17 +1619,17 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "1333d16d988b17642b35a3b36f6d13cea675b83decc6b5ad505c0098455c6dd4"
+     "digest": "8b27f89485743040a1872096fe007593b0234a527aa0a8eac9162cd57784d5ab"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -1647,13 +1655,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "5cba9e548e7e68add827400e5927068d55780527566a93c7119357c9a7f6a784"
+     "digest": "79079a464331b334f8662fe2b50b3c583aeb77dd96890d864b8b541e62797f7f"
     },
     "BV04-measure-unknown": {
      "scenario": {
@@ -1665,13 +1673,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "ffa72e8ca4ef044cad9f7013f71fc5c1949582330a2e0c8f6eb5d6ea1f71ebf9"
+     "digest": "7a8eb42addf8b9fa322489eccc41ff112f84f1ce7ca3ca9b8435ae8a4e36fd66"
     },
     "BV04-measure-missing": {
      "scenario": {
@@ -1683,17 +1691,17 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "168338626ce641e243f8d07bc0627cb1302fd8d3c1fdd31d8806a96d89772722"
+     "digest": "49a05bcdadb1db8b57c4c025d6f0dc2a6a7f069d09d6d7c0f93e4c86cbc20645"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -1717,31 +1725,33 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "1"
      },
-     "digest": "e17fc81ab02715e2d73e396ae0fda00809c2a8cee36c5fedacc65e0a856889c1"
+     "digest": "7a725a5431bda5a176662ad5d6de5bb8488ec8e6a7a64d5d4b67b563c6ae1e0c"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
   {
    "id": "BV04-outlier",
    "level": "runner",
-   "expected": "sensor outlier rejected by a plausibility rule",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "no outlier fault or plausibility filter in mock_process",
+   "expected": "implausible measurement is held with raw evidence, no ready or invented consumption",
+   "tests": [
+    "source:tests/integration/coffee-policy.test.ts::BV04 mock outlier fault preserves model quantity while source refuses implausible sensor evidence"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "BV05",
@@ -1763,13 +1773,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "1f392d30f1674ac613d2dc2ffb144afae26c009740690b0790ba2e5e7c1cb8cb"
+     "digest": "baee2cfdd654f54d47a59d4934f83b16ddb217828bde5f836c1bcbd7ab0430eb"
     },
     "BV05-reboot": {
      "scenario": {
@@ -1781,17 +1791,17 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "7989c2a5d9589d7971625275c2426efeae3662bd0fa2ff57666274e9d1d5b976"
+     "digest": "7ff99d59cf06bcb04277064011e418d9ae697c1b4bd6c362601268b102130273"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -1808,21 +1818,23 @@
    "note": "domain level: the runner always submits the locked recipe, so no runner fault produces a mismatch",
    "records": {},
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
   {
    "id": "BV06-capacity",
    "level": "domain",
-   "expected": "capacity/headspace overflow refused",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "no capacity/headspace model (same gap as BV02-capacity)",
+   "expected": "capacity/headspace policy is frozen and rejects missing conversion assumptions",
+   "tests": [
+    "source:tests/integration/coffee-policy.test.ts::BV02/BV06 capacity policy is schema validated, frozen with the recipe and rejects missing ice conversion assumptions"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "BV07-drop",
@@ -1843,13 +1855,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "515dbdf8b089c4f8f63aa3af90475fad5b86edf6eed08a13deb770a20734ed3f"
+     "digest": "7f608d03797f48f525eaf536367a891864f0d3583e84959e8c0255ea78058f47"
     }
    },
    "storedResults": [],
@@ -1874,13 +1886,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "running",
       "served": "0"
      },
-     "digest": "a6fe91cc14099583a9534d109f7f591f1d34915fb275649664910252ec7e78ac"
+     "digest": "b416afa84dcec3a6d435d00f47f7ac75b93ba1fa40f8ccceb6cb8c8022f99fad"
     }
    },
    "storedResults": [],
@@ -1905,13 +1917,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "8036b3f5941eeb05a294f756e3c45890de87eb8ab1be44e301d0baa5410909c8"
+     "digest": "f62a3f5ead6171558948fbd054421b9b989ac7e69fb2b630dbe4d3271a7f7414"
     }
    },
    "storedResults": [],
@@ -1920,14 +1932,16 @@
   {
    "id": "BV07-timeout",
    "level": "runner",
-   "expected": "pickup timeout policy",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "no pickup/handoff timeout exists in the coffee driver or domain; the robot waits indefinitely (held, never released)",
+   "expected": "pickup timeout preserves cup custody and prevents departure",
+   "tests": [
+    "source:tests/integration/lab-v2-software-gaps.test.ts::a robot that cannot dock times out pickup without departing or losing cup custody"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "BV08-ready",
@@ -1948,13 +1962,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "b055d6e3c4836318c00f539f62c9183987deee4f8968c307215f3374438ff78e"
+     "digest": "940681246594b1da193193c5198b0aba66addebce1d63fc422249bf44c93a1fa"
     }
    },
    "storedResults": [],
@@ -1970,33 +1984,38 @@
    "status": "pass",
    "records": {},
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
   {
    "id": "BV08-milk-policy",
    "level": "domain",
-   "expected": "milk batch/open-time/cold-handling policy and no interlock bypass after reboot",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "no milk batch/open-time/cold-handling metadata in recipes or devices; mock reboot keeps device status, so the reboot case is not exercised",
+   "expected": "batch/open-time/cold-chain/fresh temperature policy cannot be bypassed by reboot",
+   "tests": [
+    "source:tests/integration/coffee-policy.test.ts::BV08 reboot cannot reset batch opening time or cold-chain failure; a documented new batch with fresh temperature permits milk",
+    "source:tests/integration/coffee-policy.test.ts::BV08 cold-handling evidence lost after milk dispensing blocks quality and fulfillment readiness"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "CAMPAIGN-FD02+FD07+BV01+BV03",
    "level": "runner",
-   "expected": "food and coffee concurrently in one versioned workload; queue/travel/human wait/cell busy measured",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "no combined food+coffee scenario definition; each part runs and is measured separately",
+   "expected": "versioned concurrent food/coffee workload with two robots, resource queue, travel, human wait and process busy metrics",
+   "tests": [
+    "source:tests/integration/lab-v2-mixed.test.ts::the versioned food, corridor and coffee campaign executes both AMRs and queues the second coffee job without sharing a cup"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "ARM01",
@@ -2019,17 +2038,17 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "9b59e2998aff536574f72b13eb87d58026032a6ffe015e1094e21f4933ae93d5"
+     "digest": "9cfda98a693941cde4e0ecbfe028d48471877c6f8440295fc26e7e5061a1a2a2"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -2045,21 +2064,29 @@
    "status": "pass",
    "records": {},
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
   {
    "id": "ARM03",
    "level": "model",
-   "expected": "swept-volume collision of links/gripper/held cup, between samples",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "no geometric collision checker exists (report coverage armCollisionChecker:false); G-MOCK allows PASS only with a checker",
+   "expected": "conservative swept collision checks links/gripper/held cup between samples with engine/model/tolerance/pair evidence",
+   "tests": [
+    "source:tests/integration/lab-v2-arm-safety-model.test.ts::ARM03 swept checker catches a thin obstacle between clear endpoint poses and identifies the geometry pair",
+    "source:tests/integration/lab-v2-arm-safety-model.test.ts::ARM03 held cup participates in collision checks; no cup means the same fixture is clear",
+    "source:tests/integration/lab-v2-arm-safety-model.test.ts::ARM03 non-adjacent links and the gripper are checked as geometry, not only the TCP point",
+    "source:tests/integration/lab-v2-arm-scene.test.ts::ARM03 project fixture stops real arm motion and leaves the cup at the nozzle",
+    "source:tests/integration/lab-v2-arm-scene.test.ts::ARM03 the current AMR pose and compiled radius block the arm independently of project fixtures",
+    "source:tests/integration/lab-v2-arm-scene.test.ts::ARM03 a project fixture touching only the held cup blocks motion and retains attachment",
+    "source:tests/integration/lab-v2-arm-scene.test.ts::ARM03 a robot entering a stationary held-cup arm is checked between programs"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "ARM04",
@@ -2074,21 +2101,25 @@
    "note": "acceleration limits are not modelled",
    "records": {},
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
   {
    "id": "ARM05",
    "level": "model",
-   "expected": "following error / stop / E-stop then reset without auto-resume",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "mock_arm has no following-error or stop model; G-MOCK does not list ARM05",
+   "expected": "modeled following error/stop/E-stop then reset keeps uncertainty and does not resume",
+   "tests": [
+    "source:tests/integration/lab-v2-arm-faults.test.ts::ARM mock arm-following-error reaches source attention, preserves cup custody and cannot resume by reset",
+    "source:tests/integration/lab-v2-arm-faults.test.ts::ARM mock arm-stop reaches source attention, preserves cup custody and cannot resume by reset",
+    "source:tests/integration/lab-v2-arm-faults.test.ts::ARM mock arm-estop reaches source attention, preserves cup custody and cannot resume by reset"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "ARM06",
@@ -2110,17 +2141,17 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "6b358b2acb4a1a51d9b9da8acd982a87e0ee69d5a22a278f0d7e5089e31e4ccf"
+     "digest": "c0dcdac443319ec6f09abf92f22e81ada212bb89ba6473e3be7b6a38628bdf0b"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -2148,7 +2179,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "2fbf00d6e6d6c8a22d31f4fcb467ee2d0a86d7f55183e97c2798acd9dbf0c2c3"
+     "digest": "62ac6f11d4034cf71a383bcf138d918dce8a19e29b975667daf36c0012ba6cd5"
     },
     "FD07@77": {
      "scenario": {
@@ -2164,7 +2195,7 @@
       "status": "completed",
       "served": "2"
      },
-     "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419"
+     "digest": "e9cd08ecc7348fd33835213bfe313cf3861af6a325c02e8d759d7858e05ef717"
     },
     "BV01@77": {
      "scenario": {
@@ -2176,13 +2207,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c"
+     "digest": "9aa5edd998a2cf2ef276139f03d9634154f90ba3202b074be516e9d742b6c377"
     },
     "FD03@77": {
      "scenario": {
@@ -2198,7 +2229,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0"
+     "digest": "cbf31878df01497d3e9b8aaac3c99b0ac32f27cf8e8262cd96d73a93f063cf9e"
     },
     "FD04-reopen@77": {
      "scenario": {
@@ -2214,7 +2245,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13"
+     "digest": "c56474ca5921dd496893c41254ed415201dc17d3ec7119801048d317625bb382"
     }
    },
    "storedResults": [],
@@ -2223,14 +2254,17 @@
   {
    "id": "SYS01-render",
    "level": "browser",
-   "expected": "15/60 FPS render and a background tab leave the trace unchanged",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "no browser test varies render rate or tab visibility; the UI is not a clock source by construction (runtime ticks only on step actions)",
+   "expected": "measured 15/60 FPS and actual debugger-paused renderer preserve normalized journal/effects",
+   "tests": [
+    "lab:tests/e2e/twin-plan01.spec.ts::SYS01: normalized journal/effects are identical at 15/60 FPS and while the browser renderer is debugger-paused"
+   ],
+   "status": "pass",
+   "note": "CDP Debugger.paused acknowledgement and zero in-interval draws; not an OS background-tab throttling claim",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/lab-pw-plan01-twin-plan01.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "SYS02-executor",
@@ -2256,11 +2290,11 @@
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "47d86acf8599e51741e64f8da1f06ca9cc0dae90f7ecda55e0732ff21f6ce51c"
+     "digest": "eca9885d7af70dd9af7b5323073f298d335610101f94842fd4db9d10e5e90ef8"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -2281,14 +2315,20 @@
   {
    "id": "SYS02-reclaim",
    "level": "gateway",
-   "expected": "reclaim of a run by a new session/runtime",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "POST /runs/:id/reclaim answers 501; a restarted runtime needs re-pairing and a new run",
+   "expected": "new paired session/runtime requires ownership proof and reclaims view/reconcile-only evidence",
+   "tests": [
+    "source:tests/integration/lab-v2-stream.test.ts::a new paired runtime reclaims durable evidence only with the local proof and cannot re-drive the run",
+    "source:tests/integration/lab-v2-stream.test.ts::archiving frees an active slot while preserving proof-protected evidence for later reclaim",
+    "source:tests/integration/lab-v2-reclaim-targets.test.ts::reclaim at the actual FD01 first completed navigation exposes the waiting robot for audited reconciliation",
+    "lab:tests/unit/workspace-reclaim.test.ts::multiple known reconciliation targets require an explicit selection and never default to the first robot"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/source-integration.json",
+    "regression/lab-vitest.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "SYS03",
@@ -2314,7 +2354,7 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "91c62de4c7be3cf89e84a957f94157a6297b8fc1037a5cc828aeb658dd5c2a24"
+     "digest": "4d68042fb993b243f288819ff89d56de47d6b9811759b6e05c49e7ad5ed349b6"
     },
     "BV05-ack-dup": {
      "scenario": {
@@ -2326,13 +2366,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "1f392d30f1674ac613d2dc2ffb144afae26c009740690b0790ba2e5e7c1cb8cb"
+     "digest": "baee2cfdd654f54d47a59d4934f83b16ddb217828bde5f836c1bcbd7ab0430eb"
     },
     "BV05-reboot": {
      "scenario": {
@@ -2344,13 +2384,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "7989c2a5d9589d7971625275c2426efeae3662bd0fa2ff57666274e9d1d5b976"
+     "digest": "7ff99d59cf06bcb04277064011e418d9ae697c1b4bd6c362601268b102130273"
     }
    },
    "storedResults": [],
@@ -2359,14 +2399,17 @@
   {
    "id": "SYS03-reorder",
    "level": "runner",
-   "expected": "reordered/delayed observations",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "no reorder/delay fault in the plant adapters (duplicate/stale only)",
+   "expected": "delayed and reordered observations neither duplicate execution nor served quantity",
+   "tests": [
+    "source:tests/integration/lab-v2-software-gaps.test.ts::reorder-observations keeps one served item and does not repeat execution",
+    "source:tests/integration/lab-v2-software-gaps.test.ts::delay-observation keeps one served item and does not repeat execution"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "SYS04",
@@ -2382,7 +2425,7 @@
    "records": {},
    "storedResults": [
     "regression/lab-vitest.json",
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -2412,7 +2455,7 @@
       "status": "running",
       "served": "0"
      },
-     "digest": "62437840e4ab1af2fc398a7675219e9dcf9bef43903efbcbcbc2309c9c98b664"
+     "digest": "e7592bb467775b4789c131a2af7a9c20988f7a54da0e9e8bb2da9da06ebe1080"
     },
     "QA-06": {
      "scenario": {
@@ -2424,13 +2467,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "10e86d30fbb5f0d2cc476b126d76c323b80d00e834b84e9f8198356c0664292c"
+     "digest": "4cd5a9626386659bbc8f4e9236552206dc10764fc373792e52e76bc192f061cd"
     }
    },
    "storedResults": [
@@ -2459,13 +2502,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "ready",
       "served": "0"
      },
-     "digest": "1e35220de1f73d5571ab11c7820dd41439ab4de31c6db05f6d7d7921c99e4d9a"
+     "digest": "dd1144093abb8b36b76de7a6ebda888bfde62370c5629dba0ab3cfd58aa00f0b"
     },
     "BV05-ack-dup": {
      "scenario": {
@@ -2477,13 +2520,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "1f392d30f1674ac613d2dc2ffb144afae26c009740690b0790ba2e5e7c1cb8cb"
+     "digest": "baee2cfdd654f54d47a59d4934f83b16ddb217828bde5f836c1bcbd7ab0430eb"
     },
     "BV05-reboot": {
      "scenario": {
@@ -2495,13 +2538,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "7989c2a5d9589d7971625275c2426efeae3662bd0fa2ff57666274e9d1d5b976"
+     "digest": "7ff99d59cf06bcb04277064011e418d9ae697c1b4bd6c362601268b102130273"
     },
     "FD08-localization": {
      "scenario": {
@@ -2517,7 +2560,7 @@
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "167d59b130e31ae58463b7ad34012bc037dc7a26e624c240b401df5dd4dc852e"
+     "digest": "85a9534fc77d0501ced663235f8920fa6b0ddbf93d908b913ca88622a4787930"
     }
    },
    "storedResults": [],
@@ -2616,14 +2659,16 @@
   {
    "id": "UX-05-reset-speed",
    "level": "browser",
-   "expected": "reset and run-speed control offered by capability mode",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "v2 runs have no reset or speed action (a new run is created instead); the Lab action schema has neither",
+   "expected": "reset creates a new immutable run and pacing/plant speed controls have explicit scope",
+   "tests": [
+    "lab:tests/e2e/twin-inputs.spec.ts::UX05/UX18/QA09b: reset, speed-limit draft, saved report reopening and replay remain independent"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/lab-pw-plan01-twin-inputs.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "UX-06",
@@ -2692,13 +2737,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "10e86d30fbb5f0d2cc476b126d76c323b80d00e834b84e9f8198356c0664292c"
+     "digest": "4cd5a9626386659bbc8f4e9236552206dc10764fc373792e52e76bc192f061cd"
     }
    },
    "storedResults": [
@@ -2718,7 +2763,7 @@
    "records": {},
    "storedResults": [
     "regression/lab-vitest.json",
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -2767,7 +2812,7 @@
    "status": "pass",
    "records": {},
    "storedResults": [
-    "regression/source-referenced.json",
+    "regression/source-integration.json",
     "regression/lab-vitest.json"
    ],
    "actual": "assertions passed"
@@ -2783,7 +2828,7 @@
    "status": "pass",
    "records": {},
    "storedResults": [
-    "regression/source-referenced.json",
+    "regression/source-integration.json",
     "regression/lab-vitest.json"
    ],
    "actual": "assertions passed"
@@ -2813,11 +2858,11 @@
       "status": "completed",
       "served": "1"
      },
-     "digest": "c2f0d6d7cf4ff22c25d75bc734ae1d085dd971e6cb2d812c54270e74483e8305"
+     "digest": "3b07973805457d5fafe6eefcfea683f0d9a189ab6bf5d5fa6ec012a29cb9f628"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json",
+    "regression/source-integration.json",
     "regression/lab-vitest.json"
    ],
    "actual": "assertions passed"
@@ -2833,7 +2878,7 @@
    "status": "pass",
    "records": {},
    "storedResults": [
-    "regression/source-referenced.json",
+    "regression/source-integration.json",
     "regression/lab-vitest.json"
    ],
    "actual": "assertions passed"
@@ -2850,7 +2895,7 @@
    "status": "pass",
    "records": {},
    "storedResults": [
-    "regression/source-referenced.json",
+    "regression/source-integration.json",
     "regression/lab-vitest.json",
     "regression/lab-pw-twin-twin-recovery.json"
    ],
@@ -2882,7 +2927,7 @@
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "8f676a51da3e40720fc32d8bacdd363b237243269bb0c9c75c0118377deb6eaa"
+     "digest": "58ff526e328ffd62f1731b6cd6214521ba5a390a1b149fa92621a260a1881371"
     },
     "FD05-payload": {
      "scenario": {
@@ -2898,7 +2943,7 @@
       "status": "needs_attention",
       "served": "0"
      },
-     "digest": "4d0832a4c1c070d3e0551af35c5e2a3488cc23ddcc46f9fb97a19fcc388f5acb"
+     "digest": "b9f5c09187471c743735e79da6f720986a873c14bb1f697cac8614818d311b3a"
     },
     "BV01": {
      "scenario": {
@@ -2910,13 +2955,13 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "9b59e2998aff536574f72b13eb87d58026032a6ffe015e1094e21f4933ae93d5"
+     "digest": "9cfda98a693941cde4e0ecbfe028d48471877c6f8440295fc26e7e5061a1a2a2"
     }
    },
    "storedResults": [],
@@ -2925,14 +2970,16 @@
   {
    "id": "UX-18-speed",
    "level": "runner",
-   "expected": "a speed-limit change acts on the model",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "mock_amr speed is a fixed illustrative 0.5 m/s; scenario speed limits are not wired into the plant",
+   "expected": "speed limit is pinned and acts on admission and modeled motion",
+   "tests": [
+    "source:tests/integration/lab-v2-software-gaps.test.ts::project speed limit reaches mission admission and the plant, while the run keeps immutable inputs"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "UX-19",
@@ -2954,17 +3001,17 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "10e86d30fbb5f0d2cc476b126d76c323b80d00e834b84e9f8198356c0664292c"
+     "digest": "4cd5a9626386659bbc8f4e9236552206dc10764fc373792e52e76bc192f061cd"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json"
+    "regression/source-integration.json"
    ],
    "actual": "assertions passed"
   },
@@ -2991,17 +3038,17 @@
      "backends": [
       "mock_amr@1/mock_kinematic",
       "mock_coffee@1/mock_process",
-      "mock_arm@1/mock_kinematic"
+      "mock_arm@2/mock_kinematic"
      ],
      "actual": {
       "status": "completed",
       "served": "2"
      },
-     "digest": "9b59e2998aff536574f72b13eb87d58026032a6ffe015e1094e21f4933ae93d5"
+     "digest": "9cfda98a693941cde4e0ecbfe028d48471877c6f8440295fc26e7e5061a1a2a2"
     }
    },
    "storedResults": [
-    "regression/source-referenced.json",
+    "regression/source-integration.json",
     "regression/lab-pw-ui.json"
    ],
    "actual": "assertions passed"
@@ -3074,14 +3121,16 @@
   {
    "id": "R-MOCK-offline-bundle",
    "level": "host",
-   "expected": "offline vendored dependency bundle install",
-   "tests": [],
-   "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "no vendored offline bundle exists (F07 not_run)",
+   "expected": "vendored Node/runtime/compiled dependencies/assets boot without a package manager and reject tampering",
+   "tests": [
+    "lab:tests/integration/offline-bundle.test.ts::offline release contains its Node, runtime, built dependency assets and lock; boots with no package manager"
+   ],
+   "status": "pass",
    "records": {},
-   "storedResults": [],
-   "actual": "not executed"
+   "storedResults": [
+    "regression/lab-vitest.json"
+   ],
+   "actual": "assertions passed"
   },
   {
    "id": "R-MOCK-cold-boot",
@@ -3098,11 +3147,26 @@
   {
    "id": "UI-perf-p95",
    "level": "browser",
-   "expected": "p95 frame <= 33 ms desktop / <= 50 ms tablet 2D for 2 robots + 1 arm + 6 tables over >= 60 s",
+   "expected": "60s renderer measurement: desktop 3D p95 <=33ms and emulated tablet 2D <=50ms, 2 AMRs+arm+6 tables",
+   "tests": [
+    "lab:scripts/measure-twin-ui.mjs::60-second renderer capture meets declared desktop and emulated tablet limits"
+   ],
+   "status": "pass",
+   "note": "emulation on the recorded host; no physical tablet result",
+   "records": {},
+   "storedResults": [
+    "regression/lab-ui-performance.json"
+   ],
+   "actual": "assertions passed"
+  },
+  {
+   "id": "UI-perf-physical-tablet",
+   "level": "host",
+   "expected": "repeat frame-time capture on the target physical tablet",
    "tests": [],
    "status": "not_run",
-   "reason": "NOT_IMPLEMENTED",
-   "note": "no frame-time capture harness; F06 measured telemetry latency and heap only",
+   "reason": "NEEDS_HUMAN",
+   "note": "requires the target tablet; browser emulation does not establish device performance",
    "records": {},
    "storedResults": [],
    "actual": "not executed"
@@ -3149,8 +3213,8 @@
    "FD01": [
     {
      "seed": 1000,
-     "digest": "b3f4cb446324bcec5aa9f608fab02e34b09b95bdad97ef07988f38d1c23d6890",
-     "seedlessDigest": "efa062c2dfbc60a2b5169e8034ae866ca0415f111f6fe15df45bc126dab6aa58",
+     "digest": "3a103aec97c13961f904695679181080b6c835685998543c7bc4864569ed6a0b",
+     "seedlessDigest": "cbf1b57e36def5e8a8df1c0f65bfbdc846e5b1c9cd35c5cbfb1e84ac7702b367",
      "atTicks": [
       227
      ],
@@ -3159,8 +3223,8 @@
     },
     {
      "seed": 1001,
-     "digest": "2a9b800fa69da3c1fc020fdaed632b9d2cddc16a2adf7738652dcfd36de5c84f",
-     "seedlessDigest": "d117a72017b3a27327465b0ab2720a969b7943e9966c519cd0c44a571bc091fb",
+     "digest": "a76243276a356bd1afa923af9ace5f4f3e6dc8d23544e44ceca5cbf8627611ba",
+     "seedlessDigest": "e1b775d8d0cf832d10baac2ac0568225ecf44f8538dc6f69de1b5eb4e2b1ef15",
      "atTicks": [
       427
      ],
@@ -3169,8 +3233,8 @@
     },
     {
      "seed": 1002,
-     "digest": "248a7e32e30c4e5ccdd7c23719058dcde8be8dd357d6f43416f3ff03ea4ba7c5",
-     "seedlessDigest": "b2a7d321fc73eb255c0ea2eabfa29fcd68dd5949cb0d7c6a2d736e7ecd16f04d",
+     "digest": "5023a048a77a8d0ebea91d7a418f5c81d9c9bed1b9f22c83c3c36096b741faf9",
+     "seedlessDigest": "df798d4ab2288d6bf568d3840bd3ca604e2ea0d78f1a9511c254034dacc4237e",
      "atTicks": [
       242
      ],
@@ -3179,8 +3243,8 @@
     },
     {
      "seed": 1003,
-     "digest": "1784424498a9de41b7f79d399974debbecf013e4f50954ce48a2d862143c3c8d",
-     "seedlessDigest": "f6813f5e4257eaf6c69830b0de9a9df7ffae05eeef112e99349f21f837a7e77a",
+     "digest": "978f62a56942ad33c64a89500286fa3e09a7920c75bb886231e03b2714952e90",
+     "seedlessDigest": "e60e18213c86fe8f0b2f091ffd14fdc6d18b0ce3fa53d1f14d9b734f83af69c0",
      "atTicks": [
       403
      ],
@@ -3189,8 +3253,8 @@
     },
     {
      "seed": 1004,
-     "digest": "ca7db2fed296e12d36f8565a29fe9f4b95334bc3e7044e9cb005f7c1e0984726",
-     "seedlessDigest": "4c50f004f6a70dfcc945a3bd5273f8aa8317db119339eae58be321f77c9c9228",
+     "digest": "59d95fc143f35a4618984218c26277d0e20940a6063e9027ec027998949bb73e",
+     "seedlessDigest": "944dae66983af600841500821edf774c8c83cb70de4d95114430a1d618d1dc9c",
      "atTicks": [
       39
      ],
@@ -3199,8 +3263,8 @@
     },
     {
      "seed": 1005,
-     "digest": "c07697d581ceae96cbaa602d27727fb12064da2bd609256e6c93b2fddf57c6d0",
-     "seedlessDigest": "cc6d0494f496547ce330d2e9cac99513332cf81a8ff255a88558bc428dece7c5",
+     "digest": "5a7566ea8f6df628fa3236ce47094d61b06bb49e1ffaa971b35dd4ef236126b5",
+     "seedlessDigest": "858dd1b8c9845a652e586124cf47ba51ac0e0edf42ad96b2a02add92303e7813",
      "atTicks": [
       266
      ],
@@ -3209,8 +3273,8 @@
     },
     {
      "seed": 1006,
-     "digest": "17a1953441364e8f18c50a15887ca0f300dcdf87e45a356a0c66e3eec02b469d",
-     "seedlessDigest": "9d5948e192de710a861175929ea89a864e8f2dff811e28bfd823d685ce371531",
+     "digest": "3c3e86929d92b807f92d20491c8ca206fbe5a480caeb8eabac70333663d01924",
+     "seedlessDigest": "6e95a90ea071e9fa693a0627d611b1c5f870715920e22aa8489e7317d476beb0",
      "atTicks": [
       402
      ],
@@ -3219,8 +3283,8 @@
     },
     {
      "seed": 1007,
-     "digest": "0d60e722208695bec53d10d8f504841639285ee63999518bc9e3d1ab0543785f",
-     "seedlessDigest": "5f75a299656287ba005e4407567a96b8c2a9ca557b25656f6b92a194a3e8f56f",
+     "digest": "21a4dc1b0d53f2a0aeb5759ae757f1c037dad28d55561f7a88986629e8a5d918",
+     "seedlessDigest": "6fc6346c606d63878658f8c63dc96017d50fa54741e29b614b68adba217c7d1f",
      "atTicks": [
       118
      ],
@@ -3229,8 +3293,8 @@
     },
     {
      "seed": 1008,
-     "digest": "0bfa4d9dd89debe6f05f3b5a446d6bc9d3b8c3fdddf6d83f4a2998911c84ea56",
-     "seedlessDigest": "196627aade35d4d015e6a46e99164188748de6e80ce0ef1ada0d29a2ef05314b",
+     "digest": "8963c8a91fee15e92ed4170ef1038e0eb403eece4ce56d4eb769f3517ba0ad00",
+     "seedlessDigest": "471a6ed4420d079633e4526300bd44a2ad8b31d671c71e3c8aa801f78d529d09",
      "atTicks": [
       48
      ],
@@ -3239,8 +3303,8 @@
     },
     {
      "seed": 1009,
-     "digest": "f64bb098f294ceaf84d2574347fb79a145c450da893fdb9c1439448fb28ee7ad",
-     "seedlessDigest": "f05f6d11ef00112080ae105c91f37083cbed2a6fa50717c4a5e3359fb84ab36f",
+     "digest": "a04723319586a6ea7fa613f6e328bda6e3133a89e1ceb514e86a8928d5819a6d",
+     "seedlessDigest": "926de04cf385efcac2f75833fd315fb49dcbf859d52ef85b80a561715f39a68f",
      "atTicks": [
       77
      ],
@@ -3249,8 +3313,8 @@
     },
     {
      "seed": 1010,
-     "digest": "862d3401e46cd0b0e76ec20b585c8e0d1b4722c5ec863d09b45a4b59d93e3a53",
-     "seedlessDigest": "95837f2f48402607664a6cee578bba97acfd9f7278417f3045da0a4d1f0c8f6b",
+     "digest": "75eabfc58aafc87a6d47220c70b77b7542f50e6a7f5cb8330c96c6bf61577943",
+     "seedlessDigest": "d27fb29ff3218bd3811eead71dff6adc162a474221fb775b7004a0b4a7829623",
      "atTicks": [
       298
      ],
@@ -3259,8 +3323,8 @@
     },
     {
      "seed": 1011,
-     "digest": "e05cccf3a03c21fddf4666e31ca1f3ca21757b3d891cf0c8b9a9fec9e7ba8911",
-     "seedlessDigest": "085c6f500089fb8da96986f2285744f7a9d18234c363c137620e7f2486884c59",
+     "digest": "0bfb70f4e5a2ea5e68a7e95a2b8e7bff6776c3a12c1211a296f2c34ccaaba5dc",
+     "seedlessDigest": "2cf3e4e3cd1dc2f57f574a1a33ad09a2ed2530c7546bb5d23ba91748501b5330",
      "atTicks": [
       125
      ],
@@ -3269,8 +3333,8 @@
     },
     {
      "seed": 1012,
-     "digest": "c37f6e4244348ff40b64410d24788d0eece78aaacc4a5127b94200c644d14bcd",
-     "seedlessDigest": "0316c2231f2f1e44710e00a39b54bfdc2f8089942ab31523b5e888f2759d1950",
+     "digest": "9c99c38f07836d5f806edac2aba168009268c45da57bf154307fa688a7c838b8",
+     "seedlessDigest": "a7e9b261a0252f0a741bc9c2763faf5c58850580453935a9f919e14ff2356952",
      "atTicks": [
       391
      ],
@@ -3279,8 +3343,8 @@
     },
     {
      "seed": 1013,
-     "digest": "e2f03822bc8321b2ed28ca0ac3eb4e9519e2dbbef1393af542d4ab98aeee34eb",
-     "seedlessDigest": "9c5f1c1c62586422f7ff6d73ab4438b48db7b7ff535e7a1dd3fad7e471d0f184",
+     "digest": "79ed3d1cf63635dd7c3f0f05f7f5c126d4d3cde9ea32052d06935d836223ade0",
+     "seedlessDigest": "7db0c5f78cc73b6dc5ec1052f95989b1c8927108720b7ed678260860bfbaa326",
      "atTicks": [
       394
      ],
@@ -3289,8 +3353,8 @@
     },
     {
      "seed": 1014,
-     "digest": "c535260bf4b76b6da10768715df46c05c771a774e2e51376c08c0da50c668a41",
-     "seedlessDigest": "d38d16e26aa27d8b378ae3604e4cc7c79644fb69ac1124d0c0643c74b05bacdc",
+     "digest": "d2d91003f01ab897784faafea1ed8057a203d1a58b17154c2673f872370e335e",
+     "seedlessDigest": "afc4cd401a2531a957d06cbd884600adf265d829bfdc6c1dc8836a7bc640bd85",
      "atTicks": [
       72
      ],
@@ -3299,8 +3363,8 @@
     },
     {
      "seed": 1015,
-     "digest": "f3001246805c6316ba83939cb076d44730f1db1f4c263b91eb9287a6966df585",
-     "seedlessDigest": "6274971bb9692c616ab4e32f2f2b5932109a5630a3c2736d435101c805f0e6a9",
+     "digest": "0e116ae18050f13ec3f3cf48b55414396b5797925b7f927618e26bea4f19dbac",
+     "seedlessDigest": "91e6f9c4e98928ddd4dd90da02153ab95dd415b8b52644489b15dc29f8201e94",
      "atTicks": [
       54
      ],
@@ -3309,8 +3373,8 @@
     },
     {
      "seed": 1016,
-     "digest": "5b98876fc3d25a36566415a45ca9e66614b3bdded894a0e3191a067200f119b9",
-     "seedlessDigest": "34ee3987f5e8765af4693f8c1f25a17a15f0492ab9827ec089e49aec83dd55ee",
+     "digest": "556d1ae48c9cccd426f69185a055444fdb809e8a7e407dabc68a82f096715e92",
+     "seedlessDigest": "61ed7a093146e14dacf2ec78ffcb94ab83f6f61bf9168e0bf9d4e426dcf25389",
      "atTicks": [
       330
      ],
@@ -3319,8 +3383,8 @@
     },
     {
      "seed": 1017,
-     "digest": "17b1cfa3d9e3c8833a15904ad2540d6fde499603c7aa110a32ee6d38bf2e9095",
-     "seedlessDigest": "ebd782fbd31b613d3dc41f4ac503e5979e9f255e901ab5d95bf5dd46e3365d27",
+     "digest": "602d0e9d62f9ac23d80138da6492b4c662d8b390ce0ca9d9223dceb0babb6048",
+     "seedlessDigest": "085d921d9b69311ed79d8d9dfa4caca8b392c2e074372a82cef6f87d5cf85252",
      "atTicks": [
       210
      ],
@@ -3329,8 +3393,8 @@
     },
     {
      "seed": 1018,
-     "digest": "8ef303bbd8b1d7b281d4e96b02a597dbd4a24a7fc3717c4f5fd391f406a2b644",
-     "seedlessDigest": "00e329c3432ed31eca7a64dbb8bebfe8cfb49248d21241e5ec5e9dc15bc87031",
+     "digest": "5c50f4860df84ad2ef3d64db09213670bceeda7796e5f6e041c1ddd7d64f34c0",
+     "seedlessDigest": "aff2e7939e6102354fe86cb267fa966faae5c3e4cdd512fda75d45a718f77ebf",
      "atTicks": [
       360
      ],
@@ -3339,8 +3403,8 @@
     },
     {
      "seed": 1019,
-     "digest": "c6dbca79fe3e917c563e5c9dc8df8cf40603f5e788519f656555782896088d86",
-     "seedlessDigest": "6dd3985c1c9e5da984bd559540ef7ba0e65cef89cca71bd78578c90406731b5b",
+     "digest": "ba67274752e8d4298f969f4a1356411871b547ce6b702e1389e0d4e2dd95fd36",
+     "seedlessDigest": "4b9c697fcfa489f4184f9f30376a3685e2aa67b7e2988e3dd468f0687a42d952",
      "atTicks": [
       196
      ],
@@ -3351,8 +3415,8 @@
    "FD02": [
     {
      "seed": 1000,
-     "digest": "adbc6d529e1a61afb22087c1fbe6fb38187c967fb5584907abffdfdbd7ba620c",
-     "seedlessDigest": "2ee3305de3cb319469159a5420239c9d14236349076169404b81895b6805195a",
+     "digest": "a324d04ebeb8548b4c768e285518dba7361ed9f8cf2a5c7b704eb0dcd53de0c1",
+     "seedlessDigest": "8b96ad05d9d5441064a758e838940ee339bac99673e25ebb6a89fae1db95947e",
      "atTicks": [
       91,
       142
@@ -3362,8 +3426,8 @@
     },
     {
      "seed": 1001,
-     "digest": "6606c9abaf699fe4eaf6e76d97d853bebfb59b53344b0704a7237f08b6e8a897",
-     "seedlessDigest": "9ceb7baadb047db024cea2d86d4c499ea05307d3c2373de02b087beebd9610c4",
+     "digest": "c3a1d86b8f4621680719d2b48128f64abcd3372c6747bfb3207cb8ccbb448e34",
+     "seedlessDigest": "2796b087ea497556b1b99070bcf6b184de7514699fb6016b822df26b8d1dea19",
      "atTicks": [
       171,
       132
@@ -3373,8 +3437,8 @@
     },
     {
      "seed": 1002,
-     "digest": "9278d808fbd5e506815fbc9b787822c3c5262752904e3251ae3f7663ac8b2500",
-     "seedlessDigest": "484e4537d1b81fcc5ca27a57a72fcd06c8d0c680d0aa8833853825497e2ba719",
+     "digest": "3313dfe9f437962bd07969172af724b7a257722c877d4cdeb105c5c105563ce9",
+     "seedlessDigest": "ce8279c5a41de9f7ef2c23f5b0b6d6e875317e03d7de6d1f1d3c55d38717da3f",
      "atTicks": [
       97,
       17
@@ -3384,8 +3448,8 @@
     },
     {
      "seed": 1003,
-     "digest": "265c6ed6c90f709c15044d0152f64374e86d4454e975a1fa9af511f3371611a3",
-     "seedlessDigest": "1b196958845b6a9d687b9b5db1bd7a71e17b692f2dbbf8ed7188fe020e1e5a44",
+     "digest": "ec5209b9223df67df3f645198579e98e33ac70ce4f96292445e01778e4b4c33d",
+     "seedlessDigest": "cb6bd18e0ccfb03356b71919268d937a44c83e1f672ffb5b7695fe7e7171c57b",
      "atTicks": [
       161,
       58
@@ -3395,8 +3459,8 @@
     },
     {
      "seed": 1004,
-     "digest": "4e655c517be30e624a73a90cde5841a9866359c30df8c22b1217cd2c139fb0d1",
-     "seedlessDigest": "4467f3a1612a91998c838910b7e7a0ff5a551814a7c1a53f7f1ee6487fa3f7c6",
+     "digest": "15d8ba95c867e736ee545c963b97345bc4a2b0acf192e0b5083c9a73ff094e59",
+     "seedlessDigest": "f508c54be2e3c137230f96ae2547cbd4f62454a9c02d965bc18f11795a291e84",
      "atTicks": [
       15,
       117
@@ -3406,8 +3470,8 @@
     },
     {
      "seed": 1005,
-     "digest": "02248cec99fe32e1a1d7ff4b5af789a79321bc1653df48c6b2b3447f6e97967d",
-     "seedlessDigest": "de508b642bd55643c8ff6791dd70df674e991a91c90ffb8f90ff91e158bab3fb",
+     "digest": "5137b619dd6b909f1f9a68dae997b57beb9cb53282a6aff2b62ce9ebbd8ce392",
+     "seedlessDigest": "2d4615f1e1bc1dfc15f5a219dd8ea2ebdde6420f8fdde75f9d665469e1a39204",
      "atTicks": [
       106,
       87
@@ -3417,8 +3481,8 @@
     },
     {
      "seed": 1006,
-     "digest": "a926c25162adb44dc9dea5a9364130f8abf421b7e7623d201d86c7ddd2b90f63",
-     "seedlessDigest": "bb57aab7a2785578e80cbe109f0441c29daf5dccf4b21351bb38bce807913629",
+     "digest": "387773064c111707489970d41d1195ae58ece420c7f50172ec93ec399ad41a33",
+     "seedlessDigest": "bb89fb0e936cedc59174554d7d12f0c239c32d73bd4c8bb70e5015a16eba03ad",
      "atTicks": [
       161,
       140
@@ -3428,8 +3492,8 @@
     },
     {
      "seed": 1007,
-     "digest": "62e16430edd1229ef3ab266758d32da2931af40495cfc23cd966dd35116dfa4e",
-     "seedlessDigest": "72ea0a8fa054e326fcd6339cf48d7bbb8fc9a1e3f920cf6cdb7a47100775e5db",
+     "digest": "bac0caa62492d705b1c29ce072624630aa398302d7875c116c4ba10abf90ba48",
+     "seedlessDigest": "9ddfab1a95099a3cef410d860dea5f3113ab6cd236a8af26d1728a8bdedaebf6",
      "atTicks": [
       47,
       32
@@ -3439,8 +3503,8 @@
     },
     {
      "seed": 1008,
-     "digest": "efb9026c88634e0e507f9d515b965b1e4f6aaeb3e9ff9b0999c5a067617b77c1",
-     "seedlessDigest": "b5a4a4b8be5552e9a9346f7f24b9581d264288ee3fe8eb65ea58bd91dbd0b9a2",
+     "digest": "3a0185527b2680f225afac138cf77eb40968ad55179d741bff252cb28565de5e",
+     "seedlessDigest": "fafe87205ffbee5375215791b003903c41831dbea83dbfac583a867b88a069bd",
      "atTicks": [
       19,
       144
@@ -3450,8 +3514,8 @@
     },
     {
      "seed": 1009,
-     "digest": "91b6ea1584e285520c77822039da004b9a5977e34f4e025d164a6781b38c11e9",
-     "seedlessDigest": "72165db8e6efb1d83224c8ba6ae76253ca6712eb896da6c49229d04979d3ccb0",
+     "digest": "4892732b431eaeb5233fb8b3a52f2dd1994a66b07f0774df019997faf3184029",
+     "seedlessDigest": "4312e1ce710127bbbabad2e31df7f54c7f2daa812d0859492576b2764f2a645f",
      "atTicks": [
       31,
       124
@@ -3461,8 +3525,8 @@
     },
     {
      "seed": 1010,
-     "digest": "14706d95a7841a6f7e104c14142f9d734e067d5058f5e0f26606fb0fcea1dec3",
-     "seedlessDigest": "67c1d0cd5b16bc29fe0f99b4d9569c6a761f21a32491fa2f8afb106d12152f6d",
+     "digest": "7909b9169cc8309fab9ba42a8de52e280d06753086173a8d31e686f35655bda2",
+     "seedlessDigest": "6c0c085109831e95d893304662653c51d0c9a27953a61e15e07385521036f90f",
      "atTicks": [
       119,
       64
@@ -3472,8 +3536,8 @@
     },
     {
      "seed": 1011,
-     "digest": "70f7b031a131485ac30c75e9ecd9776099ffbb321e92cbcb24b676ac8b804313",
-     "seedlessDigest": "6e7602fe8da8e8dd7862527fa09abc9d83f189a2735cdb788526e73108e76c62",
+     "digest": "f87aebe0b15e31aa761207997c75c9b6f3bc6e0af652de424edc4732c47ca9b2",
+     "seedlessDigest": "b2e3242dc2e16a126174a2c391638a8175af420f4090c8f105ee6577984f9d6d",
      "atTicks": [
       50,
       200
@@ -3483,8 +3547,8 @@
     },
     {
      "seed": 1012,
-     "digest": "58c449121b2bf08f0515118dfa7c546cd029e56b086a2bf4f94c0f95a6576873",
-     "seedlessDigest": "98237adf0f2f02ce5a817aef2917c01e50aa6b35232a888121ad5b8347688a75",
+     "digest": "fc9cf7c6a8adc3ab4894b3c550a3735167a5dd79bf93ff8847ee34b0b1652f8e",
+     "seedlessDigest": "3452f6b517fea614c15e683257c3a894119fa23331d1fc9acda41f60164f21aa",
      "atTicks": [
       156,
       47
@@ -3494,8 +3558,8 @@
     },
     {
      "seed": 1013,
-     "digest": "23b47673503dcd092af39414eab4db847179a65928ce788e255df8e65433128b",
-     "seedlessDigest": "e2ec3fc41d4dc13d0143726a84f943f9e05d061aec348da34f3e2450ad9eff02",
+     "digest": "3a39e126a45b775c1b7ee458fdecebc1101f53fc289304c4c5b516a269165a12",
+     "seedlessDigest": "d97685236e027dd1ec42d2d122ffae3b344da823f4523ce0cbf7801401cb3937",
      "atTicks": [
       158,
       174
@@ -3505,8 +3569,8 @@
     },
     {
      "seed": 1014,
-     "digest": "1f9484947460ae0b827a011b1070414312d43aca6beabd2b77a0d0709823cf8f",
-     "seedlessDigest": "13d550d5fa05d6f8010b54cbfd5ca99529e1984c0eded2dd7df8fa5aa5e3b412",
+     "digest": "b45e8c34528228b1bce10aaec69743b59c0dd9bd195d7e775b0207424dc291dd",
+     "seedlessDigest": "8f4388c1b3131e886986d014d7b408af7bc857602f506ae5ae4d420c4117f701",
      "atTicks": [
       28,
       163
@@ -3516,8 +3580,8 @@
     },
     {
      "seed": 1015,
-     "digest": "73d1901a8f5697e4bdc8e5d7f48b93aa29df39b807fab108ce1f03fdc9ef2109",
-     "seedlessDigest": "c2e9c585babef205230ca6cc2a87fd7d4fa7f335e626d52952ae556e249272e4",
+     "digest": "4f75521c61b18b02de9aaddac23770113c6cf4f251153abff95033f38ef45f18",
+     "seedlessDigest": "91eefafad09b6b9fa0ba7d5faeeb94b6f97b0824b62abba6dbf4a7932367cf54",
      "atTicks": [
       21,
       149
@@ -3527,8 +3591,8 @@
     },
     {
      "seed": 1016,
-     "digest": "2464fc857a40ffbded97e53733e5e3863111941363626a7cb96eece6189f1d68",
-     "seedlessDigest": "924e81402d8723dc4bcf46a56cab58384da9b1405a20890b0010fa1e441e371b",
+     "digest": "f7b1fc698af0c49dec66bcbb2f50971f69a84ff975be2d52d98c905e7ba331c0",
+     "seedlessDigest": "8a3fb68dbdb72603fe008b0c65731bcb7af0f768ae33c3a606d90df673e765c4",
      "atTicks": [
       132,
       23
@@ -3538,8 +3602,8 @@
     },
     {
      "seed": 1017,
-     "digest": "073d068b8aa6835102851a582e8d31927693ecdff5b9eeed452dd36ad937be8c",
-     "seedlessDigest": "3432a3e9fdd646329e68bd383861bb736f58d2e5d1d91f4e2876d11cf914fade",
+     "digest": "e37b7588812e29ea14d1cdbc14aadef51985950ca6efd88b0dd4647373066c35",
+     "seedlessDigest": "f4561745bc6a10151be600c32418c43b65a80c09749db98b9e7a6049e08255f0",
      "atTicks": [
       84,
       35
@@ -3549,8 +3613,8 @@
     },
     {
      "seed": 1018,
-     "digest": "03c0ec4307e120b90d202e03f538603f3e964c4952163d5ff5cc45a11d9c3694",
-     "seedlessDigest": "ec607bdc44cf8aa2e195801e2de9945e420db8f741ba2445fce5f039ae3015ba",
+     "digest": "5b8ca594205eb8e41b01d25f9e1ba935aa12cd15aec0572d0413993d9da29c34",
+     "seedlessDigest": "695f9a4180f08c074e320937cfc8d4e1940493f060b7fa7964b218caf0a1a139",
      "atTicks": [
       144,
       154
@@ -3560,8 +3624,8 @@
     },
     {
      "seed": 1019,
-     "digest": "bbbd09defce153f117a00ba0a28be3796423a515c28e99c4f272ae9ac3363004",
-     "seedlessDigest": "ed8c22c51937552bffa3adf879578f2f3b21c91b960b488b7f09f455da984bed",
+     "digest": "6142d2ff8e32c1d4be18ca5448b47145808cdb7ef0063ab14ca54de61bd21407",
+     "seedlessDigest": "b65d2f14608b654b4ad8ed7bdb6dca51225c896d5c8273b535feb5f4635381bd",
      "atTicks": [
       78,
       74
@@ -3573,34 +3637,34 @@
   },
   "repeats": {
    "FD01@1000": [
-    "b3f4cb446324bcec5aa9f608fab02e34b09b95bdad97ef07988f38d1c23d6890",
-    "b3f4cb446324bcec5aa9f608fab02e34b09b95bdad97ef07988f38d1c23d6890",
-    "b3f4cb446324bcec5aa9f608fab02e34b09b95bdad97ef07988f38d1c23d6890"
+    "3a103aec97c13961f904695679181080b6c835685998543c7bc4864569ed6a0b",
+    "3a103aec97c13961f904695679181080b6c835685998543c7bc4864569ed6a0b",
+    "3a103aec97c13961f904695679181080b6c835685998543c7bc4864569ed6a0b"
    ],
    "FD02@1000": [
-    "adbc6d529e1a61afb22087c1fbe6fb38187c967fb5584907abffdfdbd7ba620c",
-    "adbc6d529e1a61afb22087c1fbe6fb38187c967fb5584907abffdfdbd7ba620c",
-    "adbc6d529e1a61afb22087c1fbe6fb38187c967fb5584907abffdfdbd7ba620c"
+    "a324d04ebeb8548b4c768e285518dba7361ed9f8cf2a5c7b704eb0dcd53de0c1",
+    "a324d04ebeb8548b4c768e285518dba7361ed9f8cf2a5c7b704eb0dcd53de0c1",
+    "a324d04ebeb8548b4c768e285518dba7361ed9f8cf2a5c7b704eb0dcd53de0c1"
    ],
    "FD07@77": [
-    "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419",
-    "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419",
-    "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419"
+    "e9cd08ecc7348fd33835213bfe313cf3861af6a325c02e8d759d7858e05ef717",
+    "e9cd08ecc7348fd33835213bfe313cf3861af6a325c02e8d759d7858e05ef717",
+    "e9cd08ecc7348fd33835213bfe313cf3861af6a325c02e8d759d7858e05ef717"
    ],
    "BV01@77": [
-    "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c",
-    "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c",
-    "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c"
+    "9aa5edd998a2cf2ef276139f03d9634154f90ba3202b074be516e9d742b6c377",
+    "9aa5edd998a2cf2ef276139f03d9634154f90ba3202b074be516e9d742b6c377",
+    "9aa5edd998a2cf2ef276139f03d9634154f90ba3202b074be516e9d742b6c377"
    ],
    "FD03@77": [
-    "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0",
-    "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0",
-    "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0"
+    "cbf31878df01497d3e9b8aaac3c99b0ac32f27cf8e8262cd96d73a93f063cf9e",
+    "cbf31878df01497d3e9b8aaac3c99b0ac32f27cf8e8262cd96d73a93f063cf9e",
+    "cbf31878df01497d3e9b8aaac3c99b0ac32f27cf8e8262cd96d73a93f063cf9e"
    ],
    "FD04-reopen@77": [
-    "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13",
-    "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13",
-    "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13"
+    "c56474ca5921dd496893c41254ed415201dc17d3ec7119801048d317625bb382",
+    "c56474ca5921dd496893c41254ed415201dc17d3ec7119801048d317625bb382",
+    "c56474ca5921dd496893c41254ed415201dc17d3ec7119801048d317625bb382"
    ]
   },
   "traces": {
@@ -3619,7 +3683,7 @@
      "status": "completed",
      "served": "1"
     },
-    "digest": "c2f0d6d7cf4ff22c25d75bc734ae1d085dd971e6cb2d812c54270e74483e8305",
+    "digest": "3b07973805457d5fafe6eefcfea683f0d9a189ab6bf5d5fa6ec012a29cb9f628",
     "attention": [],
     "faults": [],
     "rejectedObservations": [],
@@ -3628,7 +3692,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.01802948509750718
+     "minSeparationM": null
     }
    },
    "FD02": {
@@ -3646,7 +3710,7 @@
      "status": "completed",
      "served": "3"
     },
-    "digest": "15b30c2e0e9517b667bdca4c303f96849ddd8b61240963ac3f339447e7dc48c5",
+    "digest": "cbc4180c4d59cb8113558a38d8175e40d67285d3c43dc1515e1f7a5bb756d154",
     "attention": [],
     "faults": [],
     "rejectedObservations": [],
@@ -3655,7 +3719,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.01802948509750718
+     "minSeparationM": null
     }
    },
    "FD03": {
@@ -3673,7 +3737,7 @@
      "status": "completed",
      "served": "1"
     },
-    "digest": "9fc35b2da278492c6bde66619a46aafca7e3d230164defe4c7a48dc548159f7d",
+    "digest": "4b2e12cca4207c9cc16df6802d91f1ceaedeccd498df502be3f3ca5ae155655f",
     "attention": [],
     "faults": [
      {
@@ -3824,7 +3888,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.005998727883860522
+     "minSeparationM": null
     }
    },
    "FD04": {
@@ -3842,7 +3906,7 @@
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "8f676a51da3e40720fc32d8bacdd363b237243269bb0c9c75c0118377deb6eaa",
+    "digest": "58ff526e328ffd62f1731b6cd6214521ba5a390a1b149fa92621a260a1881371",
     "attention": [
      {
       "reason": "UNREACHABLE",
@@ -3865,7 +3929,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.5930294850975073
+     "minSeparationM": null
     }
    },
    "FD04-blocked": {
@@ -3883,7 +3947,7 @@
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "a4e075ed70718f5cd468481a4812b3186c34df7f0f93e57523e3ad80e3aceac0",
+    "digest": "8fd3eb483f9ccbde4759877816254bf7ed4a02f29611b4c00cdea1e5c72d7e85",
     "attention": [
      {
       "reason": "NO_PATH",
@@ -3912,7 +3976,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.007797104720415338
+     "minSeparationM": null
     }
    },
    "FD04-reopen": {
@@ -3930,7 +3994,7 @@
      "status": "completed",
      "served": "1"
     },
-    "digest": "484cd0e5ef638eebf88ea9ebeb72ca071e9cbc7556537431e2f053a25576ffde",
+    "digest": "5d889918db48b013c7459f88a12534387644696d65961f6c79fe823bceed529a",
     "attention": [],
     "faults": [
      {
@@ -3961,7 +4025,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.007797104720415338
+     "minSeparationM": null
     }
    },
    "FD05-payload": {
@@ -3979,7 +4043,7 @@
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "4d0832a4c1c070d3e0551af35c5e2a3488cc23ddcc46f9fb97a19fcc388f5acb",
+    "digest": "b9f5c09187471c743735e79da6f720986a873c14bb1f697cac8614818d311b3a",
     "attention": [
      {
       "reason": "SCRIPTED_INPUT_REJECTED",
@@ -4012,7 +4076,7 @@
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "30345ed1ad7744aea08e68338379d2bdc392ebfa9502430afe31ae05a7a27e37",
+    "digest": "be79e1f6f14041643f77500353e78ef6b9ce43a3ddebf714082e28f98f98cb43",
     "attention": [
      {
       "reason": "SCRIPTED_INPUT_REJECTED",
@@ -4045,7 +4109,7 @@
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "0a4e643b8466eaad73d58ddd2bfcedfa2c903c8431cdb859a1bd823336726775",
+    "digest": "962dfe3598a166854ce4b38acafd178939fa434e48fc7ee33081421039055a4b",
     "attention": [
      {
       "reason": "SCRIPTED_INPUT_REJECTED",
@@ -4078,7 +4142,7 @@
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "2e4ebcd13dea625d9cbe81bf325b9d0dd2caad290bb43f128d42919729a4368d",
+    "digest": "9936d3b7b04077553444f0ff464ef2e19474f9eea986e08d260fa37934d565fd",
     "attention": [
      {
       "reason": "SCRIPTED_INPUT_REJECTED",
@@ -4111,7 +4175,7 @@
      "status": "cancelled",
      "served": "0"
     },
-    "digest": "66c92353299a4bce5ec97f7edd82dca9091703a55a91d36d17c61310a445b44b",
+    "digest": "750abbb8003dba14db085645528d8dc6a80827a72538346b3744604b1e8cad21",
     "attention": [],
     "faults": [],
     "rejectedObservations": [],
@@ -4120,7 +4184,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.5930294850975073
+     "minSeparationM": null
     }
    },
    "FD07": {
@@ -4138,7 +4202,7 @@
      "status": "completed",
      "served": "2"
     },
-    "digest": "0de1d09947109ad3cd0bc709b295c84af83843551f819884b6eb98e980b437db",
+    "digest": "9d7d4f6d1cada5b7966d363dce164758095a0cebf599d354bcd3f7a4145313d7",
     "attention": [],
     "faults": [],
     "rejectedObservations": [],
@@ -4147,7 +4211,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.01802948509750718
+     "minSeparationM": 1.1860589701950146
     }
    },
    "FD08-localization": {
@@ -4165,7 +4229,7 @@
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "167d59b130e31ae58463b7ad34012bc037dc7a26e624c240b401df5dd4dc852e",
+    "digest": "85a9534fc77d0501ced663235f8920fa6b0ddbf93d908b913ca88622a4787930",
     "attention": [
      {
       "reason": "LOCALIZATION_LOST",
@@ -4188,7 +4252,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.5961917627576756
+     "minSeparationM": null
     }
    },
    "FD08-map": {
@@ -4206,14 +4270,12 @@
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "9d09f8261aa0ed3238e18291c32065abdc6fe0dde0904bbe0302dc3b822b1e2f",
+    "digest": "b772a2fb44af2acdd5d10e302b68e0c492b8e6ff9134a3f3e4ba8cbb8198b411",
     "attention": [
      {
-      "reason": "MAP_MISMATCH",
+      "reason": "MAP_CHANGED",
       "robotId": "amr-1",
-      "subjectId": "mission-e791768cf034226a1203a7f948a63c0c",
-      "commandId": "robot-command-00dfbcde01ecf49077c58774771ce767",
-      "tick": 779
+      "tick": 730
      }
     ],
     "faults": [
@@ -4229,7 +4291,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.5930294850975073
+     "minSeparationM": null
     }
    },
    "BV01": {
@@ -4242,14 +4304,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 42,
     "outcome": {
      "status": "completed",
      "served": "2"
     },
-    "digest": "9b59e2998aff536574f72b13eb87d58026032a6ffe015e1094e21f4933ae93d5",
+    "digest": "9cfda98a693941cde4e0ecbfe028d48471877c6f8440295fc26e7e5061a1a2a2",
     "attention": [],
     "faults": [],
     "rejectedObservations": [
@@ -4301,7 +4363,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.3930294850975074
+     "minSeparationM": null
     }
    },
    "BV02-removed": {
@@ -4314,14 +4376,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "3e3cfc45d3c2d8a3c10444521d8c0796fa410aa3a2428fdda43fb489d26d7675",
+    "digest": "58cd124d733c73bb4a2f23d12f16ddf1bd22d63e9f80562951da618747a69b05",
     "attention": [
      {
       "reason": "CUP_REMOVED",
@@ -4398,14 +4460,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 1,
     "outcome": {
      "status": "running",
      "served": "0"
     },
-    "digest": "da52adf615d7921e5d047d7c16b5c49927c1acb608007f8232d5e5e027f7d4de",
+    "digest": "fae40e7662a4b2b52dcd814323f155bb382a8c2e6ce0ce59bf18232bd2094b82",
     "attention": [],
     "faults": [
      {
@@ -4421,181 +4483,6 @@
       "type": "cup",
       "code": "MACHINE_NOT_READY",
       "tick": 11
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#3",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 20
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#4",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 36
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#5",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 61
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#6",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 86
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#7",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 111
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#8",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 136
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#9",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 161
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#10",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 186
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#11",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 211
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#12",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 236
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#13",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 261
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#14",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 286
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#15",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 311
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#16",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 336
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#17",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 361
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#18",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 386
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#19",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 411
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#20",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 436
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#21",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 461
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#22",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 486
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#23",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 511
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#24",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 536
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#25",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 561
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#26",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 586
-     },
-     {
-      "eventId": "coffee-1:cup#boot-0:cup_sensor#27",
-      "commandId": "",
-      "type": "cup",
-      "code": "CUP_ABSENT",
-      "tick": 611
      }
     ],
     "reconciliations": [],
@@ -4616,14 +4503,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
      "served": "1"
     },
-    "digest": "3d86fafc0702f51227ea4190712dbc492df05f1bc76b662d8d323875a4413575",
+    "digest": "05b55e3a5759f77d9634a3e5e3f55738f10109136373ccf11a2fb854afb8ebf0",
     "attention": [
      {
       "reason": "COFFEE_STEP_BLOCKED",
@@ -4688,7 +4575,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.3930294850975074
+     "minSeparationM": null
     }
    },
    "BV03-ice-before": {
@@ -4701,14 +4588,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
      "served": "1"
     },
-    "digest": "e17fc81ab02715e2d73e396ae0fda00809c2a8cee36c5fedacc65e0a856889c1",
+    "digest": "7a725a5431bda5a176662ad5d6de5bb8488ec8e6a7a64d5d4b67b563c6ae1e0c",
     "attention": [
      {
       "reason": "STEP_TIMEOUT",
@@ -4772,7 +4659,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.3930294850975074
+     "minSeparationM": null
     }
    },
    "BV03-ice-mid": {
@@ -4785,14 +4672,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
      "served": "1"
     },
-    "digest": "a18aad51566252a18eb13625d4116f1d4c9417258650203c8326ab9078dd9c56",
+    "digest": "6285d2815b5c9c9b764f6dea8888e63f617109ec087ea069608328ed352510ac",
     "attention": [
      {
       "reason": "STEP_FAILED",
@@ -4856,7 +4743,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.3930294850975074
+     "minSeparationM": null
     }
    },
    "BV03-contention": {
@@ -4869,14 +4756,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 7,
     "outcome": {
      "status": "completed",
      "served": "2"
     },
-    "digest": "1333d16d988b17642b35a3b36f6d13cea675b83decc6b5ad505c0098455c6dd4",
+    "digest": "8b27f89485743040a1872096fe007593b0234a527aa0a8eac9162cd57784d5ab",
     "attention": [],
     "faults": [],
     "rejectedObservations": [
@@ -4928,7 +4815,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.3930294850975074
+     "minSeparationM": null
     }
    },
    "BV04-dose-low": {
@@ -4941,14 +4828,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "5cba9e548e7e68add827400e5927068d55780527566a93c7119357c9a7f6a784",
+    "digest": "79079a464331b334f8662fe2b50b3c583aeb77dd96890d864b8b541e62797f7f",
     "attention": [
      {
       "reason": "QUALITY_REJECTED",
@@ -5026,14 +4913,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "ffa72e8ca4ef044cad9f7013f71fc5c1949582330a2e0c8f6eb5d6ea1f71ebf9",
+    "digest": "7a8eb42addf8b9fa322489eccc41ff112f84f1ce7ca3ca9b8435ae8a4e36fd66",
     "attention": [
      {
       "reason": "QUALITY_REJECTED",
@@ -5111,14 +4998,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "168338626ce641e243f8d07bc0627cb1302fd8d3c1fdd31d8806a96d89772722",
+    "digest": "49a05bcdadb1db8b57c4c025d6f0dc2a6a7f069d09d6d7c0f93e4c86cbc20645",
     "attention": [
      {
       "reason": "MEASUREMENT_MISSING",
@@ -5195,14 +5082,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 3,
     "outcome": {
      "status": "completed",
      "served": "2"
     },
-    "digest": "1f392d30f1674ac613d2dc2ffb144afae26c009740690b0790ba2e5e7c1cb8cb",
+    "digest": "baee2cfdd654f54d47a59d4934f83b16ddb217828bde5f836c1bcbd7ab0430eb",
     "attention": [],
     "faults": [
      {
@@ -5265,7 +5152,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.3930294850975074
+     "minSeparationM": null
     }
    },
    "BV05-reboot": {
@@ -5278,14 +5165,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 3,
     "outcome": {
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "7989c2a5d9589d7971625275c2426efeae3662bd0fa2ff57666274e9d1d5b976",
+    "digest": "7ff99d59cf06bcb04277064011e418d9ae697c1b4bd6c362601268b102130273",
     "attention": [
      {
       "reason": "STEP_UNKNOWN",
@@ -5362,14 +5249,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "515dbdf8b089c4f8f63aa3af90475fad5b86edf6eed08a13deb770a20734ed3f",
+    "digest": "7f608d03797f48f525eaf536367a891864f0d3583e84959e8c0255ea78058f47",
     "attention": [
      {
       "reason": "TRANSFER_REJECTED",
@@ -5434,7 +5321,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.3961917627576758
+     "minSeparationM": null
     }
    },
    "BV07-dock": {
@@ -5447,14 +5334,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 1,
     "outcome": {
      "status": "running",
      "served": "0"
     },
-    "digest": "a6fe91cc14099583a9534d109f7f591f1d34915fb275649664910252ec7e78ac",
+    "digest": "b416afa84dcec3a6d435d00f47f7ac75b93ba1fa40f8ccceb6cb8c8022f99fad",
     "attention": [],
     "faults": [
      {
@@ -5512,7 +5399,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.3961917627576758
+     "minSeparationM": null
     }
    },
    "BV07-cancel": {
@@ -5525,14 +5412,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "8036b3f5941eeb05a294f756e3c45890de87eb8ab1be44e301d0baa5410909c8",
+    "digest": "f62a3f5ead6171558948fbd054421b9b989ac7e69fb2b630dbe4d3271a7f7414",
     "attention": [
      {
       "reason": "CANCEL_DURING_STEP",
@@ -5603,14 +5490,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 2,
     "outcome": {
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "6b358b2acb4a1a51d9b9da8acd982a87e0ee69d5a22a278f0d7e5089e31e4ccf",
+    "digest": "c0dcdac443319ec6f09abf92f22e81ada212bb89ba6473e3be7b6a38628bdf0b",
     "attention": [
      {
       "reason": "TRANSFER_UNKNOWN",
@@ -5674,7 +5561,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.3961917627576758
+     "minSeparationM": null
     }
    },
    "BV08": {
@@ -5687,14 +5574,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 1,
     "outcome": {
      "status": "completed",
      "served": "2"
     },
-    "digest": "b055d6e3c4836318c00f539f62c9183987deee4f8968c307215f3374438ff78e",
+    "digest": "940681246594b1da193193c5198b0aba66addebce1d63fc422249bf44c93a1fa",
     "attention": [],
     "faults": [
      {
@@ -5752,7 +5639,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.3930294850975074
+     "minSeparationM": null
     }
    },
    "SYS01": {
@@ -5770,7 +5657,7 @@
      "status": "completed",
      "served": "1"
     },
-    "digest": "2fbf00d6e6d6c8a22d31f4fcb467ee2d0a86d7f55183e97c2798acd9dbf0c2c3",
+    "digest": "62ac6f11d4034cf71a383bcf138d918dce8a19e29b975667daf36c0012ba6cd5",
     "attention": [],
     "faults": [],
     "rejectedObservations": [],
@@ -5779,7 +5666,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.01802948509750718
+     "minSeparationM": null
     }
    },
    "SYS02": {
@@ -5797,7 +5684,7 @@
      "status": "needs_attention",
      "served": "0"
     },
-    "digest": "47d86acf8599e51741e64f8da1f06ca9cc0dae90f7ecda55e0732ff21f6ce51c",
+    "digest": "eca9885d7af70dd9af7b5323073f298d335610101f94842fd4db9d10e5e90ef8",
     "attention": [
      {
       "reason": "RECOVERY_UNKNOWN",
@@ -5817,7 +5704,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.01802948509750718
+     "minSeparationM": null
     }
    },
    "SYS03": {
@@ -5835,7 +5722,7 @@
      "status": "completed",
      "served": "1"
     },
-    "digest": "91c62de4c7be3cf89e84a957f94157a6297b8fc1037a5cc828aeb658dd5c2a24",
+    "digest": "4d68042fb993b243f288819ff89d56de47d6b9811759b6e05c49e7ad5ed349b6",
     "attention": [],
     "faults": [
      {
@@ -5856,14 +5743,14 @@
     ],
     "rejectedObservations": [
      {
-      "eventId": "950c5ece-fed2-48fd-99aa-e44a0a9ef255-5",
+      "eventId": "15cbfa99-3ebb-4e52-a345-5e11634ab7a7-5",
       "commandId": "robot-command-b89f9563bb8198e188c22d7861f22993",
       "type": "completed",
       "code": "STALE_ROBOT_EVENT",
       "tick": 880
      },
      {
-      "eventId": "950c5ece-fed2-48fd-99aa-e44a0a9ef255-9",
+      "eventId": "15cbfa99-3ebb-4e52-a345-5e11634ab7a7-9",
       "commandId": "robot-command-32110e69affbb968b44c93f7dd3e8bd1",
       "type": "completed",
       "code": "STOP_NOT_FOUND",
@@ -5875,7 +5762,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.01802948509750718
+     "minSeparationM": null
     }
    },
    "SYS05": {
@@ -5893,7 +5780,7 @@
      "status": "running",
      "served": "0"
     },
-    "digest": "62437840e4ab1af2fc398a7675219e9dcf9bef43903efbcbcbc2309c9c98b664",
+    "digest": "e7592bb467775b4789c131a2af7a9c20988f7a54da0e9e8bb2da9da06ebe1080",
     "attention": [],
     "faults": [],
     "rejectedObservations": [],
@@ -5915,14 +5802,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 42,
     "outcome": {
      "status": "ready",
      "served": "0"
     },
-    "digest": "1e35220de1f73d5571ab11c7820dd41439ab4de31c6db05f6d7d7921c99e4d9a",
+    "digest": "dd1144093abb8b36b76de7a6ebda888bfde62370c5629dba0ab3cfd58aa00f0b",
     "attention": [],
     "faults": [],
     "rejectedObservations": [],
@@ -5944,14 +5831,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 42,
     "outcome": {
      "status": "completed",
      "served": "2"
     },
-    "digest": "10e86d30fbb5f0d2cc476b126d76c323b80d00e834b84e9f8198356c0664292c",
+    "digest": "4cd5a9626386659bbc8f4e9236552206dc10764fc373792e52e76bc192f061cd",
     "attention": [],
     "faults": [],
     "rejectedObservations": [
@@ -6003,7 +5890,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.3930294850975074
+     "minSeparationM": null
     }
    },
    "FD01-seed-1000": {
@@ -6021,7 +5908,7 @@
      "status": "completed",
      "served": "1"
     },
-    "digest": "b3f4cb446324bcec5aa9f608fab02e34b09b95bdad97ef07988f38d1c23d6890",
+    "digest": "3a103aec97c13961f904695679181080b6c835685998543c7bc4864569ed6a0b",
     "attention": [],
     "faults": [],
     "rejectedObservations": [],
@@ -6030,7 +5917,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.01802948509750718
+     "minSeparationM": null
     }
    },
    "FD02-seed-1000": {
@@ -6048,7 +5935,7 @@
      "status": "completed",
      "served": "3"
     },
-    "digest": "adbc6d529e1a61afb22087c1fbe6fb38187c967fb5584907abffdfdbd7ba620c",
+    "digest": "a324d04ebeb8548b4c768e285518dba7361ed9f8cf2a5c7b704eb0dcd53de0c1",
     "attention": [],
     "faults": [],
     "rejectedObservations": [],
@@ -6057,7 +5944,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.01802948509750718
+     "minSeparationM": null
     }
    },
    "FD07@77": {
@@ -6075,7 +5962,7 @@
      "status": "completed",
      "served": "2"
     },
-    "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419",
+    "digest": "e9cd08ecc7348fd33835213bfe313cf3861af6a325c02e8d759d7858e05ef717",
     "attention": [],
     "faults": [],
     "rejectedObservations": [],
@@ -6084,7 +5971,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.01802948509750718
+     "minSeparationM": 1.1860589701950146
     }
    },
    "BV01@77": {
@@ -6097,14 +5984,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 77,
     "outcome": {
      "status": "completed",
      "served": "2"
     },
-    "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c",
+    "digest": "9aa5edd998a2cf2ef276139f03d9634154f90ba3202b074be516e9d742b6c377",
     "attention": [],
     "faults": [],
     "rejectedObservations": [
@@ -6156,7 +6043,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.3930294850975074
+     "minSeparationM": null
     }
    },
    "FD03@77": {
@@ -6174,7 +6061,7 @@
      "status": "completed",
      "served": "1"
     },
-    "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0",
+    "digest": "cbf31878df01497d3e9b8aaac3c99b0ac32f27cf8e8262cd96d73a93f063cf9e",
     "attention": [],
     "faults": [
      {
@@ -6325,7 +6212,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.005998727883860522
+     "minSeparationM": null
     }
    },
    "FD04-reopen@77": {
@@ -6343,7 +6230,7 @@
      "status": "completed",
      "served": "1"
     },
-    "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13",
+    "digest": "c56474ca5921dd496893c41254ed415201dc17d3ec7119801048d317625bb382",
     "attention": [],
     "faults": [
      {
@@ -6374,7 +6261,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.007797104720415338
+     "minSeparationM": null
     }
    },
    "Timing-BV01@11": {
@@ -6387,14 +6274,14 @@
     "backends": [
      "mock_amr@1/mock_kinematic",
      "mock_coffee@1/mock_process",
-     "mock_arm@1/mock_kinematic"
+     "mock_arm@2/mock_kinematic"
     ],
     "seed": 11,
     "outcome": {
      "status": "completed",
      "served": "2"
     },
-    "digest": "d9266c5757e93573450c7ad5629864029ea07cdaee66dcf42012a82569a79d4b",
+    "digest": "d49504cb582ffb76f8ee6c13ffd1cf6d368d2f88d9c001d8c83f3e0f8faa8284",
     "attention": [],
     "faults": [],
     "rejectedObservations": [
@@ -6446,7 +6333,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.3930294850975074
+     "minSeparationM": null
     }
    },
    "Timing-FD01@11": {
@@ -6464,7 +6351,7 @@
      "status": "completed",
      "served": "1"
     },
-    "digest": "40862969c6efe7683cad2de5a9359e39c7ff0fdad189bdc4429ef9c6264197e1",
+    "digest": "be7c1156c10d94f6625f88b04630aff6ed6d911b64ae302a91d73a885b28cecc",
     "attention": [],
     "faults": [],
     "rejectedObservations": [],
@@ -6473,7 +6360,7 @@
     "collision": {
      "available": true,
      "contacts": 0,
-     "minSeparationM": 0.01802948509750718
+     "minSeparationM": null
     }
    }
   },
@@ -6517,7 +6404,7 @@
    "FD08 runner: localization lost before arrival: goal unknown, attention, last pose stale, no arrival": [
     "FD08-localization"
    ],
-   "FD08 runner: map revision changes at a stop: the next leg is refused (MAP_MISMATCH) by the adapter, pose stale, nothing served": [
+   "FD08 runner: map revision changes at a stop: MAP_CHANGED latches stale pose and blocks the next leg, nothing served": [
     "FD08-map"
    ],
    "BV01 runner: both recipes run their own step order; espresso has no ice/milk; one cup owner; served only after the final handoff": [
@@ -6742,7 +6629,7 @@
    },
    "runs": {
     "BV01@11#1": {
-     "wallMs": 1768,
+     "wallMs": 2610,
      "travelMs": [
       4560,
       5660,
@@ -6776,7 +6663,7 @@
      }
     },
     "BV01@11#2": {
-     "wallMs": 1367,
+     "wallMs": 2632,
      "travelMs": [
       4560,
       5660,
@@ -6810,7 +6697,7 @@
      }
     },
     "FD01@11": {
-     "wallMs": 66,
+     "wallMs": 87,
      "travelMs": [
       11640,
       14000,
@@ -6831,7 +6718,7 @@
      }
     },
     "FD01@12": {
-     "wallMs": 62,
+     "wallMs": 56,
      "travelMs": [
       11640,
       14000,
@@ -6853,6 +6740,39 @@
     }
    },
    "compareFD01": [
+    {
+     "id": "coffeeQueueWaitS",
+     "unit": "s",
+     "a": null,
+     "b": null,
+     "delta": null,
+     "available": false,
+     "reasons": [
+      "NO_RESERVED_COFFEE_JOB",
+      "NO_RESERVED_COFFEE_JOB"
+     ]
+    },
+    {
+     "id": "travelTimeS",
+     "unit": "s",
+     "a": 29.72,
+     "b": 29.72,
+     "delta": 0,
+     "available": true,
+     "reasons": []
+    },
+    {
+     "id": "cellProcessBusyS",
+     "unit": "s",
+     "a": null,
+     "b": null,
+     "delta": null,
+     "available": false,
+     "reasons": [
+      "NO_CELL_PROCESS",
+      "NO_CELL_PROCESS"
+     ]
+    },
     {
      "id": "served",
      "unit": "count",
@@ -6910,11 +6830,14 @@
     {
      "id": "minSeparationM",
      "unit": "m",
-     "a": 0.01802948509750718,
-     "b": 0.01802948509750718,
-     "delta": 0,
-     "available": true,
-     "reasons": []
+     "a": null,
+     "b": null,
+     "delta": null,
+     "available": false,
+     "reasons": [
+      "SINGLE_ROBOT",
+      "SINGLE_ROBOT"
+     ]
     }
    ],
    "notApplicable": {

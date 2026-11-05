@@ -4,7 +4,7 @@ Lab thiết kế và mô phỏng nghiệp vụ robot giao món, giữ nhận di�
 
 Bản hiện tại có cấu hình robot, mô hình 3D/2D và lắp ráp, sơ đồ kết nối chức năng, BOM, ước tính năng lượng, trình sửa mặt bằng, báo cáo/replay và xuất candidate dự thảo. Digital Twin v2 chạy giao món, cà phê và chiến dịch hai AMR qua **domain, SQLite journal và dispatcher trong source**, với backend mock AMR/arm/coffee. S01 v1 vẫn có luồng xác nhận tải và giao món riêng. Mô hình web không chứng minh robot thật, động lực học hay an toàn vật lý.
 
-Các sửa R01–R12 và 18 phần mềm còn thiếu của Plan 01 đã có implementation và regression tương ứng; xem [bản ghi remediation](docs/reviews/2026-11-05-plan-01-remediation.md). Kiểm chứng tổng cuối, clean runtime pin và nghiệm thu vẫn phải được ghi bằng evidence riêng; tài liệu này không nâng R-MOCK thành accepted.
+Đã hoàn thiện R01–R12 và 18 mục phần mềm còn thiếu của Plan 01. Vòng kiểm chứng cuối trên source/runtime `c1d1ea7` đã qua toàn bộ lệnh CI tương đương, browser, offline và 41 acceptance tests: 96/106 dòng có bằng chứng pass, không còn `NOT_IMPLEMENTED`. Mười dòng còn lại thuộc gate người dùng/Linux hoặc fidelity vật lý. Xem [bản ghi remediation](docs/reviews/2026-11-05-plan-01-remediation.md) và [bằng chứng](docs/implementation/evidence/digital-twin-v2/mock-report.md); **R-MOCK chưa accepted**.
 
 ## Chạy giao diện
 
@@ -74,7 +74,7 @@ cd /path/to/mekoniq-lab-offline
 
 `./start` dùng Node trong gói; không cần Node, pnpm, npm hay tải mạng trên máy nhận. Mở `http://127.0.0.1:4175`, nhập mã ghép nối in trong terminal. Runtime dùng cổng 4176, dữ liệu mặc định ở `runs/` trong gói; có thể chọn `./start --data-dir /path/to/runs`. UI phải giữ cổng 4175 để khớp origin được runtime cho phép. Launcher kiểm manifest/platform, từ chối cổng đang dùng và chỉ dừng tiến trình nó đã tạo.
 
-Test gói có thể boot khi không có package manager trong `PATH`. Điều này chưa thay evidence cài trên máy mới, ngắt mạng hệ điều hành, cold boot, Linux hay browser trên final pin; trạng thái cuối nằm trong [remediation](docs/reviews/2026-11-05-plan-01-remediation.md).
+Gói macOS/Apple Silicon hiện có tại [`releases/mekoniq-lab-plan01-macos-arm64-c1d1ea7.tar.gz`](releases/mekoniq-lab-plan01-macos-arm64-c1d1ea7.tar.gz), kèm [checksum và nguồn runtime](docs/implementation/evidence/digital-twin-v2/plan01-offline-release.json). Giải nén rồi chạy `./start`. Gói này đã qua kiểm khởi động; các hành trình FD01/BV01 đã qua browser với bản offline cùng code/pin. Kiểm không có package manager trong `PATH` đã qua. Cài trên máy mới, ngắt mạng hệ điều hành, cold boot và Linux vẫn cần bằng chứng riêng.
 
 ## Đầu vào, khôi phục và báo cáo Twin
 
@@ -110,7 +110,7 @@ Runtime chỉ bind `127.0.0.1:4176`; Vite proxy cùng origin. Không dùng cổn
 
 ### Cài hoặc cập nhật runtime
 
-Revision runtime thực đang cài nằm trong [`config/source-runtime.lock.json`](config/source-runtime.lock.json): source commit, schema hash, artifact SHA-256 và protocol majors. Lab dùng protocol 1 cho S01 và 2 cho twin. `.runtime/rollback.lock.json` giữ đúng một pin trước đó; muốn quay xa hơn cần export/import revision cũ. Runtime không tự theo source HEAD. Remediation chỉ có mặt trong runtime sau khi source được commit sạch và artifact mới được export/import; trạng thái final pin đang được theo dõi trong [bản ghi remediation](docs/reviews/2026-11-05-plan-01-remediation.md).
+Revision runtime thực đang cài nằm trong [`config/source-runtime.lock.json`](config/source-runtime.lock.json): source commit, schema hash, artifact SHA-256 và protocol majors. Lab dùng protocol 1 cho S01 và 2 cho twin. `.runtime/rollback.lock.json` giữ đúng một pin trước đó; muốn quay xa hơn cần export/import revision cũ. Runtime không tự theo source HEAD. Bản remediation hiện ghim đúng source `c1d1ea70e42937d421070674f07d00edc7c41245`, export từ checkout sạch và đã kiểm trên runtime cài thực. Xem [bản ghi remediation](docs/reviews/2026-11-05-plan-01-remediation.md) để đối chiếu hash và kết quả.
 
 Dùng Node 24, dependencies của source và một checkout sạch. Chạy **từ thư mục source**:
 
@@ -148,7 +148,7 @@ pnpm build
 
 Plan 01 hiện có phần mềm mock cho delivery, coffee, mixed workload, arm model, SSE/recovery, replay/evidence và gói offline. Source vẫn quyết định arrival, fulfillment, cup custody và effect; renderer không quyết định nghiệp vụ. Candidate chỉ là draft, không chứa credentials, quyền điều khiển hay hàng đợi mission.
 
-**R-MOCK chưa được tự động nghiệm thu.** Final CI/browser/pin và review evidence cần hoàn tất; UX timing với người dùng, máy macOS mới, ngắt mạng thật, cold boot và Linux là gate riêng. Phép đo tablet 2D emulated trên Mac không thay phép đo thiết bị tablet thật. Plans 02/03, Gazebo/Nav2, LinuxCNC, native adapters, calibration và hardware/venue acceptance vẫn thuộc các gate tương ứng.
+**R-MOCK chưa được nghiệm thu.** Phần mềm, pin và vòng CI/browser cuối đã được kiểm; owner vẫn cần review bằng chứng. UX timing với ít nhất 5 người dùng mới, máy macOS mới, ngắt mạng thật, cold boot và Linux là gate riêng. Phép đo tablet 2D emulated trên Mac không thay phép đo thiết bị tablet thật. Plans 02/03, Gazebo/Nav2, LinuxCNC, native adapters, calibration và hardware/venue acceptance vẫn thuộc các gate tương ứng.
 
 Code W00–W11 trong source không tự trở thành scenario hoặc backend Lab. Nấu ăn vẫn là roadmap; pha chế hiện có mock workflow với provenance minh họa/modelled. Xem [tiến độ](docs/implementation/progress.md), [remediation](docs/reviews/2026-11-05-plan-01-remediation.md) và [compatibility](docs/simulation-compatibility.md) trước khi dùng kết quả cho quyết định kỹ thuật.
 

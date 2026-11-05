@@ -1,11 +1,11 @@
 # Simulation compatibility and evidence scope
 
-Updated 2026-11-05 for the Plan 01 software remediation. This page describes implemented interfaces and their limits. Final clean runtime pin, regression recording and owner acceptance remain pending in the [remediation record](reviews/2026-11-05-plan-01-remediation.md).
+Updated 2026-11-05 for the Plan 01 software remediation. This page describes implemented interfaces and their limits. The clean runtime pin and full regression/acceptance record are complete for source `c1d1ea70e42937d421070674f07d00edc7c41245`. Owner acceptance and external gates remain open in the [remediation record](reviews/2026-11-05-plan-01-remediation.md).
 
 ## Authoritative records
 
 - [`config/source-runtime.lock.json`](../config/source-runtime.lock.json) identifies the runtime Lab actually loads: source commit, schema hash, artifact hash and protocol majors.
-- [`config/simulation-compatibility.json`](../config/simulation-compatibility.json) is the existing machine-readable compatibility/evidence snapshot. Its earlier hashes and `NOT_IMPLEMENTED` entries describe its recorded revision until the final recorder regenerates them. Do not mix those hashes with uncommitted source changes.
+- [`config/simulation-compatibility.json`](../config/simulation-compatibility.json) binds the current source/pin, provider revision 2, scenario/recipe and fixture hashes and final evidence (including the arm profile embedded in the hashed fixture). It records zero `NOT_IMPLEMENTED` rows and keeps owner/human/Linux/physical gates separate.
 - Each run manifest locks its input project, world, assets, recipes, configuration, model, adapter and profile identities. Calibration is explicitly `not_calibrated` for these illustrative mock models.
 - The [mock acceptance report](implementation/evidence/digital-twin-v2/mock-report.md) records executed checks and unresolved gates at its own revision. The [original review](reviews/2026-11-05-plan-01-code-review.md) remains historical; remediation does not rewrite it.
 
@@ -17,7 +17,7 @@ Source owns domain decisions, journal, dispatcher, mission confirmations, invent
 
 Plans 02/03 must verify the actual exported schema/provider hashes when binding a provider. Contract changes require a version/migration decision and fresh evidence. Mock durations and the old S01 completion timing are not physical cycle-time baselines. `simulation`, `shadow`, `hil` and `live` remain distinct evidence scales; reports do not rank unlike scales as equivalent performance runs.
 
-The remediation changes the cell-adapter contract; its compatibility label moves from `lab-v2-provider/1` to `lab-v2-provider/2`. Providers must adopt the current contract and regenerate their binding evidence. The previous hashes remain historical; the final machine-readable snapshot will record the new hashes after the clean export.
+The remediation changes the cell-adapter contract; its compatibility label moves from `lab-v2-provider/1` to `lab-v2-provider/2`. Providers must adopt the current contract and regenerate their binding evidence. The machine-readable snapshot records the new hashes from the clean export; earlier hashes remain historical.
 
 ## Recovery and input identity
 
@@ -49,10 +49,11 @@ Software checks do not close these separate gates:
 
 | Gate | Evidence still required |
 |---|---|
-| Final software release | Clean source commit/export/import; matching final UI/runtime; complete regression/browser recording and owner review. |
+| Owner acceptance | Review the completed clean-pin software evidence and the separate external gates; R-MOCK remains unaccepted. |
 | Human use and host setup | UX task timing, fresh macOS setup, actual network disconnection and host cold boot. |
 | Linux | Build/run evidence on a fresh supported Linux host. |
 | Physical tablet performance | Measurement on the intended device; desktop emulation identifies only its recorded host. |
-| Simulation/hardware fidelity | Native provider tests, calibrated geometry/sensors, dynamics and physical stopping/custody evidence under Plans 02/03 and hardware/venue gates. |
+| Simulation fidelity | Linux/provider binding, scenario and model-fidelity evidence under Plans 02/03; mock evidence cannot establish these. |
+| Hardware/venue | Measured calibration, native sensor behavior, physical stop/custody and device/venue acceptance evidence. |
 
 The renderer benchmark uses 2 AMRs, one arm and six tables for at least 60 seconds, with declared desktop 33 ms and emulated tablet 2D 50 ms p95 frame targets. It measures actual renderers with synthetic visual telemetry. It does not measure runtime throughput or physical robot behavior.

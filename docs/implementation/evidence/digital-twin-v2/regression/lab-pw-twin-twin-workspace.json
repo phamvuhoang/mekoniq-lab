@@ -121,12 +121,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 447,
+                  "duration": 596,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T04:01:34.034Z",
+                  "startTime": "2026-11-05T10:23:07.778Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -136,7 +136,7 @@
           ],
           "id": "d1b86ea3867c6276c950-5011b9435fc2857cfc22",
           "file": "twin-workspace.spec.ts",
-          "line": 8,
+          "line": 9,
           "column": 1
         }
       ],
@@ -144,7 +144,7 @@
         {
           "title": "paired source runtime",
           "file": "twin-workspace.spec.ts",
-          "line": 32,
+          "line": 33,
           "column": 15,
           "specs": [
             {
@@ -159,7 +159,7 @@
                       "type": "serial",
                       "location": {
                         "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                        "line": 32,
+                        "line": 33,
                         "column": 15
                       }
                     }
@@ -172,18 +172,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1163,
+                      "duration": 1245,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-05T04:01:34.866Z",
+                      "startTime": "2026-11-05T10:23:08.754Z",
                       "annotations": [
                         {
                           "type": "serial",
                           "location": {
                             "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                            "line": 32,
+                            "line": 33,
                             "column": 15
                           }
                         }
@@ -196,7 +196,7 @@
               ],
               "id": "d1b86ea3867c6276c950-742ff68ee145ccd20704",
               "file": "twin-workspace.spec.ts",
-              "line": 39,
+              "line": 40,
               "column": 3
             },
             {
@@ -211,7 +211,7 @@
                       "type": "serial",
                       "location": {
                         "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                        "line": 32,
+                        "line": 33,
                         "column": 15
                       }
                     }
@@ -224,18 +224,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 538,
+                      "duration": 685,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-05T04:01:36.149Z",
+                      "startTime": "2026-11-05T10:23:10.114Z",
                       "annotations": [
                         {
                           "type": "serial",
                           "location": {
                             "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                            "line": 32,
+                            "line": 33,
                             "column": 15
                           }
                         }
@@ -248,7 +248,7 @@
               ],
               "id": "d1b86ea3867c6276c950-0f4615246d4ee0934c2e",
               "file": "twin-workspace.spec.ts",
-              "line": 58,
+              "line": 59,
               "column": 3
             },
             {
@@ -263,7 +263,7 @@
                       "type": "serial",
                       "location": {
                         "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                        "line": 32,
+                        "line": 33,
                         "column": 15
                       }
                     }
@@ -276,18 +276,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1632,
+                      "duration": 2973,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-05T04:01:36.694Z",
+                      "startTime": "2026-11-05T10:23:10.804Z",
                       "annotations": [
                         {
                           "type": "serial",
                           "location": {
                             "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                            "line": 32,
+                            "line": 33,
                             "column": 15
                           }
                         }
@@ -300,7 +300,7 @@
               ],
               "id": "d1b86ea3867c6276c950-e87d26f9fae862c305f4",
               "file": "twin-workspace.spec.ts",
-              "line": 85,
+              "line": 86,
               "column": 3
             },
             {
@@ -315,7 +315,7 @@
                       "type": "serial",
                       "location": {
                         "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                        "line": 32,
+                        "line": 33,
                         "column": 15
                       }
                     }
@@ -328,18 +328,18 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1128,
+                      "duration": 1458,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-05T04:01:38.333Z",
+                      "startTime": "2026-11-05T10:23:13.784Z",
                       "annotations": [
                         {
                           "type": "serial",
                           "location": {
                             "file": "<workspace>/lab/tests/e2e/twin-workspace.spec.ts",
-                            "line": 32,
+                            "line": 33,
                             "column": 15
                           }
                         }
@@ -352,7 +352,7 @@
               ],
               "id": "d1b86ea3867c6276c950-fb7ce15c8e8890b6449f",
               "file": "twin-workspace.spec.ts",
-              "line": 113,
+              "line": 114,
               "column": 3
             }
           ]
@@ -362,8 +362,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-05T04:01:33.762Z",
-    "duration": 6035.612,
+    "startTime": "2026-11-05T10:23:07.515Z",
+    "duration": 8043.368,
     "expected": 5,
     "skipped": 0,
     "unexpected": 0,
