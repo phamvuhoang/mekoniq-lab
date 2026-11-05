@@ -74,7 +74,7 @@ Runtime chỉ bind `127.0.0.1:4176`; Vite proxy cùng origin. Không dùng cổn
 
 ### Cài hoặc cập nhật runtime
 
-Ngày 2026-11-05 (F07), lock được cập nhật lên source `2be6d1591f4c481cef60fcb6058782544a5ca2d7` (nhánh `feat/lab-digital-twin-v2`): artifact có **protocol 1/2** (S01 v1 vẫn chạy; twin dùng v2), schema hash mới. Lock trước đó (W11 `a0787771…`, protocol 1) được giữ trong `.runtime/rollback.lock.json`. Runtime chỉ dùng revision trong lock, không tự theo HEAD của source.
+Lock hiện tại ([`config/source-runtime.lock.json`](config/source-runtime.lock.json)) pin source `d473d87af4fa8481e2770976b3385aceff294b52`, nhánh `feat/lab-digital-twin-v2` (F08 final fix wave). Artifact `115cf27168b0ab32579a96ee728c4bcdf52c99ac94d8355e6d0b7855c19aad57` có **protocol 1/2**: S01 v1 vẫn chạy, còn twin dùng v2. `.runtime/rollback.lock.json` giữ **đúng một** pin trước đó, là source `a741e01` (artifact `010f5c65…2606`). Muốn quay xa hơn thì phải export và import lại revision cũ. Runtime chỉ dùng revision trong lock, không tự theo HEAD của source; giá trị máy đọc luôn nằm trong lock, đoạn này chỉ để tham khảo.
 
 Dùng Node 24, dependencies của source và một checkout sạch. Chạy **từ thư mục source**:
 
@@ -91,7 +91,7 @@ node scripts/import-runtime.mjs /tmp/mekoniq-source-runtime-artifact
 pnpm check:source
 ```
 
-Importer là một giao dịch: kiểm metadata, protocol major (Lab hỗ trợ 1 và 2; major lạ bị từ chối `UNSUPPORTED_PROTOCOL`), SHA-256 runtime, băm lại các schema hợp đồng đi kèm so với `schemaHash`, chép vào `.runtime/<sha256>/` qua thư mục staging rồi mới đổi lock bằng một lần rename. Lỗi ở bất kỳ bước nào giữ nguyên lock và artifact cũ; từ chối artifact build từ source bẩn. Quay lại pin trước: `node scripts/import-runtime.mjs --rollback` (artifact cũ vẫn nằm trong `.runtime/`). Sau mỗi lần đổi lock, chạy `pnpm test`, `pnpm build` và `pnpm test:runtime-e2e`. `pnpm check:source` kiểm tính toàn vẹn artifact đã pin, không kiểm đó có phải HEAD mới nhất hay không. Runtime đóng gói chạy độc lập, không đọc source đang được chỉnh sửa ở bên cạnh. Xem thêm [README runtime source](../source/packages/lab-runtime/README.md) và [bằng chứng cập nhật W11](docs/implementation/evidence/2026-11-04-source-w11.md).
+Importer là một giao dịch: kiểm metadata, protocol major (Lab hỗ trợ 1 và 2; major lạ bị từ chối `UNSUPPORTED_PROTOCOL`), SHA-256 runtime, băm lại các schema hợp đồng đi kèm so với `schemaHash`, chép vào `.runtime/<sha256>/` qua thư mục staging rồi mới đổi lock bằng một lần rename. Lỗi ở bất kỳ bước nào giữ nguyên lock và artifact cũ. Import lại cùng một SHA thì giữ nguyên thư mục đã kiểm hash. Bản ghi rollback chỉ được ghi (nguyên tử) sau khi lock mới đã thay xong. Importer từ chối artifact build từ source bẩn. Quay lại pin trước: `node scripts/import-runtime.mjs --rollback` (artifact cũ vẫn nằm trong `.runtime/`). Sau mỗi lần đổi lock, chạy `pnpm test`, `pnpm build` và `pnpm test:runtime-e2e`. `pnpm check:source` kiểm tính toàn vẹn artifact đã pin, không kiểm đó có phải HEAD mới nhất hay không. Runtime đóng gói chạy độc lập, không đọc source đang được chỉnh sửa ở bên cạnh. Xem thêm [README runtime source](../source/packages/lab-runtime/README.md) và [bằng chứng cập nhật W11](docs/implementation/evidence/2026-11-04-source-w11.md).
 
 ## Kiểm thử
 
