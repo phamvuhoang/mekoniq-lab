@@ -13,8 +13,17 @@ export const presets:TwinPreset[]=[
   scenarioId:'FD01',scenarioRevision:1,backendSetId:'mock-amr',seed:42,project:restaurantFixture.project as LabProjectV2,assets:restaurantFixture.assets as AssetRevision[],
   names:{'amr-1':'AMR-1'},roles:{entities:['amr'],points:['kitchen','table','parking']}},
 ];
+const mixedProject:LabProjectV2=structuredClone(coffeeFixture.project as LabProjectV2);
+mixedProject.entities.push({...structuredClone(mixedProject.entities.find(e=>e.kind==='amr')!),id:'amr-2'});
+mixedProject.world={...mixedProject.world,width:10,height:6,points:[...mixedProject.world.points.map(p=>p.kind==='table'?{...p,x:8.5,y:1.5}:p),{id:'parking-2',name:'Parking 2',kind:'parking',x:0.8,y:5},{id:'kitchen',name:'Kitchen',kind:'kitchen',x:1,y:3},{id:'table-2',name:'T02',kind:'table',x:8.5,y:4.5}],obstacles:[{id:'wall-south',x:4.5,y:0,width:1,height:2.5},{id:'wall-north',x:4.5,y:3.5,width:1,height:2.5}]};
+for(const [id,scenarioId,seed,title,summary] of [
+ ['mixed','FD02-cups',42,()=>tr('Món ăn và cà phê cùng chuyến','料理とコーヒーを同じ便で','Food and coffee together'),()=>tr('Một mission giao món ăn và cốc cà phê đã xác định.','1つのミッションで料理と識別済みカップを配送。','One mission carries food and its identified coffee cup.')],
+ ['campaign','CAMPAIGN-FD02-FD07-BV01-BV03',3,()=>tr('Chiến dịch hai robot','2台ロボットの連続シナリオ','Two-robot campaign'),()=>tr('Hai AMR dùng chung hành lang, món ăn và hai recipe cà phê.','2台のAMRが通路を共有し、料理と2種のコーヒーを配送。','Two AMRs share a corridor while delivering food and two coffee recipes.')],
+] as const)presets.push({...presets[0]!,id,scenarioId,seed,title,summary,project:structuredClone(mixedProject),names:{...presets[0]!.names,'amr-2':'AMR-2'},roles:{entities:['amr','arm','coffee_machine'],points:['kitchen','coffee_pickup','table','parking']}});
 export const presetById=(id:string)=>presets.find(p=>p.id===id);
 /** Display name of an entity, point, cup or job; unknown ids are shown as-is, never invented. */
 export function nameOf(preset:TwinPreset|undefined,id:string):string {
- return preset?.names[id]??preset?.project.world.points.find(p=>p.id===id)?.name??id;
+ const name=preset?.names[id]??preset?.project.world.points.find(p=>p.id===id)?.name??id;
+ const common:Record<string,string>={'Coffee cell':tr('Trạm cà phê','コーヒーセル','Coffee cell'),'Cup station':tr('Trạm cốc','カップ置場','Cup station'),'Arm-1':tr('Cánh tay 1','アーム1','Arm-1'),'Parking':tr('Điểm chờ','待機場所','Parking'),'Kitchen':tr('Bếp','厨房','Kitchen'),'Dock':tr('Trạm sạc','充電場所','Dock')};
+ return common[name]??name;
 }

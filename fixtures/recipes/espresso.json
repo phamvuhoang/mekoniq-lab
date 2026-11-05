@@ -1,10 +1,27 @@
 {
   "schemaVersion": 2,
-  "id": "espresso",
-  "revision": 1,
-  "hash": "2fdaac68e5c91164a466ced01560600da2c8bd6a6a44071d9bba1297ff92aa82",
-  "outputType": "espresso",
+  "revision": 2,
   "cupType": "cup-paper-illustrative",
+  "recovery": {
+    "onTimeout": "hold_and_reconcile",
+    "autoRetry": false
+  },
+  "id": "espresso",
+  "outputType": "espresso",
+  "policies": {
+    "cup": {
+      "revision": 1,
+      "provenance": "illustrative",
+      "capacityM3": "0.0003",
+      "headspaceM3": "0.00002",
+      "iceVolumeM3PerKg": "0.0011"
+    },
+    "measurement": {
+      "revision": 1,
+      "provenance": "illustrative",
+      "maxTargetMultiplier": "2"
+    }
+  },
   "steps": [
     {
       "id": "brew",
@@ -43,8 +60,5 @@
       "requiredAmount": null
     }
   ],
-  "recovery": {
-    "onTimeout": "hold_and_reconcile",
-    "autoRetry": false
-  }
+  "hash": "79967849905e6a95f2b5f0cc19e1f449c6a40e5df7a2645b29e4fae3a2c5af96"
 }

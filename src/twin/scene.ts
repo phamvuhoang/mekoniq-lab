@@ -7,7 +7,8 @@ import {amrFootprint,assetOf,runtimeResolved} from './amr';
 import {cellLayout,cupLocation,jobsOf} from './coffee-cell';
 import {esc} from '../ui/icons';
 import {tr} from '../i18n';
-export interface TwinFrame {preset:TwinPreset;view:RunView|null;report:RunReport|null}
+import {stateLabel} from '../ui/labels';
+export interface TwinFrame {preset:TwinPreset;view:RunView|null;report:RunReport|null;seen?:Record<string,number>}
 export interface ViewState {view:'2d'|'3d';layers:Layers;selected:string|null}
 export interface SceneEntity {id:string;kind:string;name:string;x:number;y:number;source:'observed'|'modeled'|'derived'|'unknown';status?:string}
 const S=100;
@@ -28,14 +29,14 @@ export function sceneEntities(f:TwinFrame):SceneEntity[] {
  if(v)for(const c of v.coffee?.cups??[]){const at=cupLocation(c,p,v);out.push({id:c.cupId,kind:'cup',name:c.cupId,x:at?.x??NaN,y:at?.y??NaN,source:at?'observed':'unknown',status:`${c.ownerKind}:${c.ownerId}`});}
  return out;
 }
-const kindLabel=(k:string)=>({amr:'AMR',arm:tr('Cánh tay','アーム','Arm'),coffee_machine:tr('Máy pha','コーヒーマシン','Coffee machine'),cup_station:tr('Trạm cốc','カップ置場','Cup station'),job:'Job',cup:tr('Cốc','カップ','Cup')})[k]??k;
+const kindLabel=(k:string)=>({amr:'AMR',arm:tr('Cánh tay','アーム','Arm'),coffee_machine:tr('Máy pha','コーヒーマシン','Coffee machine'),cup_station:tr('Trạm cốc','カップ置場','Cup station'),job:tr('Công việc','ジョブ','Job'),cup:tr('Cốc','カップ','Cup')})[k]??k;
 export {kindLabel};
 export function renderTwin(f:TwinFrame,vs:ViewState):string {
  const p=f.preset.project,w=p.world,v=f.view,X=(x:number)=>x*S,Y=(y:number)=>(w.height-y)*S,pt=(x:number,y:number)=>`${X(x).toFixed(1)},${Y(y).toFixed(1)}`;
  const ents=sceneEntities(f),sel=vs.selected,L=vs.layers;
  const grid=Array.from({length:Math.floor(w.width)+1},(_,n)=>`<text x="${X(n)}" y="-8" text-anchor="middle" class="tw-axis">${n} m</text>`).join('');
  const obstacles=w.obstacles.map(o=>`<rect class="tw-obstacle" x="${X(o.x)}" y="${Y(o.y+o.height)}" width="${o.width*S}" height="${o.height*S}" rx="4"><title>${esc(o.id)} · ${tr('mô hình','モデル','modeled')}</title></rect>${L.contacts?`<rect class="tw-clearance" x="${X(o.x)-8}" y="${Y(o.y+o.height)-8}" width="${o.width*S+16}" height="${o.height*S+16}" rx="10"/>`:''}`).join('');
- const points=w.points.map(q=>`<g class="tw-point" transform="translate(${pt(q.x,q.y)})"><circle r="5"/><text y="20" text-anchor="middle">${esc(q.name)}</text></g>`).join('');
+ const points=w.points.map(q=>`<g class="tw-point" transform="translate(${pt(q.x,q.y)})"><circle r="5"/><text y="20" text-anchor="middle">${esc(nameOf(f.preset,q.id))}</text></g>`).join('');
  let overlay='';
  if(L.footprint)for(const e of ents){
   if(e.kind!=='amr')continue;
@@ -52,7 +53,7 @@ export function renderTwin(f:TwinFrame,vs:ViewState):string {
   for(const h of w.handoffPoints??[])overlay+=h.yawRad===null?`<text class="tw-unknown-label" x="${X(h.position[0]!)}" y="${Y(h.position[1]!)+30}">${esc(h.id)} · yaw ?</text>`:axes(h.position[0]!,h.position[1]!,h.yawRad,h.id);
  }
  const marks=ents.filter(e=>Number.isFinite(e.x)).map(e=>{
-  const on=e.id===sel,label=`${kindLabel(e.kind)} ${e.name}${e.status?` · ${e.status}`:''}`;
+  const on=e.id===sel,label=`${kindLabel(e.kind)} ${e.name}${e.status?` · ${stateLabel(e.status)}`:''}`;
   const shape=e.kind==='amr'?`<circle r="17" class="tw-amr ${e.source}"/><path d="m-6 5 6-12 6 12" class="tw-amr-nose"/>`
    :e.kind==='coffee_machine'?`<rect x="-22" y="-16" width="44" height="32" rx="5" class="tw-cell ${e.source}"/><text y="4" text-anchor="middle" class="tw-glyph">CM</text>`
    :e.kind==='arm'?`<circle r="14" class="tw-cell ${e.source}"/><text y="4" text-anchor="middle" class="tw-glyph">A</text>`

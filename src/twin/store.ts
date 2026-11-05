@@ -7,7 +7,7 @@ export interface TwinSample {schemaVersion:2;runId:string;entityId:string;provid
 /** A held sample: the wire sample plus when this browser received it (its own monotonic clock) and when its epoch last reset. */
 export type Held=Readonly<TwinSample&{receivedAtMs:number;epochResetAtMs:number|null}>;
 export type ApplyResult='applied'|'duplicate'|'out_of_order'|'stale_epoch'|'epoch_reset'|'foreign_provider';
-export interface Gap {reason:string;dropped?:number;fromTick?:number|null;toTick?:number;samplesNotSent?:number;atMs:number}
+export interface Gap {reason:string;dropped?:number;fromTick?:number|null;toTick?:number;fromSeq?:string;toSeq?:string;samplesNotSent?:number;atMs:number}
 const freeze=<T,>(o:T):T=>{if(o&&typeof o==='object'){Object.freeze(o);for(const v of Object.values(o))freeze(v);}return o;};
 export class TwinStore {
  private cur=new Map<string,Held>();private retired=new Map<string,string[]>();private hist=new Map<string,Held[]>();

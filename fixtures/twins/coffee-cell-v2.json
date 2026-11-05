@@ -93,6 +93,31 @@
           "height": 0.6
         }
       ]
+    },
+    "armCollisionProfile": {
+      "schemaVersion": 1,
+      "id": "coffee-arm-scene",
+      "revision": 1,
+      "units": "SI",
+      "provenance": "illustrative",
+      "reference": "Illustrative PUMA base alignment and extruded fixture/AMR heights; not calibrated or physical safety evidence",
+      "modelId": "puma560-reference",
+      "modelRevision": "bd57344faecee29df2d50b8e8535de6936b05da3778eadbf46ad0e5d626650f3",
+      "baseInMap": {
+        "position": [
+          2.794821,
+          0.941325,
+          1.2
+        ],
+        "quaternionXyzw": [
+          0,
+          0,
+          0,
+          1
+        ]
+      },
+      "fixtureHeightM": 1,
+      "robotHeightM": 0.7
     }
   },
   "assets": [

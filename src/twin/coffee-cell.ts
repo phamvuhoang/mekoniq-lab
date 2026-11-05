@@ -3,6 +3,7 @@ import type {Attention,CupView,RunReport,RunView,Quantity} from '../scenarios/co
 import type {LabProjectV2} from '../shared/types';
 import {fmt,type Row} from './amr';
 import {tr} from '../i18n';
+import {stateLabel} from '../ui/labels';
 type XY={x:number;y:number};
 /** The project has no pose for cell entities: placement is derived from the coffee pickup point and labelled derived, never measured. */
 export function cellLayout(project:LabProjectV2):{pickup:XY;machine:XY;arm:XY;cups:XY}|null {
@@ -39,8 +40,16 @@ export function explain(a:Attention):{waiting:string;observed:string;rule:string
  const e=k[a.reason];
  return e?{waiting:e[0],observed:e[1],rule:e[2],action:e[3],entities:ents}:{waiting:'—',observed:a.reason,rule:tr('Runtime giữ lần chạy ở trạng thái cần kiểm tra.','ランタイムが要確認で保持。','The runtime holds the run in attention.'),action:tr('Xem trace và đối soát nếu có thể.','トレースを確認し、可能なら照合。','Inspect the trace and reconcile when available.'),entities:ents};
 }
-/** Reconcile exists for coffee jobs in attention and for robots (mock audit); everything else is a new run. */
-export const reconcilable=(a:Attention,view:RunView)=>!!a.subjectId&&(jobsOf(view).some(j=>j.jobId===a.subjectId&&j.status==='needs_attention')||view.entities.some(r=>r.id===a.subjectId));
+/** Resolve only identities the view actually knows. Mission-level attention can name its robot separately. */
+export function reconciliationSubject(a:Attention,view:RunView):string|null {
+ const job=jobsOf(view).find(j=>j.jobId===a.subjectId);
+ if(job)return job.status==='needs_attention'?job.jobId:null;
+ const knownRobot=(id:string|undefined)=>id&&view.entities.some(r=>r.id===id)?id:null;
+ const explicit=knownRobot(a.robotId)??knownRobot(a.subjectId);if(explicit)return explicit;
+ const waiting=view.awaiting.find(stop=>stop.missionId===a.subjectId),mapped=knownRobot(waiting?.robotId);if(mapped)return mapped;
+ return a.commandId?view.entities.find(r=>r.goal?.commandId===a.commandId)?.id??null:null;
+}
+export const reconcilable=(a:Attention,view:RunView)=>reconciliationSubject(a,view)!==null;
 /** Canonical SI decimal string -> display unit (mL / g). Display only; the canonical value is shown alongside in the tooltip. */
 export function qty(q:Quantity|null):{text:string;unit:string} {
  if(!q)return {text:'—',unit:''};
@@ -50,7 +59,7 @@ export function qty(q:Quantity|null):{text:string;unit:string} {
 export function stepRows(report:RunReport|null,jobId:string|undefined):Row[] {
  const job=report?.coffee?.jobs.find(j=>j.jobId===jobId);if(!job)return [];
  return job.steps.map(s=>{const t=qty(s.target),m=qty(s.measured);
-  return {key:`step-${s.id}`,label:`${s.kind} · ${s.status}`,observed:s.measured?`${m.text} (${s.measured.provenance})`:tr('chưa có số đo','計量なし','no measurement'),commanded:t.text,unit:t.unit||m.unit,source:s.measured?.provenance==='unknown'||!s.measured?'unknown':'observed',ageMs:null};});
+  return {key:`step-${s.id}`,label:`${stateLabel(s.kind)} · ${stateLabel(s.status)}`,observed:s.measured?`${m.text} (${s.measured.provenance})`:tr('chưa có số đo','計量なし','no measurement'),commanded:t.text,unit:t.unit||m.unit,source:s.measured?.provenance==='unknown'||!s.measured?'unknown':'observed',ageMs:null};});
 }
 export function cupSensorRow(view:RunView,jobId:string|undefined):Row {
  const j=jobsOf(view).find(x=>x.jobId===jobId),st=j?.status??'';
@@ -58,16 +67,23 @@ export function cupSensorRow(view:RunView,jobId:string|undefined):Row {
  return {key:'cup-sensor',label:tr('Cảm biến cốc','カップセンサー','Cup sensor'),observed,commanded:'—',unit:'',source:observed==='—'?'unknown':'derived',ageMs:null};
 }
 export function armRows(report:RunReport|null,tick:number):Row[] {
- const t=report?.coffee?.armTrace,s=t?.samples[t.samples.length-1],age=s&&report?(tick-s.tick)*report.manifest.clock.tickMs:null;
+ const t=report?.coffee?.armTrace,s=t?.samples.filter(s=>s.tick<=tick).at(-1),age=s&&report?(tick-s.tick)*report.manifest.clock.tickMs:null;
  const rows:Row[]=Array.from({length:6},(_,i)=>({key:`joint-${i+1}`,label:`q${i+1}`,observed:tr('không có encoder (mock)','エンコーダなし(モック)','no encoder (mock)'),commanded:s?`${fmt(s.q[i]!,3)} (${fmt(s.q[i]!*180/Math.PI,1)}°)`:tr('chưa có mẫu','サンプルなし','no sample yet'),unit:'rad',source:s?'commanded':'unknown',ageMs:age}));
  if(s)rows.push({key:'tcp',label:'TCP x, y, z',observed:'—',commanded:s.tcp.map(v=>fmt(v,3)).join(', '),unit:'m',source:'modeled',ageMs:age});
  rows.push({key:'limits',label:tr('Giới hạn khớp','関節リミット','Joint limits'),observed:'—',commanded:t?(t.limitsOk?tr('trong giới hạn','範囲内','within limits'):tr('vượt giới hạn','超過','exceeded')):'—',unit:'',source:t?'modeled':'unknown',ageMs:null});
+ const collision=t?.collision,scene=collision?.scene,atCursor=scene&&scene.tick<=tick;
+ rows.push({key:'arm-scene',label:tr('Phạm vi va chạm mô hình','モデル衝突の範囲','Modeled collision scope'),observed:atCursor?
+  `${scene.available?tr('vật cản dự án + robot','プロジェクト障害物 + ロボット','project fixtures + robots'):scene.scope==='self_injected_only'?tr('tự va chạm + vật cản chèn','自己衝突 + 挿入障害物','self + injected obstacles'):scene.reason??'unavailable'} · ${tr('minh họa','参考モデル','illustrative')} · rev ${scene.profileRevision??'—'} · ${scene.revision.slice(0,8)}`:
+  tr('chưa có bằng chứng tại thời điểm này','この時点の証拠なし','no evidence at this cursor'),commanded:'—',unit:'',source:atCursor&&scene.available?'modeled':'unknown',ageMs:null});
+ const projected=collision?.evidence?.projection,checkAt=projected?.lastCheckTick,recordedCheck=checkAt!==undefined&&checkAt!==null&&checkAt<=tick;
+ if((atCursor||recordedCheck)&&collision?.last)rows.push({key:'arm-checker',label:tr('Bộ kiểm hình học','形状チェッカー','Geometry checker'),observed:`${collision.last.engine} · ${collision.last.geometryRevision.slice(0,8)} · ${collision.last.ok?tr('không chặn','ブロックなし','clear'):tr('đã chặn','ブロック済み','blocked')}${collision.last.pair?` · ${collision.last.pair.join(' ↔ ')}`:''}`,commanded:'—',unit:'',source:'modeled',ageMs:null});
+ if(projected&&!projected.historyComplete)rows.push({key:'arm-trace',label:tr('Lịch sử kiểm hình học','形状チェック履歴','Geometry check history'),observed:tr('lịch sử lưu không đầy đủ','保存履歴が不完全','retained history incomplete'),commanded:projected.reason??'—',unit:'',source:'unknown',ageMs:null});
  return rows;
 }
 export function cupRows(cup:CupView,report:RunReport|null,ownerName:string,ageMs:number|null):Row[] {
  const moves=report?.coffee?.cups.find(c=>c.cupId===cup.cupId)?.movements??[],last=moves[moves.length-1];
  return [
-  {key:'cup-owner',label:tr('Chủ sở hữu','所有者','Owner'),observed:`${ownerName} (${cup.ownerKind})`,commanded:'—',unit:'',source:'observed',ageMs},
+  {key:'cup-owner',label:tr('Chủ sở hữu','所有者','Owner'),observed:`${ownerName} (${stateLabel(cup.ownerKind)})`,commanded:'—',unit:'',source:'observed',ageMs},
   {key:'cup-moves',label:tr('Lần chuyển','移動回数','Transfers'),observed:String(moves.length),commanded:'—',unit:'',source:report?'observed':'unknown',ageMs:null},
   {key:'cup-last',label:tr('Bằng chứng gần nhất','直近の根拠','Latest evidence'),observed:last?`${last.provenance} · ${last.observedBy}`:'—',commanded:'—',unit:'',source:last?'observed':'unknown',ageMs:null},
  ];

@@ -18,18 +18,22 @@ export function openRunStreams<V=unknown,S=unknown>(runId:string,cursor:string|n
  const base=d.base??'/lab/v2',ES=d.EventSource,get=d.fetch??fetch.bind(globalThis),visible=d.visible??(()=>typeof document==='undefined'||document.visibilityState!=='hidden');
  const runUrl=`${base}/runs/${encodeURIComponent(runId)}`;
  const network=d.network===undefined?(typeof window==='undefined'?null:window):d.network,deadline=d.heartbeatDeadlineMs??5000;
- let state:LinkState='connecting',lastEventId=cursor,closed=false,timer:ReturnType<typeof setTimeout>|undefined,watchdog:ReturnType<typeof setInterval>|undefined,sources:EventSource[]=[],beat=Date.now();
+ let state:LinkState='connecting',lastEventId=cursor,closed=false,timer:ReturnType<typeof setTimeout>|undefined,watchdog:ReturnType<typeof setInterval>|undefined,sources:EventSource[]=[],beat=Date.now(),probing=false,refusals=0;
  const set=(s:LinkState)=>{if(state!==s||s==='closed'){state=s;h.onState?.(s);}};
  const json=(e:MessageEvent)=>JSON.parse(String(e.data)) as Record<string,unknown>;
  const stop=()=>{for(const s of sources)s.close();sources=[];};
  /** Why did the runtime refuse/close the stream? 401: pairing session gone (restart) -> re-pair; 404: run unknown; else runtime unreachable. */
  const probe=async()=>{
-  if(closed)return;
-  let status=0;try{status=(await get(runUrl,{credentials:'same-origin',cache:'no-store'})).status;}catch{status=0;}
-  if(closed)return;
+  if(closed||probing)return;probing=true;
+  let status=0,response:Response|undefined;try{response=await get(runUrl,{credentials:'same-origin',cache:'no-store'});status=response.status;}catch{status=0;}
+  probing=false;if(closed)return;
   if(status===401){stop();return set('session_lost');}
   if(status===404){stop();return set('run_lost');}
-  if(status===200){stop();return connect();}
+  if(status===200){
+   stop();refusals++;set('polling');try{h.onSnapshot?.(await response!.json() as V);}catch{/* a later poll retries the snapshot */}
+   if(closed)return;clearTimeout(timer);
+   timer=setTimeout(()=>{if(refusals>=3)void poll();else connect();},Math.min(500*2**(refusals-1),2000));return;
+  }
   stop();set('runtime_lost');timer=setTimeout(()=>void probe(),2000);
  };
  const on=(s:EventSource,type:string,f:(e:MessageEvent)=>void)=>s.addEventListener(type,f as EventListener);
@@ -41,10 +45,10 @@ export function openRunStreams<V=unknown,S=unknown>(runId:string,cursor:string|n
   events.onopen=()=>set('live');
   on(events,'business',e=>{lastEventId=e.lastEventId||lastEventId;set('live');h.onBusiness?.(json(e) as unknown as BusinessEntry);});
   on(events,'reset',e=>{const r=json(e);lastEventId=e.lastEventId||null;set('live');h.onReset?.(r.snapshot as V,String(r.reason));});
-  for(const s of sources)on(s,'heartbeat',e=>{beat=Date.now();h.onHeartbeat?.(json(e) as unknown as Heartbeat);});
+  for(const s of sources)on(s,'heartbeat',e=>{beat=Date.now();refusals=0;h.onHeartbeat?.(json(e) as unknown as Heartbeat);});
   on(telemetry,'sample',e=>h.onSample?.(json(e) as S));
   on(telemetry,'gap',e=>h.onGap?.(json(e)));
-  for(const s of sources)s.onerror=()=>{if(closed)return;if(s.readyState===2)void probe();else set('reconnecting');};
+  for(const s of sources)s.onerror=()=>{if(closed||!sources.includes(s))return;if(s.readyState===2)void probe();else set('reconnecting');};
  }
  const poll=async()=>{
   if(closed)return;
@@ -55,8 +59,8 @@ export function openRunStreams<V=unknown,S=unknown>(runId:string,cursor:string|n
   if(!closed)timer=setTimeout(()=>void poll(),visible()?500:2000);
  };
  /** Drop the connections and start again from the last durable cursor (the server resumes after it or sends a reset). */
- const restart=()=>{if(closed||!ES)return;stop();set('reconnecting');beat=Date.now();connect();};
- const offline=()=>{if(closed||!ES)return;stop();set('reconnecting');},online=()=>restart();
+ const restart=()=>{if(closed||!ES)return;clearTimeout(timer);stop();set('reconnecting');beat=Date.now();refusals=0;connect();};
+ const offline=()=>{if(closed||!ES)return;clearTimeout(timer);stop();set('reconnecting');},online=()=>restart();
  network?.addEventListener('offline',offline);network?.addEventListener('online',online);
  if(ES){connect();watchdog=setInterval(()=>{if(sources.length&&Date.now()-beat>deadline)restart();},1000);}
  else timer=setTimeout(()=>void poll(),visible()?500:2000);

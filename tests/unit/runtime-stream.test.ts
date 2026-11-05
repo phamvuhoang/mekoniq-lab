@@ -99,3 +99,12 @@ test('a stream that stays open but silent past the heartbeat deadline is treated
   s.close();
  }finally{vi.useRealTimers();}
 });
+
+test('refused SSE with a healthy snapshot uses bounded backoff then polling without a reconnect loop',async()=>{
+ vi.useFakeTimers();
+ try{
+  let probes=0;const {s,got}=harness(()=>{probes++;return ok({run:{id:'run-1',runRevision:probes}});});
+  for(const delay of [500,1000,2000]){const current=FakeES.all.slice(-2);current.forEach(e=>e.fail(2));await vi.advanceTimersByTimeAsync(0);const count=FakeES.all.length;await vi.advanceTimersByTimeAsync(delay-1);expect(FakeES.all).toHaveLength(count);await vi.advanceTimersByTimeAsync(1);}
+  expect(FakeES.all.length).toBeLessThanOrEqual(6);expect(s.state).toBe('polling');expect(got.snapshot!.length).toBeGreaterThan(1);const count=FakeES.all.length;await vi.advanceTimersByTimeAsync(5000);expect(FakeES.all).toHaveLength(count);s.close();
+ }finally{vi.useRealTimers();}
+});

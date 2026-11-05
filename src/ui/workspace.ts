@@ -7,9 +7,9 @@ import {renderTwin,sceneEntities,kindLabel,type TwinFrame,type ViewState} from '
 import {defaultLayers,LAYERS,layerLabel,legend,toggleLayer,type Layer} from '../twin/overlays';
 import {selectEntity,selectedEntity,onSelection} from '../twin/selection';
 import {inspect,identityItems} from '../twin/inspector';
-import {currentCup,reconcilable} from '../twin/coffee-cell';
+import {currentCup,reconciliationSubject} from '../twin/coffee-cell';
 import {operationsPanel,statusText} from './operations-panel';
-import {engineeringPanel} from './engineering-panel';
+import {engineeringPanel,engineeringInspection} from './engineering-panel';
 import type {Twin3d} from '../viewer/twin3d';
 import {icon,esc} from './icons';
 import {TwinStore} from '../twin/store';
@@ -17,9 +17,12 @@ import {freshness,type Link} from '../twin/freshness';
 import {openRunStreams,type LinkState} from '../runtime/stream';
 import {openReplayV2} from '../reports/replay';
 import {reportCsv,reportHtml,reportJson} from '../reports/metrics';
-import {reportPanel,replayBody,type ReplayState} from './report-panel';
+import {reportPanel,reportSummary,replayBody,type ReplayState} from './report-panel';
 import {tr} from '../i18n';
-const STEP_TICKS=250,PLAY_TICKS=500;
+import {stateLabel} from './labels';
+import {EvidenceStore,captureEvidence,evidenceStatus,type SavedEvidence} from '../reports/evidence';
+import {validateProjectV2} from '../project/schema';
+const STEP_TICKS=250,PLAY_TICKS=25;
 export class TwinWorkspace {
  private health:TwinHealth|null=null;private healthChecked=false;private probing=false;
  private preset:TwinPreset=presets[0]!;
@@ -30,9 +33,10 @@ export class TwinWorkspace {
  private webglFailed=false;private viewer:Twin3d|null=null;private mounting=false;
  /** Telemetry (lossy) lives in the store; the durable view only changes from action receipts, resets and polled snapshots. */
  private store=new TwinStore();private link:Link={state:'closed',lastHeartbeatMs:null,paused:false};private streams:ReturnType<typeof openRunStreams>|null=null;private streamRun='';
- private business=0;private ticker:ReturnType<typeof setInterval>|undefined;private painted=-1;private refreshing=false;
+ private business=0;private ticker:ReturnType<typeof setInterval>|undefined;private painted='';private refreshing=false;
  private replay:ReplayState|null=null;private replayTimer:ReturnType<typeof setInterval>|undefined;private previous:RunReport|null=null;
- private tokenDraft='';private busy=false;private playing=false;private notice='';private fault='cup-removed';private confirming:string|null=null;
+ private runSpeed=16;private evidenceStore=new EvidenceStore();private saved:SavedEvidence[]=[];private savedLoaded=false;private archived=false;
+ private tokenDraft='';private busy=false;private playing=false;private notice='';private fault='cup-removed';private confirming:string|null=null;private confirmationKind:'reconcile'|'restoreCup'='reconcile';private reconcileTargets:string[]=[];
  constructor(private rerender:()=>void,private rt:TwinRuntime=httpTwinRuntime()){
   onSelection(id=>{this.vs={...this.vs,selected:id};this.rerender();});
  }
@@ -40,13 +44,14 @@ export class TwinWorkspace {
  private frame():TwinFrame {
   const v=this.view,base={preset:this.runPreset??this.preset,report:this.report};
   if(!v)return {...base,view:v};
-  if(this.replay){const r=this.replay;return {...base,view:{...v,entities:v.entities.map(e=>{const p=r.rp.pose(e.id,r.tick);return p?{...e,pose:{x:p.x,y:p.y,yawRad:p.yawRad},path:[],quality:p.gap||p.epochChange?'stale':'valid',moving:false}:e;})}};}
+  if(this.replay){const r=this.replay,projection=r.rp.project(v,r.tick);return {...base,...projection};}
   const now=performance.now();
   return {...base,view:{...v,entities:v.entities.map(e=>{const s=this.store.entity(e.id),o=s?.observed;if(!s||!o||typeof o.xM!=='number')return e;
-   const fresh=freshness(s,this.link,now).state,newer=BigInt(s.seq)>=BigInt(v.tick);
-   return {...e,...newer?{pose:{x:o.xM as number,y:o.yM as number,yawRad:o.yawRad as number}}:{},quality:fresh==='live'||fresh==='frozen_sim'?e.quality:'stale'};})}};
+   const fresh=freshness(s,this.link,now),newer=s.simTimeNs!==null&&BigInt(s.simTimeNs)>=BigInt(v.simTimeNs)&&(v.run.telemetryCursor===null||BigInt(s.seq)>=BigInt(v.run.telemetryCursor));
+   return {...e,...newer?{pose:{x:o.xM as number,y:o.yM as number,yawRad:o.yawRad as number},moving:typeof o.moving==='boolean'?o.moving:e.moving,hold:typeof o.hold==='string'?o.hold:null}:{},sampleAgeMs:fresh.ageMs??undefined,quality:fresh.state==='live'||fresh.state==='frozen_sim'?newer?(s.quality==='valid'?'valid':'stale'):e.quality:'stale'};})}};
  }
  private linkText(){
+  if(this.replay)return `${tr('Đã ghi','記録済み','Recorded')} · ${(this.replay.tick*this.replay.rp.range.tickMs/1000).toFixed(2)} s`;
   const l=this.link.state,label:Record<LinkState,string>={connecting:tr('đang kết nối','接続中','connecting'),live:'SSE',polling:tr('hỏi định kỳ','ポーリング','polling'),reconnecting:tr('đang nối lại','再接続中','reconnecting'),session_lost:tr('mất phiên · cần ghép nối lại','セッション喪失 · 再ペアリング','session lost · re-pair'),run_lost:tr('runtime không còn lần chạy này','実行が見つかりません','run no longer on runtime'),runtime_lost:tr('mất runtime','ランタイム喪失','runtime lost'),closed:tr('đã đóng','終了','closed')};
   const id=this.vs.selected&&this.store.entity(this.vs.selected)?this.vs.selected:this.view?.entities[0]?.id,s=id?this.store.entity(id):undefined,f=freshness(s,this.link,performance.now());
   const state={live:tr('mới','最新','live'),stale:tr('cũ','古い','stale'),frozen_sim:'FROZEN_SIM',disconnected:tr('mất kết nối','切断','disconnected'),unknown:tr('chưa rõ','不明','unknown')}[f.state];
@@ -55,9 +60,18 @@ export class TwinWorkspace {
  }
  /** Telemetry repaint without a full re-render: the bar chip, and the 2D plan or 3D view when samples changed. */
  private tick(){
-  const chip=document.getElementById('twin-telemetry');if(chip){chip.innerHTML=this.linkText();chip.dataset.state=freshness(this.vs.selected?this.store.entity(this.vs.selected):this.store.entities()[0],this.link,performance.now()).state;}
-  const n=this.store.stats.applied+this.store.stats.epochResets;if(n===this.painted&&!this.replay)return;this.painted=n;
-  if(this.vs.view==='2d'){const st=document.getElementById('twin-stage');if(st)st.innerHTML=renderTwin(this.frame(),this.vs);}else this.viewer?.update(this.frame(),this.vs);
+  const chip=document.getElementById('twin-telemetry');if(chip){chip.innerHTML=this.linkText();chip.dataset.state=this.replay?'recorded':freshness(this.vs.selected?this.store.entity(this.vs.selected):this.store.entities()[0],this.link,performance.now()).state;}
+  const now=performance.now(),n=JSON.stringify([this.store.stats.applied,this.store.stats.epochResets,this.link.state,this.link.paused,this.vs.selected,this.store.entities().map(s=>{const f=freshness(s,this.link,now);return [s.entityId,f.state,f.reason];})]);
+  if(n===this.painted&&!this.replay)return;this.painted=n;
+  const f=this.frame();
+  if(this.vs.view==='2d'){const st=document.getElementById('twin-stage');if(st)st.innerHTML=renderTwin(f,this.vs);}else this.viewer?.update(f,this.vs);
+  const inspector=document.getElementById('twin-inspector');if(inspector)inspector.innerHTML=engineeringInspection(inspect(f,this.vs.selected,f.seen??this.seen));
+  if(this.replay){
+   const bar=document.getElementById('twin-run-bar');if(bar)bar.outerHTML=this.bar();
+   const list=document.getElementById('twin-entity-list');if(list)list.innerHTML=this.entityList(f);
+   const operations=document.getElementById('twin-operations');if(operations)operations.outerHTML=this.operations(f);
+   const summary=document.getElementById('twin-report-summary');if(summary&&f.report)summary.outerHTML=reportSummary(f.report,this.business);
+  }
  }
  private openStreams(v:RunView){
   if(this.streamRun===v.run.id&&this.streams&&!['session_lost','run_lost','closed'].includes(this.streams.state))return;
@@ -75,20 +89,25 @@ export class TwinWorkspace {
     else if(st==='run_lost'||st==='runtime_lost'){this.playing=false;this.rerender();}
     else this.tick();}},
    {EventSource:this.health?.features?.sse===false?undefined:globalThis.EventSource});
-  clearInterval(this.ticker);this.ticker=setInterval(()=>this.tick(),250);
+  clearInterval(this.ticker);this.ticker=setInterval(()=>this.tick(),100);
  }
  /** Durable events arrived that this view does not reflect yet (e.g. another tab acted): re-read the snapshot. */
  private async refresh(){this.refreshing=true;try{if(this.view)await this.apply(await this.rt.get(this.view.run.id));this.rerender();}catch{/* keep the last snapshot */}finally{this.refreshing=false;}}
+ private async saveEvidence(){if(!this.report||!this.runPreset||typeof indexedDB==='undefined')return;await this.evidenceStore.save(captureEvidence(this.report,this.runPreset.project));this.saved=await this.evidenceStore.list();}
+ private evidenceHtml(){
+  return `<section class="panel" data-testid="saved-evidence"><h3>${tr('Báo cáo đã lưu','保存済みレポート','Saved reports')}</h3><p class="field-help">${tr('Báo cáo được giữ nguyên. Phạm vi cũ cần chạy lại khi đầu vào đổi.','レポートは不変。入力変更時は該当範囲を再実行。','Reports stay unchanged. Changed inputs require new evidence for the affected scope.')}</p>${this.saved.map(s=>{const state=evidenceStatus(s,this.preset.project,this.report?.manifest.scenario.id===s.report.manifest.scenario.id?this.report:null);return `<p><button class="text-button" data-action="twin-open-evidence" data-value="${esc(s.id)}">${esc(s.report.manifest.scenario.id)} · ${esc(s.report.manifest.runId.slice(0,8))} · tick ${s.report.outcome.tick}</button> <span data-testid="evidence-status">${state.stale?`${tr('bằng chứng cũ','古い検証記録','stale evidence')}: ${state.scopes.join(', ')}`:tr('khớp đầu vào','入力一致','inputs match')}${!state.runtimeChecked?` · ${tr('chưa so runtime','ランタイム未比較','runtime not compared')}`:''}</span></p>`;}).join('')||'<p>—</p>'}</section>`;
+ }
+ private runSettings(){const speed=this.preset.project.entities.find(e=>e.kind==='amr')?.speedLimitMps??0.5;return `<div class="twin-settings"><label for="twin-run-speed">${tr('Tốc độ chạy','実行速度','Run speed')}</label><select id="twin-run-speed">${[1,4,16,64].map(n=>`<option value="${n}" ${n===this.runSpeed?'selected':''}>${n}×</option>`).join('')}</select><label for="twin-speed-limit">${tr('Giới hạn AMR cho lần chạy mới (m/s)','新しい実行のAMR速度上限(m/s)','AMR limit for new runs (m/s)')}</label><input id="twin-speed-limit" type="number" min="0.01" max="0.5" step="0.01" value="${speed}"><button class="button quiet" data-action="twin-run" ${this.busy||this.playing||!!this.replay||this.archived||!this.rt.paired?'disabled':''}>${tr('Chạy với đầu vào mới','変更した入力で実行','Run with edited inputs')}</button>${this.rt.paired?(this.rt.recoverableRunIds??[]).map(id=>`<button class="text-button" data-action="twin-reclaim" data-value="${esc(id)}" ${this.busy?'disabled':''}>${tr('Mở lại chỉ xem/đối soát','表示・照合のみで再開','Reopen for view/reconcile')} · ${esc(id.slice(0,8))}</button>`).join(''):''}</div>`;}
  async checkHealth(){try{this.health=await this.rt.health();}catch{this.health=null;}this.healthChecked=true;this.probing=false;this.rerender();}
  private bar(){
-  const v=this.view,p=this.runPreset??this.preset,m=this.report?.manifest,r=v?.run;
+  const f=this.frame(),v=f.view,p=f.preset,r=v?.run;
   const badge=r?r.mode.toUpperCase():tr('CHƯA CHẠY','未実行','NOT RUN');
   const cup=currentCup(v);
   const item=(label:string,value:string,id='')=>`<span class="twin-bar-item"${id?` data-testid="${id}"`:''}><small>${label}</small><b>${esc(value)}</b></span>`;
-  return `<div class="twin-bar" role="region" aria-label="${tr('Chế độ, backend và revision của lần chạy','実行のモード・バックエンド・リビジョン','Run mode, backends and revisions')}">
+  return `<div class="twin-bar" id="twin-run-bar" role="region" aria-label="${tr('Chế độ, backend và revision của lần chạy','実行のモード・バックエンド・リビジョン','Run mode, backends and revisions')}">
 <span class="twin-mode ${r?'live':''}" data-testid="mode-badge">${icon(r?'lock':'info',14)}${esc(badge)}${r?` · ${esc(r.access)}`:''}</span>
-<span class="twin-identity" data-testid="run-identity">${r?identityItems(v!,this.report).map(x=>`<span>${esc(x)}</span>`).join(''):`<span>${esc(p.scenarioId)} · ${esc(p.backendSetId)} · ${tr('chưa khóa','未固定','not locked')}</span>`}</span>
-${r?`${item(tr('Trạng thái','状態','Status'),statusText(r.status),'run-status')}${item(tr('Thời gian mô phỏng','シミュレーション時間','Sim time'),`${(Number(v!.simTimeNs)/1e9).toFixed(1)} s`,'run-tick')}${item('Run rev.',String(r.runRevision),'run-revision')}${item(tr('Đã giao','提供数','Served'),v!.served,'run-served')}<span class="twin-bar-item"><small>${tr('Cốc hiện tại','現在のカップ','Current cup')}${cup?` ${esc(cup.cupId)}`:''}</small><b data-testid="cup-owner">${cup?esc(nameOf(p,cup.ownerId)):'—'}</b></span><span class="twin-bar-item"><small>Telemetry</small><b id="twin-telemetry" data-testid="twin-telemetry" aria-live="off">${this.linkText()}</b></span><span class="twin-run-id" data-testid="run-id">${esc(r.id)}</span>`:''}
+<span class="twin-identity" data-testid="run-identity">${r?identityItems(v!,f.report).map(x=>`<span>${esc(x)}</span>`).join(''):`<span>${esc(p.scenarioId)} · ${esc(p.backendSetId)} · ${tr('chưa khóa','未固定','not locked')}</span>`}</span>
+${r?`${item(tr('Trạng thái','状態','Status'),statusText(r.status),'run-status')}${item(tr('Thời gian mô phỏng','シミュレーション時間','Sim time'),`${(Number(v!.simTimeNs)/1e9).toFixed(1)} s`,'run-tick')}${item('Run rev.',this.replay?'—':String(r.runRevision),'run-revision')}${item(tr('Đã giao','提供数','Served'),v!.served,'run-served')}<span class="twin-bar-item"><small>${tr('Cốc hiện tại','現在のカップ','Current cup')}${cup?` ${esc(cup.cupId)}`:''}</small><b data-testid="cup-owner">${cup?esc(nameOf(p,cup.ownerId)):'—'}</b></span><span class="twin-bar-item"><small>Telemetry</small><b id="twin-telemetry" data-testid="twin-telemetry" aria-live="off">${this.linkText()}</b></span><span class="twin-run-id" data-testid="run-id">${esc(r.id)}</span>`:''}
 </div>`;
  }
  private pairForm(){
@@ -101,31 +120,35 @@ ${r?`${item(tr('Trạng thái','状態','Status'),statusText(r.status),'run-stat
   const c=preflight(this.preset,this.health,this.rt.paired);
   return `<div class="preflight" data-testid="preflight"><h3>${tr('Kiểm tra trước khi chạy','実行前チェック','Preflight')}</h3><ul>${c.map(x=>`<li class="${x.ok?'ok':'fail'}"><span class="check-mark" aria-hidden="true">${icon(x.ok?'check':'cross',14)}</span><span><b>${esc(x.label)}</b> <span class="state-text">${x.ok?tr('đạt','合格','pass'):tr('chưa đạt','未達','fail')}</span><br><small>${esc(x.detail)}</small></span>${x.entityId?`<button class="text-button" data-action="twin-select" data-value="${esc(x.entityId)}">${tr('Xem','表示','Show')}</button>`:''}</li>`).join('')}</ul></div>`;
  }
+ private operations(f:TwinFrame){return operationsPanel({paired:this.rt.paired,ready:ready(preflight(this.preset,this.health,this.rt.paired)),busy:this.busy||!!this.replay,playing:this.playing,view:f.view,preset:f.preset},this.checks());}
+ private entityList(f:TwinFrame){return sceneEntities(f).map(e=>`<li><button data-action="twin-select" data-value="${esc(e.id)}" aria-pressed="${e.id===this.vs.selected}"><span class="entity-kind">${esc(kindLabel(e.kind))}</span><b>${esc(e.name)}</b>${e.name!==e.id?`<small>${esc(e.id)}</small>`:''}${e.status?`<span class="state-text">${esc(stateLabel(e.status))}</span>`:''}</button></li>`).join('');}
  html():string {
-  const f=this.frame(),ents=sceneEntities(f),sel=this.vs.selected,insp=inspect(f,sel,this.seen),p=f.preset;
+  const f=this.frame(),ents=sceneEntities(f),sel=this.vs.selected,insp=inspect(f,sel,f.seen??this.seen),p=f.preset;
   const presetsHtml=`<div class="twin-presets" role="group" aria-label="${tr('Preset kịch bản','シナリオプリセット','Scenario presets')}">${presets.map(x=>`<button class="preset-option" data-action="twin-preset" data-value="${x.id}" aria-pressed="${x.id===this.preset.id}" aria-label="${esc(x.title())}" aria-describedby="preset-${x.id}-summary">${icon(x.id==='coffee'?'coffee':'robot',20)}<span><b>${esc(x.title())}</b><small id="preset-${x.id}-summary">${esc(x.summary())}</small></span></button>`).join('')}</div>`;
   const layers=`<div class="twin-layers" role="group" aria-label="${tr('Lớp hiển thị','表示レイヤー','Layers')}">${LAYERS.map(l=>`<button data-action="twin-layer" data-value="${l}" aria-pressed="${this.vs.layers[l]}">${layerLabel(l)}</button>`).join('')}</div>`;
   const viewSwitch=`<div class="viewer-switch" role="group" aria-label="${tr('Kiểu xem','表示形式','View')}"><button data-action="twin-view" data-value="3d" aria-pressed="${this.vs.view==='3d'}" ${this.webglFailed?'disabled':''}>3D</button><button data-action="twin-view" data-value="2d" aria-pressed="${this.vs.view==='2d'}">2D</button></div>`;
   const legendHtml=`<ul class="twin-legend" data-testid="twin-legend" aria-label="${tr('Chú giải','凡例','Legend')}">${legend().map(x=>`<li><i class="mark ${x.mark}" aria-hidden="true"></i><b>${x.label}</b><small>${x.note}</small></li>`).join('')}</ul>`;
-  const list=`<ul class="entity-list" data-testid="entity-list" aria-label="${tr('Đối tượng trong twin','ツイン内の対象','Twin objects')}">${ents.map(e=>`<li><button data-action="twin-select" data-value="${esc(e.id)}" aria-pressed="${e.id===sel}"><span class="entity-kind">${esc(kindLabel(e.kind))}</span><b>${esc(e.name)}</b>${e.name!==e.id?`<small>${esc(e.id)}</small>`:''}${e.status?`<span class="state-text">${esc(e.status)}</span>`:''}</button></li>`).join('')}</ul>`;
+  const list=`<ul class="entity-list" id="twin-entity-list" data-testid="entity-list" aria-label="${tr('Đối tượng trong twin','ツイン内の対象','Twin objects')}">${this.entityList(f)}</ul>`;
   const scene=`<section class="panel twin-scene-panel" aria-labelledby="twin-scene-title"><div class="twin-scene-top"><h2 id="twin-scene-title" class="small-code">${esc(p.project.name)} · ${p.project.world.width} × ${p.project.world.height} m</h2>${viewSwitch}</div>${layers}
 <div class="twin-stage" id="twin-stage" data-testid="twin-scene">${renderTwin(f,this.vs)}</div>
 ${this.webglFailed?`<p class="source-note" data-testid="twin-fallback-note" role="status">${icon('info',15)}${tr('WebGL không khả dụng · đang hiển thị mặt bằng 2D với cùng dữ liệu và lựa chọn.','WebGLを利用できません · 同じデータと選択で2D平面図を表示中。','WebGL unavailable · showing the 2D plan with the same data and selection.')}</p>`:''}
-${legendHtml}<p class="source-note">${icon('info',15)}${tr('Cảnh chỉ đọc: vị trí lấy từ runtime, canvas không quyết định đến đích hay hoàn thành.','表示は読み取り専用。位置はランタイムから取得し、描画は到着や完了を判定しません。','Read-only scene: positions come from the runtime; the canvas never decides arrival or completion.')}</p></section>`;
-  const ops=operationsPanel({paired:this.rt.paired,ready:ready(preflight(this.preset,this.health,this.rt.paired)),busy:this.busy,playing:this.playing,view:this.view,preset:p},this.checks());
-  const eng=engineeringPanel(insp,{hasRun:!!this.view,busy:this.busy||this.playing,fault:this.fault,coffee:!!this.view?.coffee});
-  const dialog=this.confirming?`<dialog id="twin-confirm" aria-labelledby="twin-confirm-title"><h2 id="twin-confirm-title">${tr('Xác nhận đối soát','照合の確認','Confirm reconciliation')}</h2><p>${tr(`Đối soát ${esc(this.confirming)}: Lab yêu cầu runtime hỏi thiết bị theo command id và ghi lại câu trả lời. Lab không gửi lại lệnh; kết quả là những gì runtime báo về sau đó. Chỉ xác nhận sau khi đã kiểm tra tại chỗ.`,`${esc(this.confirming)} を照合:LabはランタイムにコマンドIDで機器へ問い合わせ、回答を記録するよう依頼します。Labはコマンドを再送しません。結果はその後ランタイムが報告する内容です。現場確認後のみ確認してください。`,`Reconcile ${esc(this.confirming)}: the Lab asks the runtime to query the device by command id and record the answer. The Lab resends nothing; the outcome is whatever the runtime then reports. Confirm only after checking on site.`)}</p><div class="dialog-actions"><button class="button quiet" data-action="twin-confirm-cancel">${tr('Hủy','キャンセル','Cancel')}</button><button class="button primary" data-action="twin-confirm-ok">${icon('check',16)}${tr('Xác nhận đã kiểm tra','確認済みとして実行','Confirm checked')}</button></div></dialog>`:'';
+${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớp vùng chiếm chỗ thể hiện hình học mô hình.','3D形状は模式図です。占有領域レイヤーがモデル形状を示します。','3D shapes are schematic. The footprint layer shows model geometry.')}</p>`:''}${legendHtml}<p class="source-note">${icon('info',15)}${tr('Cảnh chỉ đọc: vị trí lấy từ runtime, canvas không quyết định đến đích hay hoàn thành.','表示は読み取り専用。位置はランタイムから取得し、描画は到着や完了を判定しません。','Read-only scene: positions come from the runtime; the canvas never decides arrival or completion.')}</p></section>`;
+  const ops=this.operations(f);
+  const eng=engineeringPanel(insp,{hasRun:!!this.view,busy:this.busy||this.playing||!!this.replay,fault:this.fault,coffee:!!f.view?.coffee});
+  const selection=this.reconcileTargets.length>1?`<label for="twin-reconcile-target">${tr('Chọn đối tượng đối soát','照合対象を選択','Choose reconciliation target')}</label><select id="twin-reconcile-target"><option value="">${tr('Chọn đối tượng','対象を選択','Select a target')}</option>${this.reconcileTargets.map(id=>`<option value="${esc(id)}" ${this.confirming===id?'selected':''}>${esc(nameOf(p,id))} · ${esc(id)}</option>`).join('')}</select>`:'';
+  const dialog=this.confirming||this.reconcileTargets.length?`<dialog id="twin-confirm" aria-labelledby="twin-confirm-title"><h2 id="twin-confirm-title">${this.confirmationKind==='restoreCup'?tr('Xác nhận đã đặt đúng cốc','カップ位置の修正を確認','Confirm cup correction'):tr('Xác nhận đối soát','照合の確認','Confirm reconciliation')}</h2>${selection}<p>${!this.confirming?tr('Chọn đúng đối tượng đã kiểm tra trước khi xác nhận.','確認した対象を選んでから実行してください。','Select the target you checked before confirming.'):this.confirmationKind==='restoreCup'?tr('Đã đặt đúng cốc rỗng dưới vòi? Runtime sẽ kiểm trạng thái chưa rót và nhận quan sát mới từ cảm biến mock.','正しい空のカップをノズル下に置きましたか。ランタイムが未抽出状態を確認し、新しいモックセンサー観測を受け取ります。','Confirm the correct empty cup is under the nozzle. The runtime checks that no dispensing started and receives a fresh mock sensor observation.'):tr(`Đối soát ${esc(this.confirming)}: Lab yêu cầu runtime hỏi thiết bị theo command id và ghi lại câu trả lời. Lab không gửi lại lệnh; kết quả là những gì runtime báo về sau đó. Chỉ xác nhận sau khi đã kiểm tra tại chỗ.`,`${esc(this.confirming)} を照合:LabはランタイムにコマンドIDで機器へ問い合わせ、回答を記録するよう依頼します。Labはコマンドを再送しません。結果はその後ランタイムが報告する内容です。現場確認後のみ確認してください。`,`Reconcile ${esc(this.confirming)}: the Lab asks the runtime to query the device by command id and record the answer. The Lab resends nothing; the outcome is whatever the runtime then reports. Confirm only after checking on site.`)}</p><div class="dialog-actions"><button class="button quiet" data-action="twin-confirm-cancel">${tr('Hủy','キャンセル','Cancel')}</button><button class="button primary" data-action="twin-confirm-ok" ${!this.confirming?'disabled':''}>${icon('check',16)}${tr('Xác nhận đã kiểm tra','確認済みとして実行','Confirm checked')}</button></div></dialog>`:'';
   return `${this.bar()}${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(this.notice)}</span><button aria-label="${tr('Đóng','閉じる','Dismiss')}" data-action="twin-dismiss">${icon('cross',16)}</button></div>`:''}
-<div class="twin-top">${presetsHtml}${this.pairForm()}</div>
-<div class="twin-grid">${scene}<div class="twin-side">${ops}${reportPanel(this.report,{replay:this.replay,previous:this.previous,selected:sel,business:this.business})}<section class="panel" aria-labelledby="ent-title"><div class="panel-heading"><h2 id="ent-title">${tr('Đối tượng','対象','Objects')}</h2><span class="pill">${ents.length}</span></div>${list}</section></div>${eng}</div>${dialog}`;
+<div class="twin-top">${presetsHtml}${this.pairForm()}</div>${this.runSettings()}
+<div class="twin-grid">${scene}<div class="twin-side">${ops}${reportPanel(f.report,{replay:this.replay,previous:this.previous,selected:sel,business:this.business})}${this.evidenceHtml()}<section class="panel" aria-labelledby="ent-title"><div class="panel-heading"><h2 id="ent-title">${tr('Đối tượng','対象','Objects')}</h2><span class="pill">${ents.length}</span></div>${list}</section></div>${eng}</div>${dialog}`;
  }
  /** After the host HTML is replaced: modal dialog, optional 3D view. The 2D plan is already in the DOM and stays the fallback. */
  mounted(){
-  if(this.view&&this.rt.paired&&!this.streams)this.openStreams(this.view);
+  if(!this.savedLoaded&&typeof indexedDB!=='undefined'){this.savedLoaded=true;void this.evidenceStore.list().then(saved=>{this.saved=saved;this.rerender();}).catch(e=>{this.notice=String(e);this.rerender();});}
+  if(this.view&&this.rt.paired&&!this.streams&&!this.archived)this.openStreams(this.view);
   const token=document.getElementById('twin-pair-token') as HTMLInputElement|null;if(token&&this.tokenDraft)token.value=this.tokenDraft;
   // the local runtime is only probed from a local origin, once, when the twin page is first shown
   if(!this.healthChecked&&!this.probing&&['localhost','127.0.0.1','[::1]'].includes(location.hostname)){this.probing=true;void this.checkHealth();}
-  if(this.confirming){const d=document.getElementById('twin-confirm') as HTMLDialogElement|null;if(d&&!d.open)d.showModal();d?.addEventListener('cancel',()=>{this.confirming=null;},{once:true});}
+  if(this.confirming||this.reconcileTargets.length){const d=document.getElementById('twin-confirm') as HTMLDialogElement|null;if(d&&!d.open)d.showModal();d?.addEventListener('cancel',()=>{this.confirming=null;this.reconcileTargets=[];},{once:true});}
   const stage=document.getElementById('twin-stage');
   if(!stage||this.vs.view!=='3d'||this.webglFailed)return;
   if(this.viewer){this.viewer.attach(stage);this.viewer.update(this.frame(),this.vs);return;}
@@ -156,16 +179,29 @@ ${legendHtml}<p class="source-note">${icon('info',15)}${tr('Cảnh chỉ đọc:
   // the action receipt/snapshot is the pause acknowledgement; heartbeats only refresh it between receipts (e.g. another tab)
   this.link={...this.link,paused:v.run.status==='paused'};try{this.report=await this.rt.report(v.run.id);}catch{this.report=null;}if(this.report&&this.replay)this.replay={...this.replay,rp:openReplayV2(this.report)};}
  private act(kind:Parameters<TwinRuntime['action']>[1],payload?:Record<string,unknown>){return this.rt.action(this.view!,kind,payload).then(v=>this.apply(v));}
- private async create(p:TwinPreset){
+ /** Recover display metadata from the recorded input; catalog entries provide labels/assets only. */
+ private reclaimedPreset(v:RunView):TwinPreset {
+  const input=v.lockedInput;
+  if(!input)throw new TwinRuntimeError('RECLAIM_INPUTS_MISSING',[],502);
+  if(input.scenarioId!==v.run.scenarioId||input.scenarioRevision!==v.run.scenarioRevision||input.seed!==v.run.seed||input.backendSetId!==v.run.backendSetId||input.mode!==v.run.mode||input.access!==v.run.access||input.mode!=='mock'||input.access!=='simulated'||!Number.isSafeInteger(input.seed))throw new TwinRuntimeError('RECLAIM_INPUTS_MISMATCH',[],502);
+  let project:ReturnType<typeof validateProjectV2>;try{project=validateProjectV2(input.project);}catch{throw new TwinRuntimeError('RECLAIM_INPUTS_INVALID',[],502);}
+  const labels=presets.find(p=>p.scenarioId===input.scenarioId);
+  return {id:labels?.id??input.scenarioId,title:labels?.title??(()=>input.scenarioId),summary:labels?.summary??(()=>''),assets:labels?.assets??[],names:labels?.names??{},roles:labels?.roles??{entities:[],points:[]},
+   project,seed:input.seed,scenarioId:input.scenarioId,scenarioRevision:input.scenarioRevision,backendSetId:input.backendSetId};
+ }
+ private async create(p:TwinPreset,start=true){
   if(!this.health)throw new TwinRuntimeError('RUNTIME_UNAVAILABLE',[],0);
-  this.previous=this.report;this.view=null;this.report=null;this.seen={};this.runPreset=p;this.stopReplay();this.replay=null;
+  await this.saveEvidence();
+  if(this.view&&!this.archived&&this.rt.archive){this.streams?.close();this.streams=null;clearInterval(this.ticker);await this.rt.archive(this.view.run.id);}
+  this.archived=false;
+  this.previous=this.report;this.view=null;this.report=null;this.seen={};this.runPreset={...p,project:structuredClone(p.project)};this.stopReplay();this.replay=null;
   const v=await this.rt.create({project:structuredClone(p.project),scenarioId:p.scenarioId,scenarioRevision:p.scenarioRevision,seed:p.seed,mode:'mock',backendSetId:p.backendSetId,access:'simulated'},{sourceCommit:this.health.sourceCommit,schemaHash:this.health.schemaHash});
-  await this.apply(v);this.openStreams(v);await this.act('start');await this.act('step',{ticks:STEP_TICKS});
+  await this.apply(v);this.openStreams(v);if(start){await this.act('start');await this.act('step',{ticks:STEP_TICKS});}
  }
  private async play(){
   this.playing=true;
   await this.call(async()=>{
-   while(this.playing&&this.view&&['running','awaiting_confirmation'].includes(this.view.run.status)){await this.act('step',{ticks:PLAY_TICKS});this.rerender();}
+   while(this.playing&&this.view&&['running','awaiting_confirmation'].includes(this.view.run.status)){const started=performance.now();await this.act('step',{ticks:PLAY_TICKS});this.rerender();const delay=PLAY_TICKS*(this.report?.manifest.clock.tickMs??20)/this.runSpeed-(performance.now()-started);if(delay>0)await new Promise(resolve=>setTimeout(resolve,delay));}
   });
   this.playing=false;this.rerender();
  }
@@ -173,11 +209,20 @@ ${legendHtml}<p class="source-note">${icon('info',15)}${tr('Cảnh chỉ đọc:
   if((action==='twin-select'||action==='twin-pick')&&value)return selectEntity(value);
   if(action==='twin-layer'){this.vs={...this.vs,layers:toggleLayer(this.vs.layers,value as Layer)};return this.rerender();}
   if(action==='twin-view'){if(value==='2d'){this.viewer?.dispose();this.viewer=null;}this.vs={...this.vs,view:value==='3d'&&!this.webglFailed?'3d':'2d'};return this.rerender();}
-  if(action==='twin-preset'){const p=presetById(value??'');if(p&&p!==this.preset){this.preset=p;if(!this.playing){this.view=null;this.report=null;this.runPreset=null;}selectEntity(null);}return this.rerender();}
+  if(action==='twin-preset'){const p=presetById(value??'');if(p&&p!==this.preset){this.preset=p;if(!this.view)selectEntity(null);}return this.rerender();}
   if(action==='twin-dismiss'){this.notice='';return this.rerender();}
+  if(action==='twin-reclaim'&&value&&this.rt.reclaim)return void this.call(async()=>{
+   const reclaimed=await this.rt.reclaim!(value);
+   this.stopReplay();this.replay=null;this.archived=false;this.streams?.close();this.streams=null;clearInterval(this.ticker);
+   this.view=null;this.report=null;this.runPreset=null;this.seen={};
+   this.runPreset=this.reclaimedPreset(reclaimed);await this.apply(reclaimed);this.openStreams(reclaimed);
+   this.notice=tr('Đã mở lại để xem và đối soát. Không phát lại chuyển động.','表示と照合のみで再開しました。動作は再送されません。','Reopened for viewing and reconciliation. Motion is not replayed.');
+  });
+  if(action==='twin-save-evidence')return void this.call(()=>this.saveEvidence());
+  if(action==='twin-open-evidence'&&value){const saved=this.saved.find(s=>s.id===value);if(!saved)return;this.playing=false;this.streams?.close();this.streams=null;clearInterval(this.ticker);this.stopReplay();this.archived=true;this.report=structuredClone(saved.report);const preset=presets.find(p=>p.scenarioId===saved.report.manifest.scenario.id)??this.preset;this.runPreset={...preset,project:structuredClone(saved.project)};const m=saved.report.manifest;this.view={run:{schemaVersion:2,id:m.runId,mode:'mock',access:m.access,backendSetId:m.backendSetId,backends:m.backends.map(b=>b.id),status:saved.report.outcome.status as RunView['run']['status'],runRevision:0,eventCursor:null,telemetryCursor:null,fidelity:'modeled',ageMs:0,sourceCommit:m.sourceCommit,scenarioId:m.scenario.id,scenarioRevision:m.scenario.revision,seed:m.seed},tick:saved.report.outcome.tick,simTimeNs:saved.report.outcome.simTimeNs,model:m.backends[0]?.model??'unknown',entities:saved.project.entities.filter(e=>e.kind==='amr').map(e=>({id:e.id,kind:'amr',pose:{x:NaN,y:NaN,yawRad:NaN},quality:'stale',moving:false,hold:null,goal:null,path:[],distanceM:NaN})),workload:[],awaiting:[],attention:[],served:saved.report.outcome.served,coffee:null};this.replay={rp:openReplayV2(this.report),tick:saved.report.outcome.tick,playing:false};return this.rerender();}
   if(action==='twin-export'&&this.report)return this.download(value??'json');
   if(action==='twin-replay'&&this.report){this.playing=false;this.replay={rp:openReplayV2(this.report),tick:0,playing:false};return this.rerender();}
-  if(action==='twin-replay-exit'){this.stopReplay();this.replay=null;this.painted=-1;return this.rerender();}
+  if(action==='twin-replay-exit'){this.stopReplay();this.replay=null;if(this.archived){this.archived=false;this.view=null;this.report=null;this.runPreset=null;}this.painted='';return this.rerender();}
   if(action==='twin-replay-play'&&this.replay){
    if(this.replay.playing){this.stopReplay();return this.rerender();}
    this.replay.playing=true;if(this.replay.tick>=this.replay.rp.range.toTick)this.replay.tick=0;
@@ -185,9 +230,13 @@ ${legendHtml}<p class="source-note">${icon('info',15)}${tr('Cảnh chỉ đọc:
    this.replayTimer=setInterval(()=>{const r=this.replay;if(!r){this.stopReplay();return;}r.tick=Math.min(r.rp.range.toTick,r.tick+25);this.scrubbed();if(r.tick>=r.rp.range.toTick){this.stopReplay();this.rerender();}},50);
    return this.rerender();
   }
+  if(this.replay||this.archived)return;
   if(action==='twin-run')return void this.call(()=>this.create(this.preset));
-  if(action==='twin-rerun')return void this.call(()=>this.create(this.runPreset??this.preset));
+  if(action==='twin-reset')return this.view&&this.runPreset?void this.call(()=>this.create(this.runPreset!,false)):undefined;
+  if(action==='twin-start')return void this.call(()=>this.act('start'));
+  if(action==='twin-rerun')return this.view&&this.runPreset?void this.call(()=>this.create(this.runPreset!)):undefined;
   if(!this.view)return;
+  if(this.view.controlAccess==='view_reconcile'&&!['twin-reconcile','twin-confirm-cancel','twin-confirm-ok'].includes(action))return;
   if(action==='twin-step')return void this.call(()=>this.act('step',{ticks:STEP_TICKS}));
   if(action==='twin-play')return void this.play();
   if(action==='twin-stop'){this.playing=false;return this.rerender();}
@@ -195,17 +244,19 @@ ${legendHtml}<p class="source-note">${icon('info',15)}${tr('Cảnh chỉ đọc:
   if(action==='twin-pause')return void this.call(()=>this.act('pause'));
   if(action==='twin-resume')return void this.call(()=>this.act('resume'));
   if(action==='twin-fault')return void this.call(()=>this.act('injectFault',{faultId:this.fault}));
-  if(action==='twin-reconcile'){const a=this.view.attention.find(x=>reconcilable(x,this.view!));this.confirming=a?.subjectId??null;return this.rerender();}
-  if(action==='twin-confirm-cancel'){this.confirming=null;return this.rerender();}
-  if(action==='twin-confirm-ok'&&this.confirming){const subjectId=this.confirming;this.confirming=null;return void this.call(()=>this.act('reconcile',{subjectId}));}
+  if(action==='twin-restore-cup'){this.reconcileTargets=[];this.confirming=this.view.coffee?.jobs.find(j=>j.canRestoreCup)?.jobId??null;this.confirmationKind='restoreCup';return this.rerender();}
+  if(action==='twin-reconcile'){this.confirmationKind='reconcile';this.reconcileTargets=this.knownReconciliationTargets();this.confirming=this.reconcileTargets.length===1?this.reconcileTargets[0]!:null;return this.rerender();}
+  if(action==='twin-confirm-cancel'){this.confirming=null;this.reconcileTargets=[];return this.rerender();}
+  if(action==='twin-confirm-ok'&&this.confirming){const subjectId=this.confirming;this.confirming=null;this.reconcileTargets=[];if(this.confirmationKind==='reconcile'&&!this.knownReconciliationTargets().includes(subjectId))return this.rerender();return void this.call(()=>this.act(this.confirmationKind,{subjectId}));}
  }
- change(id:string,value:string){if(id==='twin-fault')this.fault=value;if(id==='twin-replay-cursor')this.input(id,value);}
+ private knownReconciliationTargets(){return this.view?[...new Set(this.view.attention.map(a=>reconciliationSubject(a,this.view!)).filter((id):id is string=>id!==null))]:[];}
+ change(id:string,value:string){if(id==='twin-reconcile-target'&&this.confirmationKind==='reconcile'){this.confirming=this.reconcileTargets.includes(value)&&this.knownReconciliationTargets().includes(value)?value:null;return this.rerender();}if(id==='twin-run-speed'&&[1,4,16,64].includes(Number(value))){this.runSpeed=Number(value);this.rerender();}if(id==='twin-speed-limit'){const n=Number(value);if(Number.isFinite(n)&&n>0&&n<=0.5){this.preset={...this.preset,project:{...this.preset.project,revision:this.preset.project.revision+1,entities:this.preset.project.entities.map(e=>e.kind==='amr'?{...e,speedLimitMps:n}:e)}};this.rerender();}}if(id==='twin-fault')this.fault=value;if(id==='twin-replay-cursor')this.input(id,value);}
  /** Scrub: update the replay body and the scene in place so the range input keeps focus and drag state. */
  input(id:string,value:string){if(id!=='twin-replay-cursor'||!this.replay)return;this.replay.tick=Number(value);this.scrubbed();}
  private scrubbed(){
   const r=this.replay!;const body=document.getElementById('twin-replay-body');if(body)body.innerHTML=replayBody(r,this.vs.selected);
   const range=document.getElementById('twin-replay-cursor') as HTMLInputElement|null;if(range&&document.activeElement!==range)range.value=String(r.tick);
-  this.painted=-1;this.tick();
+  this.painted='';this.tick();
  }
  private download(format:string){
   const r=this.report!,name=`mekoniq-run-${r.manifest.scenario.id}-seed${r.manifest.seed}-${r.manifest.runId.slice(0,8)}`;

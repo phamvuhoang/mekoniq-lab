@@ -41,7 +41,7 @@ async function main(){
  const started=performance.now(),owned=[];
  let stopping;
  const stop=()=>stopping??=Promise.all(owned.filter(c=>c.exitCode===null&&c.signalCode===null).map(c=>new Promise(r=>{const k=setTimeout(()=>c.kill('SIGKILL'),5000);c.once('exit',()=>{clearTimeout(k);r();});c.kill('SIGTERM');})));
- for(const s of ['SIGINT','SIGTERM'])process.once(s,()=>{console.log('\nStopping the runtime and UI this launcher started…');void stop().then(()=>process.exit(0));});
+ for(const s of ['SIGINT','SIGTERM'])process.on(s,()=>{if(stopping)return;console.log('\nStopping the runtime and UI this launcher started…');void stop().then(()=>process.exit(0));});
  try{
   assertNode();assertPlatform();
   const o=options(process.argv.slice(2));

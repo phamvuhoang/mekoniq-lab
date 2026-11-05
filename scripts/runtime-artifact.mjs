@@ -1,6 +1,7 @@
 import {readFile,writeFile,mkdir,rename,stat,rm,readdir} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
+import {auditBundle} from './runtime-audit.mjs';
 export const digest=(value)=>createHash('sha256').update(value).digest('hex');
 // Protocol majors this Lab speaks: v1 (S01 business_sim) and v2 (twin, FD01/BV01). An artifact offering anything else needs a Lab update first.
 export const LAB_PROTOCOL_MAJORS=[1,2];
@@ -28,6 +29,7 @@ export async function installRuntime(from,destination) {
  if((await stat(join(input,'runtime.mjs'))).size>64*1024*1024) throw new Error('ARTIFACT_TOO_LARGE');
  const bytes=await readFile(join(input,'runtime.mjs'));
  if(digest(bytes)!==manifest.artifactSha256)throw new Error('ARTIFACT_HASH_MISMATCH');
+ auditBundle(bytes.toString('utf8'));
  const schemas=[];
  if(manifest.schemas){
   const names=[...manifest.schemas].sort(),hash=createHash('sha256');

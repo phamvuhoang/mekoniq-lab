@@ -13,7 +13,7 @@ test("missing cup: visible reason and entity, confirmed reconcile, corrected run
   await page.getByRole("button", { name: "Cà phê sữa đá" }).click();
   await page.getByRole("button", { name: "Chạy mock" }).click();
   await expect(page.getByTestId("mode-badge")).toContainText("MOCK");
-  await expect(page.getByTestId("cup-owner")).toHaveText("Coffee cell");
+  await expect(page.getByTestId("cup-owner")).toHaveText("Trạm cà phê");
   const firstRun = await page.getByTestId("run-id").textContent();
   // the cup is under the nozzle while brewing: remove it
   await page.locator("#twin-fault").selectOption("cup-removed");
@@ -34,10 +34,10 @@ test("missing cup: visible reason and entity, confirmed reconcile, corrected run
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("coffee-job-1");
   await dialog.getByRole("button", { name: "Hủy" }).click();
-  await expect(page.getByTestId("cycle-queue")).not.toContainText("quarantined");
+  await expect(page.getByTestId("cycle-queue")).not.toContainText("Đã cách ly");
   await page.getByRole("button", { name: "Đối soát" }).click();
   await dialog.getByRole("button", { name: "Xác nhận đã kiểm tra" }).click();
-  await expect(page.getByTestId("cycle-queue")).toContainText("quarantined");
+  await expect(page.getByTestId("cycle-queue")).toContainText("Đã cách ly");
   // the run itself stays in attention: it is not relabelled completed
   await expect(page.getByTestId("run-status")).toContainText("Cần kiểm tra");
   await page.getByRole("button", { name: "Chạy lại cùng đầu vào" }).click();

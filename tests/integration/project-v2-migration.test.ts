@@ -137,17 +137,17 @@ describe('IndexedDB v1 -> v2 upgrade',()=>{
  });
  it('an interruption mid-transaction leaves no half-save: backup, v2 and the readable v1 are as before',async()=>{
   const store=fresh(),p=v1.service;await store.save(p);
-  // first put (legacy backup) succeeds inside the transaction, the second one (projectsV2) fails
+  // Backup and v2 addition are queued; the asset write fails and aborts all three stores.
   const real=IDBObjectStore.prototype.put;let calls=0;
   vi.spyOn(IDBObjectStore.prototype,'put').mockImplementation(function(this:IDBObjectStore,...a:Parameters<IDBObjectStore['put']>){if(++calls===2)throw new DOMException('Storage is full','QuotaExceededError');return real.apply(this,a);});
   await expect(store.upgradeToV2(p.id)).rejects.toThrow(/Storage is full/);
   vi.restoreAllMocks();
   expect(await store.load(p.id)).toEqual(p);expect(await store.loadLegacy(p.id)).toBeNull();expect(await store.loadV2(p.id)).toBeNull();
-  // retry succeeds and a later interrupted re-upgrade keeps the first backup and the stored v2 untouched
+  // Retry succeeds; a later re-upgrade is explicitly refused and keeps the first backup and stored v2 untouched.
   const ok=await store.upgradeToV2(p.id),backup=await store.loadLegacy(p.id);
   await store.save({...p,revision:2,name:'edited'});
   vi.spyOn(IDBObjectStore.prototype,'put').mockImplementation(function(this:IDBObjectStore,...a:Parameters<IDBObjectStore['put']>){if(a[0]&&(a[0] as {schemaVersion?:number}).schemaVersion===2)throw new DOMException('Disk error','DataError');return real.apply(this,a);});
-  await expect(store.upgradeToV2(p.id)).rejects.toThrow(/Disk error/);
+  await expect(store.upgradeToV2(p.id)).rejects.toThrow('PROJECT_V2_EXISTS');
   vi.restoreAllMocks();
   expect(await store.loadLegacy(p.id)).toEqual(backup);expect(await store.loadV2(p.id)).toEqual(ok.projectV2);expect((await store.load(p.id))?.revision).toBe(2);
  });
@@ -167,4 +167,15 @@ describe('IndexedDB v1 -> v2 upgrade',()=>{
   // an upgraded database still reads the v1 record and exposes the new stores
   expect((await store.upgradeToV2(p.id)).projectV2.id).toBe(p.id);expect(await store.load(p.id)).toEqual(p);
  });
+});
+
+it('repeat migration refuses to overwrite an edited v2 project',async()=>{
+ const name=`repeat-${crypto.randomUUID()}`,store=fresh(name),p=v1.service;await store.save(p);const migrated=await store.upgradeToV2(p.id),edited={...migrated.projectV2,name:'edited v2',revision:9};
+ const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open(name);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+ await new Promise<void>((resolve,reject)=>{const tx=db.transaction('projectsV2','readwrite');tx.objectStore('projectsV2').put(edited);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});db.close();
+ await expect(store.upgradeToV2(p.id)).rejects.toThrow('PROJECT_V2_EXISTS');expect(await store.loadV2(p.id)).toEqual(edited);
+});
+it('a synchronous IndexedDB open failure can be retried on the same store',async()=>{
+ const store=fresh();vi.spyOn(indexedDB,'open').mockImplementationOnce(()=>{throw new DOMException('Temporarily unavailable','InvalidStateError');});
+ await expect(store.load('missing')).rejects.toThrow('Temporarily unavailable');expect(await store.load('missing')).toBeNull();
 });

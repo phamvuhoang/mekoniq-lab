@@ -28,6 +28,7 @@ export class ProjectStore {
         };
       });
       this.connection=attempt;
+      void attempt.catch(()=>{if(this.connection===attempt)this.connection=null;});
     }
     return this.connection;
   }
@@ -71,6 +72,7 @@ export class ProjectStore {
    * Migration and validation run before the transaction opens; any failure aborts it, so nothing is half-saved and the v1 record is never touched.
    */
   async upgradeToV2(id:string):Promise<MigrationResult> {
+    if(await this.loadV2(id))throw new Error('PROJECT_V2_EXISTS');
     const v1=await this.load(id);
     if (!v1) throw new Error('PROJECT_NOT_FOUND');
     const migrated=migrateV1Project(v1);
@@ -87,7 +89,7 @@ export class ProjectStore {
       existing.onsuccess=()=>{
         try {
           if (existing.result===undefined) legacy.put({id,backedUpAt:new Date().toISOString(),project:v1} satisfies LegacyBackup);
-          transaction.objectStore('projectsV2').put(migrated.projectV2);
+          transaction.objectStore('projectsV2').add(migrated.projectV2);
           for (const asset of migrated.assets) transaction.objectStore('assetsV2').put(asset);
         } catch(error) {fail(error);}
       };

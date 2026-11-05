@@ -83,3 +83,12 @@ describe('bounded project geometry',()=>{
     for(const trays of [NaN,Infinity,-1])expect(robotSvg(trays,'trays')).not.toMatch(/NaN|Infinity/);
   });
 });
+
+it('v2 project validates bounded per-AMR speed limits without allowing the field on cell entities',async()=>{
+ const {validateProjectV2}=await import('../../src/project/schema');
+ const {project}=await import('../../fixtures/twins/coffee-cell-v2.json');
+ const p=structuredClone(project);Object.assign(p.entities.find(e=>e.kind==='amr')!,{speedLimitMps:0.2});
+ expect(validateProjectV2(p).entities.find(e=>e.kind==='amr')).toHaveProperty('speedLimitMps',0.2);
+ for(const speedLimitMps of [0,-1,0.6,NaN]){const bad=structuredClone(p);Object.assign(bad.entities.find(e=>e.kind==='amr')!,{speedLimitMps});expect(()=>validateProjectV2(bad)).toThrow();}
+ Object.assign(p.entities.find(e=>e.kind==='arm')!,{speedLimitMps:0.2});expect(()=>validateProjectV2(p)).toThrow();
+});

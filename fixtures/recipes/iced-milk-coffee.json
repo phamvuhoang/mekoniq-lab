@@ -1,10 +1,35 @@
 {
   "schemaVersion": 2,
-  "id": "iced-milk-coffee",
-  "revision": 1,
-  "hash": "ce3445ef75dc12e099ea505cc3b50a701ce41c9cda14bba4c6449f6a7856b905",
-  "outputType": "iced-milk-coffee",
+  "revision": 2,
   "cupType": "cup-paper-illustrative",
+  "recovery": {
+    "onTimeout": "hold_and_reconcile",
+    "autoRetry": false
+  },
+  "id": "iced-milk-coffee",
+  "outputType": "iced-milk-coffee",
+  "policies": {
+    "cup": {
+      "revision": 1,
+      "provenance": "illustrative",
+      "capacityM3": "0.0003",
+      "headspaceM3": "0.00002",
+      "iceVolumeM3PerKg": "0.0011"
+    },
+    "milk": {
+      "revision": 1,
+      "provenance": "illustrative",
+      "maxOpenMs": 14400000,
+      "minTemperatureK": "273.15",
+      "maxTemperatureK": "278.15",
+      "temperatureMaxAgeMs": 10000
+    },
+    "measurement": {
+      "revision": 1,
+      "provenance": "illustrative",
+      "maxTargetMultiplier": "2"
+    }
+  },
   "steps": [
     {
       "id": "brew",
@@ -91,8 +116,5 @@
       "requiredAmount": null
     }
   ],
-  "recovery": {
-    "onTimeout": "hold_and_reconcile",
-    "autoRetry": false
-  }
+  "hash": "455651aa0850a7547f14afce86da3ea9c6c926b2a5ff9466ed31aac18d71df72"
 }

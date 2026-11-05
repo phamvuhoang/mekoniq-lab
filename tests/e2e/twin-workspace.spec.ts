@@ -90,14 +90,14 @@ test.describe.serial("paired source runtime", () => {
     for (const h of ["Quan sát", "Lệnh", "Tuổi dữ liệu"]) await expect(eng).toContainText(h);
     await expect(eng.getByTestId("eng-pose-x")).toContainText(" m");
     await expect(eng.getByTestId("eng-yaw")).toContainText("rad");
-    await page.getByTestId("entity-list").getByRole("button", { name: /Arm-1/ }).click();
+    await page.getByTestId("entity-list").getByRole("button", { name: /Cánh tay 1/ }).click();
     // before the arm moves there is no trace sample: shown as unknown, not as zero
     await expect(eng.getByTestId("eng-joint-1")).toContainText("chưa có mẫu");
     for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "+5 s" }).click();
     await expect(page.getByTestId("run-tick")).toContainText("35.0 s");
     await expect(eng.getByTestId("eng-joint-1")).toContainText("rad");
     await expect(eng.getByTestId("eng-joint-1")).toContainText("ms");
-    await page.getByTestId("entity-list").getByRole("button", { name: /Coffee cell/ }).click();
+    await page.getByTestId("entity-list").getByRole("button", { name: /Trạm cà phê/ }).click();
     await expect(eng.getByTestId("eng-step-brew")).toContainText("mL");
     await expect(eng.getByTestId("eng-cup-sensor")).toBeVisible();
     await shot(page, "engineering-desktop-vi");

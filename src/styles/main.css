@@ -2404,3 +2404,9 @@ label.button:has(+ input:focus-visible) {
 .compare table{margin-top:6px}
 .report-panel{padding-bottom:14px}
 .report-panel>*:not(.panel-heading){margin-left:16px;margin-right:16px}
+
+/* New-run inputs stay separate from the locked run shown in the scene. */
+.twin-settings { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0 20px; }
+.twin-settings input { width: 88px; }
+.twin-settings select { min-width: 72px; }
+.twin-settings label { font-size: 0.85rem; }

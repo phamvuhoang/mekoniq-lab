@@ -20,5 +20,7 @@ export interface AssetRevision {schemaVersion:2;id:string;revision:number;conten
  kinematics?:{convention:'modified_dh'|'urdf';jointCount:number};inertial?:{massKg:number};sensorRefs?:string[];toolRefs?:string[];
  provenance:{parameter:string;source:'measured'|'vendor_spec'|'vendor_cad'|'assumed'|'illustrative';reference?:string;license?:string}[];}
 export interface LabProjectV2 {schemaVersion:2;id:string;name:string;revision:number;updatedAt:string;
- entities:{id:string;kind:'amr'|'arm'|'coffee_machine'|'cup_station';assetRef:{id:string;revision:number;contentHash:string};recipeRefs?:{id:string;revision:number;hash:string}[]}[];
+ armCollisionProfile?:{schemaVersion:1;id:string;revision:number;units:'SI';provenance:'illustrative';reference:string;modelId:string;modelRevision:string;
+  baseInMap:{position:number[];quaternionXyzw:number[]};fixtureHeightM:number;robotHeightM:number};
+ entities:{id:string;speedLimitMps?:number;kind:'amr'|'arm'|'coffee_machine'|'cup_station';assetRef:{id:string;revision:number;contentHash:string};recipeRefs?:{id:string;revision:number;hash:string}[]}[];
  world:{id:string;revision:number;width:number;height:number;points:{id:string;name:string;kind:PointKindV2;x:number;y:number}[];handoffPoints?:{id:string;name:string;kind:PointKindV2;position:number[];yawRad:number|null}[];obstacles:Obstacle[]};}

@@ -51,6 +51,16 @@ test('missing runtime says preview only and how to install; never starts a stand
  await mkdir(root,{recursive:true});const r=run(['--root',root,'--ui-port',String(await freePort()),'--runtime-port',String(await freePort())]);
  expect(await r.exit).toBe(1);expect(r.err).toMatch(/preview only/i);expect(r.err).toContain('import-runtime.mjs');expect(r.out).not.toMatch(/ready/i);
 }));
+test('import rescans a hash-valid runtime and refuses credentials or external requires without changing its pin',()=>withRoot(async(root,tmp)=>{
+ const artifact=join(tmp,'export');await exported(artifact);await installRuntime(artifact,root);
+ const original=await readFile(join(root,'config/source-runtime.lock.json'),'utf8');
+ for(const code of ['const external=require("unsafe-dependency");','const secret="ghp_abcdefghijklmnopqrstuvwxyz1234567890";']){
+  const manifest=JSON.parse(await readFile(join(artifact,'manifest.json'),'utf8'));
+  await writeFile(join(artifact,'runtime.mjs'),code);manifest.artifactSha256=sha(code);await writeFile(join(artifact,'manifest.json'),JSON.stringify(manifest));
+  await expect(installRuntime(artifact,root)).rejects.toThrow(/NON_STANDALONE_IMPORT|SECRET_IN_ARTIFACT/);
+  expect(await readFile(join(root,'config/source-runtime.lock.json'),'utf8')).toBe(original);
+ }
+}));
 test('corrupt and dirty artifacts are refused',()=>withRoot(async(root,tmp)=>{
  const m=await exported(join(tmp,'export'));await installRuntime(join(tmp,'export'),root);
  await writeFile(join(root,'.runtime',m.artifactSha256,'runtime.mjs'),'tampered');

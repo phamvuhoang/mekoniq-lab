@@ -53,13 +53,24 @@ function list(value:unknown,field:string,max=200):unknown[] {if (!Array.isArray(
 function vec(value:unknown,length:number,field:string):void {if (!Array.isArray(value)||value.length!==length||!value.every(Number.isFinite)) invalid(field);}
 /** Structural v2 check on the Lab side; the source runtime stays the authoritative validator (JSON Schema). Rejects unknown members, so a bad migration cannot be stored. */
 export function validateProjectV2(value:unknown):LabProjectV2 {
-  const project=object(value,['schemaVersion','id','name','revision','updatedAt','entities','world'],'root');
+  const hasArmProfile=!!value&&typeof value==='object'&&'armCollisionProfile' in value;
+  const project=object(value,['schemaVersion','id','name','revision','updatedAt','entities','world',...hasArmProfile?['armCollisionProfile']:[]],'root');
   if (project.schemaVersion!==2) invalid('schemaVersion');
   id(project.id,'id');text(project.name,'name');revision(project.revision,'revision');
   if (typeof project.updatedAt!=='string'||!Number.isFinite(Date.parse(project.updatedAt))) invalid('updatedAt');
+  if(hasArmProfile){
+    const p=object(project.armCollisionProfile,['schemaVersion','id','revision','units','provenance','reference','modelId','modelRevision','baseInMap','fixtureHeightM','robotHeightM'],'armCollisionProfile');
+    id(p.id,'armCollisionProfile.id');revision(p.revision,'armCollisionProfile.revision');id(p.modelId,'armCollisionProfile.modelId');hash(p.modelRevision,'armCollisionProfile.modelRevision');
+    if(p.schemaVersion!==1||p.units!=='SI'||p.provenance!=='illustrative'||typeof p.reference!=='string'||p.reference.length<1||p.reference.length>1000)invalid('armCollisionProfile');
+    const pose=object(p.baseInMap,['position','quaternionXyzw'],'armCollisionProfile.baseInMap');vec(pose.position,3,'armCollisionProfile.position');vec(pose.quaternionXyzw,4,'armCollisionProfile.quaternionXyzw');
+    if((pose.position as number[]).some(n=>Math.abs(n)>1000)||Math.abs(Math.hypot(...pose.quaternionXyzw as number[])-1)>1e-6)invalid('armCollisionProfile.baseInMap');
+    for(const k of ['fixtureHeightM','robotHeightM']){number(p[k],`armCollisionProfile.${k}`,true);if(Number(p[k])>100)invalid(`armCollisionProfile.${k}`);}
+  }
   const ids=new Set<string>();
   for (const e of list(project.entities,'entities')) {
-    const entity=e&&typeof e==='object'&&!Array.isArray(e)&&'recipeRefs' in e ? object(e,['id','kind','assetRef','recipeRefs'],'entity') : object(e,['id','kind','assetRef'],'entity');
+    const optional=e&&typeof e==='object'?['recipeRefs','speedLimitMps'].filter(k=>k in e):[];
+    const entity=object(e,['id','kind','assetRef',...optional],'entity');
+    if('speedLimitMps' in entity&&(entity.kind!=='amr'||typeof entity.speedLimitMps!=='number'||!Number.isFinite(entity.speedLimitMps)||entity.speedLimitMps<=0||entity.speedLimitMps>0.5)) invalid('entity.speedLimitMps');
     id(entity.id,'entity.id');if (ids.has(entity.id as string)||!['amr','arm','coffee_machine','cup_station'].includes(String(entity.kind))) invalid('entity');
     ids.add(entity.id as string);
     const ref=object(entity.assetRef,['id','revision','contentHash'],'entity.assetRef');id(ref.id,'assetRef.id');revision(ref.revision,'assetRef.revision');hash(ref.contentHash,'assetRef.contentHash');

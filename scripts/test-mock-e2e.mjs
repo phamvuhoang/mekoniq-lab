@@ -6,6 +6,7 @@ import {mkdtemp,rm,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {pairingOutput} from './launcher-output.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const args=process.argv.slice(2),specs=args.filter(a=>!a.startsWith('--'));
 const {CI:_ci,...env}=process.env;// Playwright must reuse the launcher's UI, not start its own
@@ -16,9 +17,11 @@ const stop=()=>{runner?.kill('SIGTERM');launcher?.kill('SIGINT');};
 process.once('SIGINT',stop);process.once('SIGTERM',stop);
 try{
  for(const spec of specs.length?specs:['twin-recovery.spec.ts','coffee-journey.spec.ts']){
-  launcher=spawn(process.execPath,[join(root,'scripts/start-mock.mjs'),'--data-dir',join(work,`runs-${spec}`)],{cwd:root,stdio:['ignore','pipe','inherit'],env});
+  const offline=process.env.LAB_TEST_OFFLINE_ROOT;
+  launcher=spawn(offline?join(offline,'bin/node'):process.execPath,[offline?join(offline,'start.mjs'):join(root,'scripts/start-mock.mjs'),'--data-dir',join(work,`runs-${spec}`)],{cwd:root,stdio:['ignore','pipe','inherit'],env});
   const exited=new Promise(r=>launcher.once('exit',c=>r(c??1)));
-  const token=await new Promise((ok,fail)=>{let out='';launcher.stdout.on('data',c=>{out+=c;process.stdout.write(String(c).replace(/(pairing code[^:]*: )\S+/,'$1<redacted>'));const m=/one-use pairing code \(expires in 5 minutes\): (\S+)[\s\S]*Ready in/.exec(out);if(m)ok(m[1]);});void exited.then(c=>fail(new Error(`Launcher exited before ready: ${c}`)));});
+  const redacted=pairingOutput(c=>process.stdout.write(c));launcher.stdout.once('end',()=>redacted.end());
+  const token=await new Promise((ok,fail)=>{let out='';launcher.stdout.on('data',c=>{out+=c;redacted.write(c);const m=/one-use pairing code \(expires in 5 minutes\): (\S+)[\s\S]*Ready in/.exec(out);if(m)ok(m[1]);});void exited.then(c=>fail(new Error(`Launcher exited before ready: ${c}`)));});
   console.log(`Running ${spec} through pnpm lab:mock with a fresh journal.`);
   // one JSON result per spec when LAB_PW_JSON is set, so a later spec does not overwrite an earlier one
   runner=spawn('pnpm',['exec','playwright','test',spec],{cwd:root,stdio:'inherit',env:{...env,LAB_TEST_PAIRING_TOKEN:token,...env.LAB_PW_JSON?{LAB_PW_JSON:env.LAB_PW_JSON.replace(/\.json$/,`-${spec.replace(/\.spec\.ts$/,'')}.json`)}:{}}});

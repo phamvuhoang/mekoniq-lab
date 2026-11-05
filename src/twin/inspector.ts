@@ -4,6 +4,7 @@ import {armRows,cupRows,cupSensorRow,jobsOf,stepRows} from './coffee-cell';
 import {sceneEntities,kindLabel,type TwinFrame} from './scene';
 import {nameOf} from '../scenarios/catalog';
 import {tr} from '../i18n';
+import {stateLabel} from '../ui/labels';
 import type {RunReport,RunView} from '../scenarios/controls';
 /** Locked-run identity, only from what the runtime reported (snapshot + report manifest/jobs); a value it has not reported shows '?'. */
 export function identityItems(v:RunView,report:RunReport|null):string[] {
@@ -19,12 +20,12 @@ export function inspect(f:TwinFrame,entityId:string|null,seen:Record<string,numb
  const v=f.view,report=f.report,tick=v?.tick??0,tickMs=report?.manifest.clock.tickMs??20;
  const base={id:e.id,title:`${e.name}`,kind:kindLabel(e.kind),source:e.source};
  const noRun=tr('Chưa có lần chạy: chỉ có dữ liệu mô hình của preset.','未実行:プリセットのモデル値のみ。','No run yet: preset model data only.');
- if(e.kind==='amr'){const a=v?.entities.find(r=>r.id===e.id);return {...base,rows:a?amrRows(a,v!.run.ageMs,runtimeResolved(report,f.preset.project,e.id)):[],note:a?tr('Pose quan sát từ backend mock (mô hình động học), không phải cảm biến.','姿勢はモック(運動学モデル)の観測でセンサーではありません。','Pose is observed from the mock backend (kinematic model), not a sensor.'):noRun};}
+ if(e.kind==='amr'){const a=v?.entities.find(r=>r.id===e.id);return {...base,rows:a?amrRows(a,a.sampleAgeMs??v!.run.ageMs,runtimeResolved(report,f.preset.project,e.id)):[],note:a?tr('Pose quan sát từ backend mock (mô hình động học), không phải cảm biến.','姿勢はモック(運動学モデル)の観測でセンサーではありません。','Pose is observed from the mock backend (kinematic model), not a sensor.'):noRun};}
  if(e.kind==='arm')return {...base,rows:v?armRows(report,tick):[],note:tr('Góc khớp là quỹ đạo lệnh của mock_kinematic; không có encoder hay lực kẹp.','関節角はmock_kinematicの指令軌道。エンコーダ・把持力なし。','Joint angles are the mock_kinematic commanded trace; no encoder or grip force.')};
  const job=e.kind==='job'?e.id:jobsOf(v).find(j=>!['delivered','quarantined','cancelled'].includes(j.status))?.jobId??jobsOf(v).at(-1)?.jobId;
  if(e.kind==='coffee_machine'||e.kind==='job'){
   const j=jobsOf(v).find(x=>x.jobId===job);
-  const head=j?[{key:'job-status',label:`Job ${j.jobId}`,observed:`${j.status}${j.attentionReason?` · ${j.attentionReason}`:''}`,commanded:`${j.recipeId}`,unit:'',source:'observed' as const,ageMs:null}]:[];
+  const head=j?[{key:'job-status',label:`Job ${j.jobId}`,observed:`${stateLabel(j.status)}${j.attentionReason?` · ${j.attentionReason}`:''}`,commanded:`${j.recipeId}`,unit:'',source:'observed' as const,ageMs:null}]:[];
   return {...base,rows:v?[...head,...stepRows(report,job),cupSensorRow(v,job)]:[],note:v?tr('Lượng đo của mock_process là mô hình, không phải phép đo máy pha.','mock_processの計量はモデルで、実測ではありません。','mock_process amounts are modelled, not a machine measurement.'):noRun};
  }
  if(e.kind==='cup'){

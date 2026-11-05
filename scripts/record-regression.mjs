@@ -7,7 +7,7 @@
 //   --ci:    adds the source CI-equivalent gate (build, unit, contracts, adapters, the full integration suite, pytest); the integration suite
 //            needs the repo's local Supabase already running (`pnpm supabase:start` in source). This script never starts or stops services.
 import {spawnSync,execFileSync} from 'node:child_process';
-import {readFileSync,writeFileSync,mkdirSync,existsSync,rmSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,existsSync,rmSync,mkdtempSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
@@ -26,6 +26,7 @@ function summarize(kind,text){
  if(kind==='junit'){const m=/<testsuite[^>]*\btests="(\d+)"[^>]*\bfailures="(\d+)"|<testsuite[^>]*\bfailures="(\d+)"[^>]*\btests="(\d+)"/.exec(text),e=/\berrors="(\d+)"/.exec(text),s=/\bskipped="(\d+)"/.exec(text);
   return {tests:Number(m?.[1]??m?.[4]),failures:Number(m?.[2]??m?.[3]),errors:Number(e?.[1]??0),skipped:Number(s?.[1]??0)};}
  const j=JSON.parse(text);
+ if(kind==='measurement')return {durationMs:j.durationMs,minimumDurationMet:j.minimumDurationMet,profiles:j.results.map(p=>({id:p.id,p95Ms:p.frameIntervals.p95Ms,paintP95Ms:p.workspacePaint.p95Ms,meetsTarget:p.meetsTarget}))};
  return kind==='vitest'?{passed:j.numPassedTests,failed:j.numFailedTests,skipped:j.numPendingTests+(j.numTodoTests??0),total:j.numTotalTests}:{expected:j.stats.expected,unexpected:j.stats.unexpected,skipped:j.stats.skipped,flaky:j.stats.flaky};
 }
 function run(id,repo,cmd,args,{kind=null,files=[],extraEnv={}}={}){
@@ -41,7 +42,7 @@ function run(id,repo,cmd,args,{kind=null,files=[],extraEnv={}}={}){
  console.log(id,'exit',r.status);
 }
 const V='node_modules/vitest/vitest.mjs',out=f=>`--outputFile=${OUT}/${f}`;
-const referenced=['lab-v2-mock','lab-v2-recovery','lab-v2-contracts','lab-v2-model','lab-v2-arm-model','lab-v2-stream','lab-v2-report','lab-v2-residuals','lab-runtime','lab-runtime-gateway','lab-runtime-contracts','lab-runtime-artifact','coffee-job','coffee-transfer','coffee-recovery','robot-admission','table-order-amendments'].map(f=>`tests/integration/${f}.test.ts`);
+const referenced=['lab-v2-mock','lab-v2-recovery','lab-v2-contracts','lab-v2-model','lab-v2-arm-model','lab-v2-stream','lab-v2-report','lab-v2-residuals','lab-runtime','lab-runtime-gateway','lab-runtime-contracts','lab-runtime-artifact','coffee-job','coffee-transfer','coffee-recovery','coffee-review','coffee-policy','coffee-conservation','lab-v2-runtime-review','lab-v2-software-gaps','lab-v2-mixed','lab-v2-arm-safety-model','lab-v2-arm-faults','lab-v2-arm-scene','lab-v2-arm-inactive-scene','lab-v2-checkpoint-compat','lab-v2-reclaim-targets','robot-admission','table-order-amendments'].map(f=>`tests/integration/${f}.test.ts`);
 run('source-typecheck','source','pnpm',['-s','typecheck']);
 run('source-lint','source','pnpm',['-s','lint']);
 run('source-contracts-check','source','pnpm',['-s','contracts:check']);
@@ -60,9 +61,16 @@ run('lab-typecheck','lab','pnpm',['-s','typecheck']);
 run('lab-vitest','lab',`${LAB}/node_modules/.bin/vitest`,['run','tests/unit','tests/integration','--reporter=json',out('lab-vitest.json')],{kind:'vitest',files:['lab-vitest.json']});
 run('lab-build','lab','pnpm',['-s','build']);
 run('lab-e2e-ui','lab','pnpm',['-s','test:e2e','--','ui.spec.ts'],{kind:'playwright',files:['lab-pw-ui.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-ui.json`}});
-run('lab-twin-e2e','lab','pnpm',['-s','test:twin-e2e'],{kind:'playwright',files:['lab-pw-twin-twin-workspace.json','lab-pw-twin-coffee-journey.json','lab-pw-twin-twin-recovery.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-twin.json`}});
+run('lab-twin-e2e','lab','pnpm',['-s','test:twin-e2e','--evidence'],{kind:'playwright',files:['lab-pw-twin-twin-workspace.json','lab-pw-twin-coffee-journey.json','lab-pw-twin-twin-recovery.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-twin.json`}});
 run('lab-mock-e2e','lab','pnpm',['-s','test:mock-e2e'],{kind:'playwright',files:['lab-pw-mock-twin-recovery.json','lab-pw-mock-coffee-journey.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-mock.json`}});
 run('lab-runtime-e2e','lab','pnpm',['-s','test:runtime-e2e'],{kind:'playwright',files:['lab-pw-runtime.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-runtime.json`}});
+run('lab-plan01-e2e','lab',process.execPath,['scripts/test-mock-e2e.mjs','--evidence','twin-plan01.spec.ts','twin-inputs.spec.ts'],{kind:'playwright',files:['lab-pw-plan01-twin-plan01.json','lab-pw-plan01-twin-inputs.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-plan01.json`}});
+run('lab-ui-performance','lab',process.execPath,['scripts/measure-twin-ui.mjs','--duration-ms','60000','--output',`${OUT}/lab-ui-performance.json`],{kind:'measurement',files:['lab-ui-performance.json']});
+const offline=mkdtempSync(resolve(os.tmpdir(),'mekoniq-offline-regression-')),bundle=resolve(offline,'bundle');
+try{
+ run('lab-offline-build','lab',process.execPath,['scripts/build-offline.mjs','--out',bundle]);
+ run('lab-offline-e2e','lab',process.execPath,['scripts/test-mock-e2e.mjs','twin-recovery.spec.ts','coffee-journey.spec.ts'],{kind:'playwright',files:['lab-pw-offline-twin-recovery.json','lab-pw-offline-coffee-journey.json'],extraEnv:{LAB_TEST_OFFLINE_ROOT:bundle,LAB_PW_JSON:`${OUT}/lab-pw-offline.json`}});
+}finally{rmSync(offline,{recursive:true,force:true});}
 const git=(d,a)=>execFileSync('git',['-C',d,...a]).toString().trim();
 writeFileSync(`${OUT}/manifest.json`,JSON.stringify({schema:'lab-v2-regression/1',recorder:'lab/scripts/record-regression.mjs'+(ci?' --ci':''),
  note:'Synthetic test data only; absolute paths scrubbed to <workspace>/<home>/<tmp>, key/token shapes to <jwt>/<supabase-key>. sha256 is of the stored (scrubbed) file.',
