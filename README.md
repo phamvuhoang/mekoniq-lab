@@ -2,7 +2,9 @@
 
 Lab thiết kế và mô phỏng nghiệp vụ robot giao món, giữ nhận diện navy/lime và ba ngôn ngữ Việt/Nhật/Anh của MEKONIQ. [Kế hoạch kinh doanh gốc](public/business-plan.html) được lưu nguyên bản.
 
-Bản hiện tại có cấu hình robot, mô hình 3D/2D và lắp ráp, sơ đồ kết nối chức năng, BOM, ước tính năng lượng, trình sửa mặt bằng, báo cáo/replay và xuất candidate dự thảo. Kịch bản S01 chạy qua **domain, SQLite journal, dispatcher và SimulatorAdapter thật trong source**; người dùng phải xác nhận tải món và giao món. Mô hình web không phải bộ mô phỏng động lực học hay bằng chứng robot thật đã chạy.
+Bản hiện tại có cấu hình robot, mô hình 3D/2D và lắp ráp, sơ đồ kết nối chức năng, BOM, ước tính năng lượng, trình sửa mặt bằng, báo cáo/replay và xuất candidate dự thảo. Digital Twin v2 chạy giao món, cà phê và chiến dịch hai AMR qua **domain, SQLite journal và dispatcher trong source**, với backend mock AMR/arm/coffee. S01 v1 vẫn có luồng xác nhận tải và giao món riêng. Mô hình web không chứng minh robot thật, động lực học hay an toàn vật lý.
+
+Các sửa R01–R12 và 18 phần mềm còn thiếu của Plan 01 đã có implementation và regression tương ứng; xem [bản ghi remediation](docs/reviews/2026-11-05-plan-01-remediation.md). Kiểm chứng tổng cuối, clean runtime pin và nghiệm thu vẫn phải được ghi bằng evidence riêng; tài liệu này không nâng R-MOCK thành accepted.
 
 ## Chạy giao diện
 
@@ -31,7 +33,7 @@ Sau đó, mỗi lần dùng (không cần mạng):
 pnpm lab:mock
 ```
 
-Launcher chạy **runtime source đã pin** (chỉ backend `mock_amr`, `mock_coffee`, `mock_arm`; không kết nối robot thật) trên `127.0.0.1:4176` và giao diện trên `127.0.0.1:4175`, rồi in mã ghép nối một lần ngay trong terminal. Mở http://127.0.0.1:4175, vào **Twin**, nhập mã (hết hạn sau 5 phút, không nằm trong URL, không lưu vào dự án hay journal), chọn FD01 giao món hoặc BV01 cà phê. Journal nằm trong `runs/` (không commit). `Ctrl-C` chỉ dừng runtime và UI mà launcher đã khởi động.
+Launcher chạy **runtime source đã pin** (chỉ backend `mock_amr`, `mock_coffee`, `mock_arm`; không kết nối robot thật) trên `127.0.0.1:4176` và giao diện trên `127.0.0.1:4175`, rồi in mã ghép nối một lần ngay trong terminal. Mở http://127.0.0.1:4175, vào **Twin**, nhập mã (hết hạn sau 5 phút, không nằm trong URL, không lưu vào dự án hay journal), chọn FD01 giao món, BV01 cà phê, food + cup hoặc chiến dịch hai AMR. Các đơn trong twin dùng chính sách nhân viên scripted của scenario; tải/giao vẫn phải đi qua confirmation trong source. Journal nằm trong `runs/` (không commit). `Ctrl-C` chỉ dừng runtime và UI mà launcher đã khởi động.
 
 Launcher không tự tải hay cài gì khi khởi động, không mở bản mô phỏng thay thế khi thiếu runtime, và không bao giờ dừng tiến trình khác. Nó dừng với mã lỗi rõ ràng:
 
@@ -49,6 +51,40 @@ Launcher không tự tải hay cài gì khi khởi động, không mở bản m�
 | `RUNTIME_IDENTITY_MISMATCH` | Runtime đang chạy không khớp commit/schema trong lock. |
 
 Lab không bao giờ dùng cổng `1880`/`1884` (`FORBIDDEN_PORT`). `--ui-port/--runtime-port/--data-dir/--root` chỉ dành cho kiểm thử; runtime source chỉ nhận trình duyệt từ `127.0.0.1:4175`. `node scripts/start-mock.mjs --boot-only` khởi động tới trạng thái sẵn sàng rồi dừng (đo boot-to-ready). Hệ điều hành đã kiểm: macOS (Apple Silicon); Linux chưa kiểm, xem [bằng chứng F07](docs/implementation/evidence/digital-twin-v2/F07-launcher.md).
+
+## Gói offline có sẵn Node
+
+Trên máy build đúng hệ điều hành/kiến trúc đích, dùng Node 24, dependencies đã cài và runtime đã import/kiểm. Build lại UI sau mỗi lần đổi runtime pin:
+
+```sh
+pnpm check:source
+pnpm build
+node scripts/build-offline.mjs --out /tmp/mekoniq-lab-offline
+```
+
+Đường dẫn output phải chưa tồn tại. Builder đóng gói UI/dependencies đã compile, runtime và schema đã pin, Node đang dùng, lockfile và license vào một thư mục có manifest SHA-256. Gói macOS/Apple Silicon cần build riêng với gói Linux hoặc kiến trúc khác.
+
+Chép nguyên thư mục sang máy cùng hệ điều hành/kiến trúc rồi chạy:
+
+```sh
+cd /path/to/mekoniq-lab-offline
+./start
+# tương đương: ./bin/node ./start.mjs
+```
+
+`./start` dùng Node trong gói; không cần Node, pnpm, npm hay tải mạng trên máy nhận. Mở `http://127.0.0.1:4175`, nhập mã ghép nối in trong terminal. Runtime dùng cổng 4176, dữ liệu mặc định ở `runs/` trong gói; có thể chọn `./start --data-dir /path/to/runs`. UI phải giữ cổng 4175 để khớp origin được runtime cho phép. Launcher kiểm manifest/platform, từ chối cổng đang dùng và chỉ dừng tiến trình nó đã tạo.
+
+Test gói có thể boot khi không có package manager trong `PATH`. Điều này chưa thay evidence cài trên máy mới, ngắt mạng hệ điều hành, cold boot, Linux hay browser trên final pin; trạng thái cuối nằm trong [remediation](docs/reviews/2026-11-05-plan-01-remediation.md).
+
+## Đầu vào, khôi phục và báo cáo Twin
+
+Mỗi run khóa project, seed, scenario, recipe, model, adapter và profile bằng revision/hash. **Reset** lưu báo cáo, archive run cũ rồi tạo run mới ở tick 0 với đúng đầu vào đã khóa. Chọn tốc độ chạy 1/4/16/64× chỉ đổi nhịp gửi step; đồng hồ mô phỏng vẫn 20 ms/tick. Giới hạn AMR `(0, 0.5] m/s` là đầu vào cho lần chạy mới và được áp dụng ở admission/plant.
+
+Sau khi runtime/phiên khởi động lại, ghép nối lại rồi chọn **Mở lại chỉ xem/đối soát**. Proof riêng được giữ trong browser, không nằm trong report/export. Runtime chỉ cho xem và đối soát, giữ journal/custody và không chạy lại motion. Project/seed lấy từ record đã lưu trong source; thiếu đầu vào thì Lab chặn reset và lưu evidence thay vì dùng preset khác. Nếu có nhiều đối tượng cần đối soát, phải chọn rõ robot/job rồi xác nhận. Đối soát ghi kết quả native/mock; không tự gỡ attention hoặc xác nhận cargo.
+
+Replay dựng trạng thái cup/job/measurement/arm và served theo cursor; dữ liệu chưa được ghi tại thời điểm đó hiển thị unavailable. Evidence đã lưu không đổi; chỉnh model/world/recipe/profile đánh dấu phạm vi cũ cần chạy lại. KPI correlate human wait theo mission/stop và allocation cuối; báo cáo tách queue wait, travel và thời gian process cell, với chu kỳ chưa hoàn tất là unavailable. Một AMR không có KPI khoảng cách giữa các robot.
+
+Arm mock dùng capsule sweep bảo thủ. Project có `armCollisionProfile` khai báo frame SI, revision model và chiều cao minh họa mới có phạm vi fixture/AMR scene; project cũ chỉ có self/injected-obstacle scope. Hình học thiếu hoặc khoảng sweep chưa giải được không tạo clearance pass. Xem [phạm vi tương thích và fidelity](docs/simulation-compatibility.md).
 
 ## Chạy S01 qua source
 
@@ -70,11 +106,11 @@ Giữ terminal này mở. Trong Lab chọn **Kịch bản**, nhập pairing toke
 
 Mỗi bước di chuyển hoàn tất bằng observation của source simulator. Việc tăng đồng hồ không xác nhận thay con người. Fault injection hỗ trợ blocked/clear, offline/online, reboot và duplicate completion; đây là lỗi nghiệp vụ/giao thức giả lập, không chứng minh khoảng dừng vật lý. Hủy không tự giải quyết hàng còn trên robot.
 
-Runtime chỉ bind `127.0.0.1:4176`; Vite proxy cùng origin. Không dùng cổng vận hành `1880`/`1884`. Cookie/CSRF và ownership bảo vệ run theo phiên. Khi khởi động lại runtime cần pairing lại; UI chưa có chức năng lấy lại run của phiên trước. Journal cũ vẫn nằm trong `runs/` để chẩn đoán, không tự gửi lại lệnh.
+Runtime chỉ bind `127.0.0.1:4176`; Vite proxy cùng origin. Không dùng cổng vận hành `1880`/`1884`. Cookie/CSRF và ownership bảo vệ run theo phiên. Khi khởi động lại runtime cần pairing lại. Twin v2 có reclaim chỉ xem/đối soát bằng proof như trên; S01 v1 không dùng giao thức reclaim này. Journal cũ vẫn nằm trong `runs/`, không tự gửi lại lệnh.
 
 ### Cài hoặc cập nhật runtime
 
-Lock hiện tại ([`config/source-runtime.lock.json`](config/source-runtime.lock.json)) pin source `d473d87af4fa8481e2770976b3385aceff294b52`, nhánh `feat/lab-digital-twin-v2` (F08 final fix wave). Artifact `115cf27168b0ab32579a96ee728c4bcdf52c99ac94d8355e6d0b7855c19aad57` có **protocol 1/2**: S01 v1 vẫn chạy, còn twin dùng v2. `.runtime/rollback.lock.json` giữ **đúng một** pin trước đó, là source `a741e01` (artifact `010f5c65…2606`). Muốn quay xa hơn thì phải export và import lại revision cũ. Runtime chỉ dùng revision trong lock, không tự theo HEAD của source; giá trị máy đọc luôn nằm trong lock, đoạn này chỉ để tham khảo.
+Revision runtime thực đang cài nằm trong [`config/source-runtime.lock.json`](config/source-runtime.lock.json): source commit, schema hash, artifact SHA-256 và protocol majors. Lab dùng protocol 1 cho S01 và 2 cho twin. `.runtime/rollback.lock.json` giữ đúng một pin trước đó; muốn quay xa hơn cần export/import revision cũ. Runtime không tự theo source HEAD. Remediation chỉ có mặt trong runtime sau khi source được commit sạch và artifact mới được export/import; trạng thái final pin đang được theo dõi trong [bản ghi remediation](docs/reviews/2026-11-05-plan-01-remediation.md).
 
 Dùng Node 24, dependencies của source và một checkout sạch. Chạy **từ thư mục source**:
 
@@ -110,13 +146,18 @@ pnpm build
 
 ## Phạm vi và bước kế tiếp
 
-Đã có vertical slice source và giao diện MVP; **chưa đạt toàn bộ ma trận G1**. S01 là scenario chạy được; polling có sẵn, SSE và các scenario khác chưa triển khai. Candidate chỉ là draft, không chứa quyền điều khiển, credentials hay hàng đợi mission; readiness không tự nâng thành đã nghiệm thu.
+Plan 01 hiện có phần mềm mock cho delivery, coffee, mixed workload, arm model, SSE/recovery, replay/evidence và gói offline. Source vẫn quyết định arrival, fulfillment, cup custody và effect; renderer không quyết định nghiệp vụ. Candidate chỉ là draft, không chứa credentials, quyền điều khiển hay hàng đợi mission.
 
-Code W00–W11 đã có trong source/main, gồm POS, robot, kho/nhân sự, CRM/khuyến mãi/đặt bàn, chuỗi/tích hợp và công cụ release. Lab hiện vẫn chỉ mở S01 business simulation; các module mới không tự trở thành scenario hoặc backend Lab. Nối backend native, import/apply candidate và nghiệm thu robot thật là các mốc tiếp theo. W11 có code và kiểm chứng local; UAT, cutover và các gate triển khai thật vẫn chưa được nghiệm thu. Pha chế/nấu ăn hiện là roadmap. Xem [tiến độ và giới hạn cụ thể](docs/implementation/progress.md) trước khi dùng kết quả cho quyết định kỹ thuật.
+**R-MOCK chưa được tự động nghiệm thu.** Final CI/browser/pin và review evidence cần hoàn tất; UX timing với người dùng, máy macOS mới, ngắt mạng thật, cold boot và Linux là gate riêng. Phép đo tablet 2D emulated trên Mac không thay phép đo thiết bị tablet thật. Plans 02/03, Gazebo/Nav2, LinuxCNC, native adapters, calibration và hardware/venue acceptance vẫn thuộc các gate tương ứng.
+
+Code W00–W11 trong source không tự trở thành scenario hoặc backend Lab. Nấu ăn vẫn là roadmap; pha chế hiện có mock workflow với provenance minh họa/modelled. Xem [tiến độ](docs/implementation/progress.md), [remediation](docs/reviews/2026-11-05-plan-01-remediation.md) và [compatibility](docs/simulation-compatibility.md) trước khi dùng kết quả cho quyết định kỹ thuật.
 
 ## Tài liệu
 
-- **[Đề xuất nâng cấp Digital Twin v2 — 2026-11-05](docs/specs/2026-11-05-digital-twin/README.md)**: food delivery + coffee cell (máy pha, đá/sữa, arm), mock/simulation/hardware; [bộ implementation plan](docs/plans/2026-11-05-digital-twin/README.md). Đây là spec/plan chưa triển khai, không thay trạng thái S01 bên trên.
+- [Remediation Plan 01 và trạng thái các gate](docs/reviews/2026-11-05-plan-01-remediation.md).
+- [Tương thích runtime và giới hạn bằng chứng](docs/simulation-compatibility.md); [record pin/hash máy đọc](config/simulation-compatibility.json).
+
+- **[Đề xuất nâng cấp Digital Twin v2 — 2026-11-05](docs/specs/2026-11-05-digital-twin/README.md)**: food delivery + coffee cell (máy pha, đá/sữa, arm), mock/simulation/hardware; [bộ implementation plan](docs/plans/2026-11-05-digital-twin/README.md). Plan 01 có implementation mock; Plans 02/03 và các gate simulation/hardware giữ phạm vi riêng.
 
 - [Giới thiệu Lab bằng hình ảnh — HTML tương tác, mở offline](../source/artifacts/robot-lab.html): 9 trang, Việt/Nhật/Anh; cấu hình robot, mặt bằng, S01, thử lỗi, replay và xuất draft.
 - [Khảo sát Drone Lab/OOMWOO và code nền](docs/research/2026-11-01-baseline-and-references.md).

@@ -1,0 +1,14 @@
+# Root implementation report (in progress)
+
+> Tracked snapshot of the local implementation/review report. Interim results are preserved; later follow-ups supersede earlier findings. Temporary probe names refer to disposable review scripts, not committed artifacts. Local tool paths were normalized; commands require Node 24.22.2 on PATH. Final pin/full-CI/acceptance status is recorded in the [remediation index](../2026-11-05-plan-01-remediation.md).
+
+- Backup test no-op reproduced previously for original X→X. Replaced literal overwrite with XOR1 and explicit changed assertion. Verifier unit check covers every original byte (256). Unit passed; upgrade-recovery 7/7 with source-owned Supabase passed (44s). Prior 2/4 failure frequency is not claimed fully explained.
+- ARM03: new conservative capsule geometry checker, modified DH FK; links/gripper/held cup against spheres/AABBs and nonadjacent link self-collision. Adaptive sweep subdivides using reach*sum(abs(dq)) bound, blocks unresolved interval at 0.5mm instead of asserting pass. Metadata engine/model/geometry/tolerance/pair. Mock plant checks actual next joint segment before moving, retains custody on collision.
+- ARM05: modeled following error/stop/E-stop latch, distinct requested/acknowledged/observed events, reset never resumes unknown program or frees cup. No physical safety claim. Eight model/plant regressions + prior coffee-transfer 8 passed (prior run of new file had7 before added geometry test).
+- Packaging: offline release vendors current Node24, built UI/dependencies, pinned runtime/schemas, dependency lock, Node/Three notices; integrity inventory, platform/arch checks, Node-only static/proxy server, loopback, same CSRF/pairing. Builder refuses mismatched UI/runtime and existing output. Two integration checks red then green against installed real runtime. Final bundle will be rebuilt/retested after new pin.
+- Auditor: detect literal require/__require outside built-ins, decode JWT claims independent of base64 alignment, private JWK, GitHub/Slack credential shapes. Import rescans before transaction. Source/Lab audit implementation copied exactly. Source focused auditor test and Lab13 launcher/offline tests green.
+- Launcher: line-buffer token redaction, validated proxy port rejects operational1880/1884, repeated signals reuse owned-child shutdown. Two new tests red then green; launcher suite green.
+- Residual diagnostics: matching invalid prediction unit/frame reason survives instead of NO_PREDICTION. Red1 then green9.
+- Legacy checkpoint: missing coffee.trays initializes empty observer map, never invents receiver evidence. Regression crashed before fix; reopens prior-pickup checkpoint and completes both cups after fix.
+
+Source-owned Supabase started successfully using existing repo script. Must stop it at end. Other Docker projects untouched.
