@@ -1,0 +1,251 @@
+{
+ "schemaVersion": 1,
+ "purpose": "Frozen R-MOCK interfaces for plan 02 (simulation) and plan 03 (arm/hardware). A simulation/hardware provider must match these hashes or bump the provider interface version with a migration note. Freezing is not acceptance: R-MOCK is implemented/tested, not accepted.",
+ "frozenAt": "2026-11-05",
+ "gates": {
+  "R-MOCK": "implemented_tested_not_accepted",
+  "R-SIM": "blocked_external",
+  "G-SIM-NAV": "blocked_external",
+  "G-SIM-ARM": "blocked_external",
+  "G-HW-READY": "not_started",
+  "G-HW-ACCEPT": "blocked_external"
+ },
+ "codeRevisions": {
+  "source": {
+   "branch": "feat/lab-digital-twin-v2",
+   "artifactCommit": "76960de6f34a8aed544e283edfc65404193a77cd",
+   "finalHead": "76960de6f34a8aed544e283edfc65404193a77cd",
+   "dirty": false
+  },
+  "lab": {
+   "branch": "feat/robot-lab",
+   "baseCommit": "a816217b1a6df90472c57130025a3b9ac3c1e6f2",
+   "note": "baseCommit is the lab HEAD this file was generated on; the commit that adds this file is its child"
+  },
+  "artifact": {
+   "sha256": "70197e40e7fb2cc98f53a6dc80b2042a9b496276e95623fe40b3164a6cb5cbe4",
+   "entrypoint": "runtime.mjs",
+   "schemaHash": "3b632d1ec0ef38dedef0a1e96b80109ebdda185cd713b47309924a48d3a3ed4e",
+   "protocolMajors": [
+    1,
+    2
+   ],
+   "nodeMajor": 24
+  },
+  "toolchain": {
+   "node": "v24.22.2",
+   "pnpm": "10.32.1"
+  }
+ },
+ "contracts": {
+  "note": "sha256 of the schema file bytes in source/packages/contracts/schemas",
+  "schemas": {
+   "asset-manifest.schema.json": "df1bb9f365c767f9ae2cc3108a54162fa3fa2bd05cb78e1b7b700147fe4829b8",
+   "asset-revision.schema.json": "ff741ad719244d9f16cd971b9fc8dc4e9a9462270e130cfd6f89f679c741721d",
+   "cell-command.schema.json": "45d327b86a8b7afd2cf482caf7a6cd552f8958fd597d9355866a17b6def8a7be",
+   "cell-observation.schema.json": "cce31a49800cf9188ef0c478b7e172fde649e1c654b910201016d279e750c481",
+   "coffee-recipe.schema.json": "4ed8a8592c33bd85ae660e3e7a6bdb1e445cdfd47739e50ae3260fc12ba86de8",
+   "lab-action-v2.schema.json": "fe0cbc9429ab5f4f2bf73faefb6d4e23731715c82dda4f7a218252dcee1757e7",
+   "lab-evidence-v2.schema.json": "b9ebf24647539f91a6b9d112210282f46f5d568a739be77603b9ff19ef1c77e3",
+   "lab-project-v2.schema.json": "823828e094b55652ab9691520bd9bcbd2f2eac6445d9337b581b72f99d3ecbb1",
+   "lab-run-v2.schema.json": "eba3cff43425db498fde279deef316e74c9be459ba872d59ad52a934c654c800",
+   "twin-sample-v2.schema.json": "84b86d2f33099860c82ece0da34a061f0eb669d96e78712165d12573eb53f525",
+   "robot-command.schema.json": "9a39142ea1cbc4087dc04fc4af2204e6431e826d33d82321375b0206d985bc06",
+   "robot-manifest.schema.json": "63660819ee65df2ff0d005ddcc61fdd34dcfde116cbd586677487655507953f5"
+  }
+ },
+ "fixtures": {
+  "note": "sha256 of file bytes under lab/fixtures (twins, recipes, catalog, worlds); all synthetic/illustrative",
+  "files": {
+   "fixtures/catalog/service-illustrative.json": "ae2c26a11647c2dce5e6615e561bfc1f29df9a4830a1f018aaf2f9297f70750a",
+   "fixtures/recipes/espresso.json": "bde84bccbd3d408c2296b731fd0d5e1cf8f3f8f2f51fdfd5ffafc67616c9016a",
+   "fixtures/recipes/iced-milk-coffee.json": "98419958d657d547826047e4886c53324d70b0970f32a56931d580d309dd30ce",
+   "fixtures/twins/coffee-cell-v2.json": "b30320715000f55d64c478efc4639623e6330af189f6fbe64d6d1464fef07f97",
+   "fixtures/twins/negative-v2.json": "f80a1f71e1c54e8d8976f7c6e7f097b9bba86c011f0cac85b63e43f6eb82afdb",
+   "fixtures/twins/restaurant-v2.json": "900ffaeec5fa0e669e180edb53f7a537c4a5897dcfd565fec6aefaf4b877b6ff",
+   "fixtures/twins/v1-legacy.json": "aa8e23d559dbfa5a2389b7541e118bd893ea341a88e70f95e426ff45c264afb9",
+   "fixtures/worlds/restaurant-six-tables.json": "9748983965bf231103a01a24296cf1ddc2159ed5e91b3d48c8cd399cc6745386"
+  }
+ },
+ "providerInterface": {
+  "version": "lab-v2-provider/1",
+  "note": "Version label introduced by this freeze and bound to the contract file hashes below; any change to these files is a new provider interface version.",
+  "robotAdapterContract": {
+   "file": "source/packages/robot-adapters/src/contract.ts",
+   "sha256": "71bf5f40c4dc3dd6d0d2c42e2cfe49ff304462e13c3816779b4c2b4b3e93b52f"
+  },
+  "cellAdapterContract": {
+   "file": "source/packages/cell-adapters/src/contract.ts",
+   "sha256": "0e418ee3ca8dfbbee02f83e8fb2186cc51d6e016249bc906da15bf82f82d6d50"
+  },
+  "capabilityCatalog": {
+   "file": "source/packages/lab-runtime/src/v2/capabilities.ts",
+   "sha256": "bdca78df9ad89e8d6941a4104a795366821283500274e1ae104b3eabd580debe",
+   "backendSets": {
+    "mock-default": {
+     "mode": "mock",
+     "access": "simulated",
+     "backends": [
+      "mock_amr",
+      "mock_coffee",
+      "mock_arm"
+     ]
+    },
+    "mock-amr": {
+     "mode": "mock",
+     "access": "simulated",
+     "backends": [
+      "mock_amr"
+     ]
+    },
+    "simulation-default": {
+     "mode": "simulation",
+     "access": "simulated",
+     "backends": [
+      "gazebo_nav2",
+      "linuxcnc_sim",
+      "coffee_io_sim"
+     ]
+    },
+    "hardware-shadow": {
+     "mode": "hardware",
+     "access": "shadow",
+     "backends": [
+      "valetudo_native"
+     ]
+    },
+    "hardware-hil": {
+     "mode": "hardware",
+     "access": "hil",
+     "backends": [
+      "valetudo_native",
+      "cell_native"
+     ]
+    },
+    "hardware-live": {
+     "mode": "hardware",
+     "access": "live",
+     "backends": [
+      "valetudo_native",
+      "cell_native"
+     ]
+    }
+   }
+  },
+  "mockBackends": [
+   {
+    "id": "mock_amr",
+    "version": "1",
+    "model": "mock_kinematic",
+    "dynamics": false
+   },
+   {
+    "id": "mock_coffee",
+    "version": "1",
+    "model": "mock_process",
+    "dynamics": false
+   },
+   {
+    "id": "mock_arm",
+    "version": "1",
+    "model": "mock_kinematic",
+    "dynamics": false
+   }
+  ],
+  "clock": {
+   "tickMs": 20,
+   "source": "virtual mock clock; simulation providers must publish their own clock mapping"
+  },
+  "prng": {
+   "algorithm": "xoshiro128**",
+   "seeding": "sha256(seed:actorId)",
+   "version": 1
+  }
+ },
+ "scenarios": [
+  {
+   "id": "FD01",
+   "revision": 1,
+   "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+  },
+  {
+   "id": "FD07",
+   "revision": 1,
+   "hash": "532ac5b0f7ca1e968f2715d2f5382b18e4e2a2a2d12b742c82af34c7b0f798f1"
+  },
+  {
+   "id": "FD02",
+   "revision": 1,
+   "hash": "4581308265f7fae8a860dc9bb7ddf584dcc632db416446b1f87fecdd04b799e8"
+  },
+  {
+   "id": "FD03",
+   "revision": 1,
+   "hash": "f04ddbae90b79d2a88f84e67329c12c86fc42f3091623a32c8933561000f55be"
+  },
+  {
+   "id": "FD04",
+   "revision": 1,
+   "hash": "ba082db82be5c7e2f23085dcacd018f86b5d9150a0f095a55d5175c3962b87dd"
+  },
+  {
+   "id": "FD04-blocked",
+   "revision": 1,
+   "hash": "d99b6c8548959e647688a4e70f95721ef8183e175bc131f638621132577030e3"
+  },
+  {
+   "id": "FD04-reopen",
+   "revision": 1,
+   "hash": "1f62e04470ef50ae8c466b03f5ed0813abc39df6c2522235ddca48b604ed447c"
+  },
+  {
+   "id": "FD05-payload",
+   "revision": 1,
+   "hash": "bb5022e0a5319cdbe99df0676a3b708c36bbb98e59393389dd756d047ee503ee"
+  },
+  {
+   "id": "FD05-battery",
+   "revision": 1,
+   "hash": "ef0b3d953b75d9d4bdb04f95c3880669b473233e9e1fa5538086c4952b54c626"
+  },
+  {
+   "id": "FD05-capability",
+   "revision": 1,
+   "hash": "a39e77c9a54413cb5068e8e931cde033fea09eb1f63d2b744c12ba4bf4525f05"
+  },
+  {
+   "id": "FD05-binding",
+   "revision": 1,
+   "hash": "df67cf7d4c300293449548427adb1b2f268cbf27dda3a3cb5d491a00c3cf828a"
+  },
+  {
+   "id": "BV01",
+   "revision": 1,
+   "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+  }
+ ],
+ "recipes": [
+  {
+   "id": "espresso",
+   "revision": 1,
+   "hash": "2fdaac68e5c91164a466ced01560600da2c8bd6a6a44071d9bba1297ff92aa82"
+  },
+  {
+   "id": "iced-milk-coffee",
+   "revision": 1,
+   "hash": "ce3445ef75dc12e099ea505cc3b50a701ce41c9cda14bba4c6449f6a7856b905"
+  }
+ ],
+ "evidence": {
+  "report": "docs/implementation/evidence/digital-twin-v2/mock-report.md",
+  "results": {
+   "file": "docs/implementation/evidence/digital-twin-v2/F08-mock-acceptance.json",
+   "sha256": "65bb614282988f1f8d919d02a21afc65e83d76ce62cad619c271a2e04f29f625"
+  }
+ },
+ "handoff": [
+  "Plans 02/03 bind to the source domain/adapter contracts above; mock results are not physical evidence.",
+  "Do not use the old simulator 1000 ms completion timing or mock_kinematic durations as a physical cycle-time baseline.",
+  "ARM03 has no collision checker yet: G-SIM-ARM and R-SIM require one."
+ ]
+}

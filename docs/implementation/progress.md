@@ -1,6 +1,6 @@
 # Robot Lab — tiến độ thực hiện
 
-Cập nhật: 2026-11-04. Lab đã re-pin runtime từ `a2f271c` (W06) lên `a078777` trên source/main, chứa W00–W11 và các sửa lỗi sau review. Đây là bản bàn giao **vertical slice S01 + giao diện Lab**, không phải tuyên bố hoàn tất toàn bộ plan L00–L11 hay nghiệm thu production W11.
+Cập nhật: 2026-11-05 (Digital Twin v2, plan 01 F01–F08: xem mục dưới). Trước đó, 2026-11-04: Lab đã re-pin runtime từ `a2f271c` (W06) lên `a078777` trên source/main, chứa W00–W11 và các sửa lỗi sau review. Đây là bản bàn giao **vertical slice S01 + giao diện Lab**, không phải tuyên bố hoàn tất toàn bộ plan L00–L11 hay nghiệm thu production W11.
 
 ## Đối chiếu source W07–W11 với Lab
 
@@ -27,6 +27,27 @@ Nguồn đối chiếu: [index W00–W11](../../../source/docs/superpowers/plans
 | L06 | Fault enum cơ bản, source report/journal, tách travel/wait/attempts, replay chỉ đọc | S02–S14, 20-seed matrix, SSE/backpressure; **G1 chưa đạt đầy đủ** |
 | L09 phần draft | Candidate với canonical hashes/checksums, evidence refs được lọc, readiness và native action bị chặn | Source dry-run/apply/rollback cho candidate Lab, nối map/profile provisioning W06 |
 
+## Digital Twin v2 — plan 01 foundation/mock (F01–F08)
+
+Chỉ ghi bằng chứng đã chạy thật. Ba trạng thái tách riêng: **implemented** (code/config có trong commit), **tested** (test đã chạy xanh trong phiên này), **accepted** (owner đã review bằng chứng). Chưa hạng mục nào ở trạng thái accepted.
+
+| Hạng mục | Implemented | Tested | Accepted |
+|---|---|---|---|
+| F01–F07: contracts v2, models asset/frame/arm, scenario runtime, coffee domain + mock cell/arm, twin UI, SSE/replay/compare, launcher + pin | có (source `feat/lab-digital-twin-v2`, lab `feat/robot-lab`) | có. Từng task có report, review đạt | không |
+| F08: R-MOCK acceptance | có. Source `79d801e` thêm scenarios FD02–FD05, faults và coffee cancel; `76960de` thêm acceptance test. Lab pin `519f893` (artifact `70197e40…cbe4`, protocol 1/2) | có. Acceptance 40/40; 102 dòng coverage gồm 77 pass, 16 NOT_IMPLEMENTED, 4 UNSUPPORTED_FIDELITY, 4 NEEDS_HUMAN, 1 BLOCKED_EXTERNAL. Regression source/Lab và cả bốn bộ browser đều xanh | **không** |
+| R-MOCK | đủ phần software trong phạm vi mock | trên host này (M2 Pro, macOS 26.5, Node 24.22.2) | **không**: cần owner review bằng chứng, và các mục NEEDS_HUMAN còn mở (usability với ≥5 người mới, fresh macOS profile, network-off, cold boot) |
+| R-SIM, G-SIM-* | chưa bắt đầu (plan 02/03) | không | `blocked_external`: cần Linux, Gazebo/Nav2 và LinuxCNC |
+| G-HW-READY / G-HW-ACCEPT / G-VENUE | chưa bắt đầu | không | `blocked_external`: chưa có thiết bị |
+
+- Bằng chứng: [mock-report](evidence/digital-twin-v2/mock-report.md) và [F08-mock-acceptance.json](evidence/digital-twin-v2/F08-mock-acceptance.json). Bản freeze cho plan 02/03: [simulation-compatibility.json](../../config/simulation-compatibility.json).
+- Chưa đo: p95 frame-time của UI; mục tiêu usability 3/5/2 phút; fresh macOS/Linux profile; network-off; offline bundle; cold boot.
+- Giới hạn chính:
+  - Mock không chứng minh motion control, physics, sensing hay hardware.
+  - ARM03 chưa có collision checker.
+  - Run đã needs_attention thì giữ nguyên trạng thái đó; reconcile của mock chỉ ghi audit.
+  - Reclaim trả 501.
+  - Chưa có campaign food + coffee đồng thời.
+
 ## Các gate chưa đạt
 
 - **L07 / Valetudo:** adapter, protocol rig và Android executor W06 đã có trong source/main. Còn đăng ký backend protocol/native trong Lab và chạy các scenario tương ứng; Lab chưa gọi adapter Valetudo hoặc robot trial.
@@ -45,7 +66,7 @@ Nguồn đối chiếu: [index W00–W11](../../../source/docs/superpowers/plans
 ## Vị trí bàn giao
 
 - App: thư mục `lab/`, branch `feat/robot-lab`.
-- Runtime source: `source/packages/lab-runtime/`, branch `main`; artifact pin commit `a07877718196ffc88832044fad97b027cedd53f4`. Giá trị máy đọc nằm trong [runtime lock](../../config/source-runtime.lock.json).
+- Runtime source: `source/packages/lab-runtime/`, branch `feat/lab-digital-twin-v2`; artifact pin commit `76960de6f34a8aed544e283edfc65404193a77cd` (pin cũ `2be6d15` giữ trong `.runtime/rollback.lock.json`). Giá trị máy đọc nằm trong [runtime lock](../../config/source-runtime.lock.json).
 - Worktree source riêng và worktree Lab tạm đã xóa; mỗi repository chỉ còn checkout chính. Journal/ghi chú local cũ được giữ trong `lab/runs/worktree-archive-2026-11-02/` (ignored).
 - Fixture map binding và danh tính observer W06 vẫn tương thích W11; lần cập nhật này không cần sửa logic runtime hoặc nới kiểm tra production.
 - Lab đã cài artifact local trong `.runtime/`; chạy `pnpm check:source` để kiểm. Không cần đọc worktree source để chạy artifact đã cài.
