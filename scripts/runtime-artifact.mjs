@@ -14,12 +14,10 @@ export function validateManifest(m) {
  return m;
 }
 const lockOf=(m)=>({dirty:false,packageVersion:m.packageVersion,toolchain:{node:m.toolchain.node},sourceCommit:m.sourceCommit,schemaHash:m.schemaHash,protocolMajor:m.protocolMajor,...(m.protocolMajors?{protocolMajors:m.protocolMajors}:{}),nodeMajor:m.nodeMajor,artifactSha256:m.artifactSha256,entrypoint:m.entrypoint});
-async function writeLock(root,lock){
- await mkdir(join(root,'config'),{recursive:true});
- const tmp=join(root,'config',`.source-lock-${randomUUID()}.json`);
- await writeFile(tmp,JSON.stringify(lock,null,2)+'\n');
- await rename(tmp,join(root,'config','source-runtime.lock.json'));
-}
+/** Write JSON through a temporary sibling and one rename: a crash leaves the old file or the new one, never half of one. */
+async function writeAtomic(file,value){const tmp=join(resolve(file,'..'),`.${randomUUID()}.tmp`);try{await writeFile(tmp,JSON.stringify(value,null,2)+'\n');await rename(tmp,file);}finally{await rm(tmp,{force:true});}}
+async function writeLock(root,lock){await mkdir(join(root,'config'),{recursive:true});await writeAtomic(join(root,'config','source-runtime.lock.json'),lock);}
+const intact=async(directory,sha)=>{try{return digest(await readFile(join(directory,'runtime.mjs')))===sha;}catch{return false;}};
 const readLock=async(root)=>{try{return JSON.parse(await readFile(join(root,'config/source-runtime.lock.json'),'utf8'));}catch(e){if(e.code==='ENOENT')return null;throw e;}};
 /** One transaction: manifest/protocol check, runtime hash, contract schemas re-hashed against the manifest, staged content-addressed copy, then one atomic lock rename.
  * Any failure leaves the current lock and installed artifacts untouched. The previous lock is kept in .runtime/rollback.lock.json (its artifact stays installed). */
@@ -38,6 +36,8 @@ export async function installRuntime(from,destination) {
   if(hash.digest('hex')!==manifest.schemaHash)throw new Error('SCHEMA_HASH_MISMATCH');
  }
  const runtimes=join(root,'.runtime'),directory=join(runtimes,manifest.artifactSha256),staging=join(runtimes,`.staging-${randomUUID()}`);
+ // an installed, verified copy of the same SHA stays where it is: removing it before the rename would leave the lock pointing at nothing
+ if(!await intact(directory,manifest.artifactSha256)){
  await mkdir(join(staging,'schemas'),{recursive:true});
  try{
   await writeFile(join(staging,'runtime.mjs'),bytes);
@@ -46,9 +46,11 @@ export async function installRuntime(from,destination) {
   await rm(directory,{recursive:true,force:true});
   await rename(staging,directory);
  }finally{await rm(staging,{recursive:true,force:true});}
+ }
  const previous=await readLock(root),lock=lockOf(manifest);
- if(previous&&previous.artifactSha256!==lock.artifactSha256)await writeFile(join(runtimes,'rollback.lock.json'),JSON.stringify(previous,null,2)+'\n');
  await writeLock(root,lock);
+ // the rollback record is written only once the new lock is in place, and atomically
+ if(previous&&previous.artifactSha256!==lock.artifactSha256)await writeAtomic(join(runtimes,'rollback.lock.json'),previous);
  return lock;
 }
 /** Re-select the previously pinned artifact (swap with the current one) after verifying it is still installed intact. */
@@ -58,7 +60,7 @@ export async function rollbackRuntime(destination) {
  if(digest(await readFile(join(root,'.runtime',previous.artifactSha256,previous.entrypoint)))!==previous.artifactSha256)throw new Error('ARTIFACT_HASH_MISMATCH');
  const current=await readLock(root);
  await writeLock(root,previous);
- if(current)await writeFile(file,JSON.stringify(current,null,2)+'\n');
+ if(current)await writeAtomic(file,current);
  return previous;
 }
 export async function checkedRuntime(root) {

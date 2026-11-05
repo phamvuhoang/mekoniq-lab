@@ -1,6 +1,6 @@
 import {expect,test} from 'vitest';
 import {spawn,type ChildProcess} from 'node:child_process';
-import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,readFile,rm,readdir} from 'node:fs/promises';
 import {createServer,type Server} from 'node:net';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -112,6 +112,17 @@ test('install is one transaction: protocol compatibility, contract schemas and l
  const b=await exported(join(tmp,'b'),{enabled:[...MOCK,'gazebo_sim']});await installRuntime(join(tmp,'b'),root);
  expect((await checkedRuntime(root)).lock.artifactSha256).toBe(b.artifactSha256);
  await rollbackRuntime(root);expect((await checkedRuntime(root)).lock.artifactSha256).toBe(a.artifactSha256);
+}));
+test('re-importing the installed SHA keeps the verified directory in place (no remove-then-rename window); rollback lock written atomically after the lock',()=>withRoot(async(root,tmp)=>{
+ const a=await exported(join(tmp,'a'));await installRuntime(join(tmp,'a'),root);
+ const dir=join(root,'.runtime',a.artifactSha256);await writeFile(join(dir,'marker'),'same directory');
+ const lock=await readFile(join(root,'config/source-runtime.lock.json'),'utf8');
+ await installRuntime(join(tmp,'a'),root);
+ expect(await readFile(join(dir,'marker'),'utf8')).toBe('same directory');expect(await readFile(join(root,'config/source-runtime.lock.json'),'utf8')).toBe(lock);
+ const b=await exported(join(tmp,'b'),{enabled:[...MOCK,'gazebo_sim']});await installRuntime(join(tmp,'b'),root);
+ expect(JSON.parse(await readFile(join(root,'.runtime/rollback.lock.json'),'utf8')).artifactSha256).toBe(a.artifactSha256);
+ expect((await readdir(join(root,'.runtime'))).filter(n=>n.startsWith('.'))).toEqual([]); // no staging or temporary rollback file left behind
+ expect((await readdir(join(root,'config'))).filter(n=>n.startsWith('.'))).toEqual([]);
 }));
 test('a lock offering protocols 1 and 2 stays compatible with the S01 v1 health',()=>{
  const lock={sourceCommit:'a',schemaHash:'s',protocolMajor:2,protocolMajors:[1,2]};
