@@ -20,7 +20,8 @@ try{
   const exited=new Promise(r=>launcher.once('exit',c=>r(c??1)));
   const token=await new Promise((ok,fail)=>{let out='';launcher.stdout.on('data',c=>{out+=c;process.stdout.write(String(c).replace(/(pairing code[^:]*: )\S+/,'$1<redacted>'));const m=/one-use pairing code \(expires in 5 minutes\): (\S+)[\s\S]*Ready in/.exec(out);if(m)ok(m[1]);});void exited.then(c=>fail(new Error(`Launcher exited before ready: ${c}`)));});
   console.log(`Running ${spec} through pnpm lab:mock with a fresh journal.`);
-  runner=spawn('pnpm',['exec','playwright','test',spec],{cwd:root,stdio:'inherit',env:{...env,LAB_TEST_PAIRING_TOKEN:token}});
+  // one JSON result per spec when LAB_PW_JSON is set, so a later spec does not overwrite an earlier one
+  runner=spawn('pnpm',['exec','playwright','test',spec],{cwd:root,stdio:'inherit',env:{...env,LAB_TEST_PAIRING_TOKEN:token,...env.LAB_PW_JSON?{LAB_PW_JSON:env.LAB_PW_JSON.replace(/\.json$/,`-${spec.replace(/\.spec\.ts$/,'')}.json`)}:{}}});
   const code=await new Promise((ok,fail)=>{runner.once('error',fail);runner.once('exit',c=>ok(c??1));});
   runner=undefined;launcher.kill('SIGINT');const stopped=await exited;launcher=undefined;
   if(stopped!==0){console.error(`Launcher did not stop cleanly: ${stopped}`);process.exitCode=1;break;}
