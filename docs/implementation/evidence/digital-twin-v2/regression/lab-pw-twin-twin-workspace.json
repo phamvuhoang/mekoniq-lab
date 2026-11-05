@@ -1,7 +1,7 @@
 {
   "config": {
     "argv": [
-      "<home>/.nvm/versions/node/v24.22.2/bin/node",
+      "node",
       "<workspace>/lab/node_modules/@playwright/test/cli.js",
       "test",
       "twin-workspace.spec.ts"
@@ -121,12 +121,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 542,
+                  "duration": 447,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T03:24:19.865Z",
+                  "startTime": "2026-11-05T04:01:34.034Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -172,12 +172,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1135,
+                      "duration": 1163,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-05T03:24:21.208Z",
+                      "startTime": "2026-11-05T04:01:34.866Z",
                       "annotations": [
                         {
                           "type": "serial",
@@ -224,12 +224,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 528,
+                      "duration": 538,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-05T03:24:22.456Z",
+                      "startTime": "2026-11-05T04:01:36.149Z",
                       "annotations": [
                         {
                           "type": "serial",
@@ -276,12 +276,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 2343,
+                      "duration": 1632,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-05T03:24:22.989Z",
+                      "startTime": "2026-11-05T04:01:36.694Z",
                       "annotations": [
                         {
                           "type": "serial",
@@ -328,12 +328,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1125,
+                      "duration": 1128,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-11-05T03:24:25.338Z",
+                      "startTime": "2026-11-05T04:01:38.333Z",
                       "annotations": [
                         {
                           "type": "serial",
@@ -362,8 +362,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-05T03:24:19.615Z",
-    "duration": 7220.481000000001,
+    "startTime": "2026-11-05T04:01:33.762Z",
+    "duration": 6035.612,
     "expected": 5,
     "skipped": 0,
     "unexpected": 0,

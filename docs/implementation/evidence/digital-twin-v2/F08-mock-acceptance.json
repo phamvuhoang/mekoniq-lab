@@ -1,6 +1,6 @@
 {
  "schema": "lab-v2-mock-acceptance/1",
- "generatedAt": "2026-11-05T03:26:54.489Z",
+ "generatedAt": "2026-11-05T04:16:57.270Z",
  "note": "Synthetic mock data only. pass = assertions executed: self rows in this run (records = run traces), source/lab rows = PASSED entries in the stored regression results (regression/manifest.json with sha256).",
  "counts": {
   "pass": 78,
@@ -52,7 +52,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -331,7 +331,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -367,7 +367,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json",
+    "regression/source-referenced.json",
     "regression/lab-vitest.json"
    ],
    "actual": "assertions passed"
@@ -454,7 +454,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -499,7 +499,7 @@
    "records": {},
    "storedResults": [
     "regression/lab-vitest.json",
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -571,7 +571,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json",
+    "regression/source-referenced.json",
     "regression/lab-vitest.json"
    ],
    "actual": "assertions passed"
@@ -1131,7 +1131,7 @@
    "note": "domain level only: the Lab action schema has no retarget action, so no runner check",
    "records": {},
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -1243,7 +1243,7 @@
    "note": "domain level only: the mock runner never produces an unknown zone reservation",
    "records": {},
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -1316,7 +1316,7 @@
    "note": "domain level: the Lab runner has no map-report/rebind action",
    "records": {},
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -1417,7 +1417,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -1494,7 +1494,7 @@
    "note": "domain level (CUP_TYPE_MISMATCH, CUP_MISMATCH); no runner fault places a wrong cup",
    "records": {},
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -1621,7 +1621,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -1693,7 +1693,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -1727,7 +1727,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -1791,7 +1791,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -1808,7 +1808,7 @@
    "note": "domain level: the runner always submits the locked recipe, so no runner fault produces a mismatch",
    "records": {},
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -1970,7 +1970,7 @@
    "status": "pass",
    "records": {},
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -2029,7 +2029,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -2045,7 +2045,7 @@
    "status": "pass",
    "records": {},
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -2074,7 +2074,7 @@
    "note": "acceleration limits are not modelled",
    "records": {},
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -2120,7 +2120,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -2260,7 +2260,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -2382,7 +2382,7 @@
    "records": {},
    "storedResults": [
     "regression/lab-vitest.json",
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -2718,7 +2718,7 @@
    "records": {},
    "storedResults": [
     "regression/lab-vitest.json",
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -2767,7 +2767,7 @@
    "status": "pass",
    "records": {},
    "storedResults": [
-    "regression/source-integration.json",
+    "regression/source-referenced.json",
     "regression/lab-vitest.json"
    ],
    "actual": "assertions passed"
@@ -2783,7 +2783,7 @@
    "status": "pass",
    "records": {},
    "storedResults": [
-    "regression/source-integration.json",
+    "regression/source-referenced.json",
     "regression/lab-vitest.json"
    ],
    "actual": "assertions passed"
@@ -2817,7 +2817,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json",
+    "regression/source-referenced.json",
     "regression/lab-vitest.json"
    ],
    "actual": "assertions passed"
@@ -2833,7 +2833,7 @@
    "status": "pass",
    "records": {},
    "storedResults": [
-    "regression/source-integration.json",
+    "regression/source-referenced.json",
     "regression/lab-vitest.json"
    ],
    "actual": "assertions passed"
@@ -2850,7 +2850,7 @@
    "status": "pass",
    "records": {},
    "storedResults": [
-    "regression/source-integration.json",
+    "regression/source-referenced.json",
     "regression/lab-vitest.json",
     "regression/lab-pw-twin-twin-recovery.json"
    ],
@@ -2964,7 +2964,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json"
+    "regression/source-referenced.json"
    ],
    "actual": "assertions passed"
   },
@@ -3001,7 +3001,7 @@
     }
    },
    "storedResults": [
-    "regression/source-integration.json",
+    "regression/source-referenced.json",
     "regression/lab-pw-ui.json"
    ],
    "actual": "assertions passed"
@@ -5856,14 +5856,14 @@
     ],
     "rejectedObservations": [
      {
-      "eventId": "f20a9d8a-b271-444c-b9f9-6b1dc48ef780-5",
+      "eventId": "950c5ece-fed2-48fd-99aa-e44a0a9ef255-5",
       "commandId": "robot-command-b89f9563bb8198e188c22d7861f22993",
       "type": "completed",
       "code": "STALE_ROBOT_EVENT",
       "tick": 880
      },
      {
-      "eventId": "f20a9d8a-b271-444c-b9f9-6b1dc48ef780-9",
+      "eventId": "950c5ece-fed2-48fd-99aa-e44a0a9ef255-9",
       "commandId": "robot-command-32110e69affbb968b44c93f7dd3e8bd1",
       "type": "completed",
       "code": "STOP_NOT_FOUND",
@@ -6742,7 +6742,7 @@
    },
    "runs": {
     "BV01@11#1": {
-     "wallMs": 1404,
+     "wallMs": 1768,
      "travelMs": [
       4560,
       5660,
@@ -6776,7 +6776,7 @@
      }
     },
     "BV01@11#2": {
-     "wallMs": 1405,
+     "wallMs": 1367,
      "travelMs": [
       4560,
       5660,
@@ -6810,7 +6810,7 @@
      }
     },
     "FD01@11": {
-     "wallMs": 68,
+     "wallMs": 66,
      "travelMs": [
       11640,
       14000,
@@ -6831,7 +6831,7 @@
      }
     },
     "FD01@12": {
-     "wallMs": 57,
+     "wallMs": 62,
      "travelMs": [
       11640,
       14000,

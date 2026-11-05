@@ -1,7 +1,7 @@
 {
   "config": {
     "argv": [
-      "<home>/.nvm/versions/node/v24.22.2/bin/node",
+      "node",
       "<workspace>/lab/node_modules/@playwright/test/cli.js",
       "test",
       "service-journey.spec.ts"
@@ -121,12 +121,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 1777,
+                  "duration": 2282,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T03:25:06.997Z",
+                  "startTime": "2026-11-05T04:02:19.249Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -144,8 +144,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-05T03:25:06.364Z",
-    "duration": 3079.462,
+    "startTime": "2026-11-05T04:02:18.620Z",
+    "duration": 3613.849,
     "expected": 1,
     "skipped": 0,
     "unexpected": 0,

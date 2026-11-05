@@ -1,6 +1,7 @@
 {
  "schema": "lab-v2-regression/1",
- "note": "Synthetic test data only; absolute paths scrubbed to <workspace>/<home>/<tmp>. sha256 is of the stored (scrubbed) file.",
+ "recorder": "lab/scripts/record-regression.mjs --ci",
+ "note": "Synthetic test data only; absolute paths scrubbed to <workspace>/<home>/<tmp>, key/token shapes to <jwt>/<supabase-key>. sha256 is of the stored (scrubbed) file.",
  "host": {
   "platform": "darwin",
   "release": "25.5.0",
@@ -12,27 +13,27 @@
   "pnpm": "10.32.1"
  },
  "revisions": {
-  "source": "a741e019fd2b3a909b6241f88d3d306d5b892312",
+  "source": "d473d87af4fa8481e2770976b3385aceff294b52",
   "sourceDirty": false,
-  "lab": "37692f217e3c32f1f80f986d994743532124cf75",
+  "lab": "0c91b1e42fc1476bbc5de9956cd98105b1ca0703",
   "labDirty": false
  },
  "runs": [
   {
-   "id": "source-integration:source-integration.json",
+   "id": "source-referenced:source-referenced.json",
    "repo": "source",
    "kind": "vitest",
-   "command": "node node_modules/vitest/vitest.mjs run tests/integration/lab-v2-mock.test.ts tests/integration/lab-v2-recovery.test.ts tests/integration/lab-v2-contracts.test.ts tests/integration/lab-v2-model.test.ts tests/integration/lab-v2-arm-model.test.ts tests/integration/lab-v2-stream.test.ts tests/integration/lab-v2-report.test.ts tests/integration/lab-v2-residuals.test.ts tests/integration/lab-runtime.test.ts tests/integration/lab-runtime-gateway.test.ts tests/integration/lab-runtime-contracts.test.ts tests/integration/lab-runtime-artifact.test.ts tests/integration/coffee-job.test.ts tests/integration/coffee-transfer.test.ts tests/integration/coffee-recovery.test.ts tests/integration/robot-admission.test.ts tests/integration/table-order-amendments.test.ts --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-integration.json",
-   "startedAt": "2026-11-05T03:23:16.544Z",
-   "finishedAt": "2026-11-05T03:23:54.110Z",
+   "command": "LAB_V2_CLEAN_EXPORT=1 node node_modules/vitest/vitest.mjs run tests/integration/lab-v2-mock.test.ts tests/integration/lab-v2-recovery.test.ts tests/integration/lab-v2-contracts.test.ts tests/integration/lab-v2-model.test.ts tests/integration/lab-v2-arm-model.test.ts tests/integration/lab-v2-stream.test.ts tests/integration/lab-v2-report.test.ts tests/integration/lab-v2-residuals.test.ts tests/integration/lab-runtime.test.ts tests/integration/lab-runtime-gateway.test.ts tests/integration/lab-runtime-contracts.test.ts tests/integration/lab-runtime-artifact.test.ts tests/integration/coffee-job.test.ts tests/integration/coffee-transfer.test.ts tests/integration/coffee-recovery.test.ts tests/integration/robot-admission.test.ts tests/integration/table-order-amendments.test.ts --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-referenced.json",
+   "startedAt": "2026-11-05T03:57:34.479Z",
+   "finishedAt": "2026-11-05T03:58:10.954Z",
    "exitCode": 0,
-   "file": "source-integration.json",
-   "sha256": "2a59a08c2f24575c171805e4cceab4c08432aa7d0cd7eca4b3c6c9d5ee8c817b",
+   "file": "source-referenced.json",
+   "sha256": "618d2cb7116de9f76678fcb8bef7a9f2023b66e965b4e193795b6a17fc201ee4",
    "summary": {
-    "passed": 183,
+    "passed": 186,
     "failed": 0,
     "skipped": 1,
-    "total": 184
+    "total": 187
    }
   },
   {
@@ -40,11 +41,11 @@
    "repo": "source",
    "kind": "vitest",
    "command": "node node_modules/vitest/vitest.mjs run tests/unit --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-unit.json",
-   "startedAt": "2026-11-05T03:23:54.112Z",
-   "finishedAt": "2026-11-05T03:23:56.277Z",
+   "startedAt": "2026-11-05T03:58:10.956Z",
+   "finishedAt": "2026-11-05T03:58:12.835Z",
    "exitCode": 0,
    "file": "source-unit.json",
-   "sha256": "02d8ccfed16d0479c0b5276cd1771bbb54e3689a6b2e4476649831800848e47d",
+   "sha256": "f19b93ad9b739daf1b63e0d9fd3f3607c2603b6846c9166ae505e732b8c0106d",
    "summary": {
     "passed": 48,
     "failed": 0,
@@ -57,11 +58,11 @@
    "repo": "source",
    "kind": "vitest",
    "command": "node node_modules/vitest/vitest.mjs run tests/contracts --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-contracts.json",
-   "startedAt": "2026-11-05T03:23:56.278Z",
-   "finishedAt": "2026-11-05T03:23:57.228Z",
+   "startedAt": "2026-11-05T03:58:12.836Z",
+   "finishedAt": "2026-11-05T03:58:13.784Z",
    "exitCode": 0,
    "file": "source-contracts.json",
-   "sha256": "9a41a50d443a56486d3bfff706717b2125e1c84e38784ea89a224de8d31a306e",
+   "sha256": "832378dcfa5c7f087fa373b94edc50c4519f57d762948439e51dc6db315dcc67",
    "summary": {
     "passed": 37,
     "failed": 0,
@@ -70,20 +71,71 @@
    }
   },
   {
+   "id": "source-adapters:source-adapters.json",
+   "repo": "source",
+   "kind": "vitest",
+   "command": "node node_modules/vitest/vitest.mjs run tests/adapters --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-adapters.json",
+   "startedAt": "2026-11-05T03:58:32.554Z",
+   "finishedAt": "2026-11-05T03:58:34.427Z",
+   "exitCode": 0,
+   "file": "source-adapters.json",
+   "sha256": "e3d91a4d92dc0e49e01290d07971408aaabc9dfe807641f438a9753662b557f8",
+   "summary": {
+    "passed": 50,
+    "failed": 0,
+    "skipped": 0,
+    "total": 50
+   }
+  },
+  {
+   "id": "source-integration:source-integration.json",
+   "repo": "source",
+   "kind": "vitest",
+   "command": "node node_modules/vitest/vitest.mjs run tests/integration --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-integration.json",
+   "startedAt": "2026-11-05T03:58:34.428Z",
+   "finishedAt": "2026-11-05T04:01:05.175Z",
+   "exitCode": 1,
+   "file": "source-integration.json",
+   "sha256": "f509a15be0eb47e568deb539e33a1b3dd14460ff3f861eaa059cf72629643af3",
+   "summary": {
+    "passed": 588,
+    "failed": 1,
+    "skipped": 2,
+    "total": 591
+   }
+  },
+  {
+   "id": "source-pytest:source-pytest.xml",
+   "repo": "source",
+   "kind": "junit",
+   "command": "<workspace>/source/.venv/bin/python -m pytest robotics/agent/tests tests/hardware tests/contracts/test_schema_python.py -q --junitxml=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-pytest.xml",
+   "startedAt": "2026-11-05T04:01:05.179Z",
+   "finishedAt": "2026-11-05T04:01:06.438Z",
+   "exitCode": 0,
+   "file": "source-pytest.xml",
+   "sha256": "bee6426b132c115e3d850fc16a4c3461c393622e2cbca31b8445f00cd2b7433a",
+   "summary": {
+    "tests": 178,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+   }
+  },
+  {
    "id": "lab-vitest:lab-vitest.json",
    "repo": "lab",
    "kind": "vitest",
    "command": "<workspace>/lab/node_modules/.bin/vitest run tests/unit tests/integration --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/lab-vitest.json",
-   "startedAt": "2026-11-05T03:23:58.970Z",
-   "finishedAt": "2026-11-05T03:24:01.297Z",
+   "startedAt": "2026-11-05T04:01:08.192Z",
+   "finishedAt": "2026-11-05T04:01:10.104Z",
    "exitCode": 0,
    "file": "lab-vitest.json",
-   "sha256": "b19190aaf5b3a4a99a2c87c18622dd6f8b9ba88141b07c4b88ae6202859d9c92",
+   "sha256": "1166a1340914cd5ebf87be746c03b316e6907f07c418c6a9e369f482d555d5bb",
    "summary": {
-    "passed": 98,
+    "passed": 100,
     "failed": 0,
     "skipped": 1,
-    "total": 99
+    "total": 101
    }
   },
   {
@@ -91,11 +143,11 @@
    "repo": "lab",
    "kind": "playwright",
    "command": "LAB_PW_JSON=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/lab-pw-ui.json pnpm -s test:e2e -- ui.spec.ts",
-   "startedAt": "2026-11-05T03:24:03.453Z",
-   "finishedAt": "2026-11-05T03:24:18.480Z",
+   "startedAt": "2026-11-05T04:01:12.467Z",
+   "finishedAt": "2026-11-05T04:01:32.605Z",
    "exitCode": 0,
    "file": "lab-pw-ui.json",
-   "sha256": "0456eadd548a8285ec8a940e350421a2fdc5ff7fb1274554a2c0f6295de1f40c",
+   "sha256": "928c23b0b3358c212000a55497568d986a30e832a6c50667c150fe07d29986bc",
    "summary": {
     "expected": 13,
     "unexpected": 0,
@@ -108,11 +160,11 @@
    "repo": "lab",
    "kind": "playwright",
    "command": "LAB_PW_JSON=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/lab-pw-twin.json pnpm -s test:twin-e2e",
-   "startedAt": "2026-11-05T03:24:18.482Z",
-   "finishedAt": "2026-11-05T03:24:46.058Z",
+   "startedAt": "2026-11-05T04:01:32.612Z",
+   "finishedAt": "2026-11-05T04:01:58.234Z",
    "exitCode": 0,
    "file": "lab-pw-twin-twin-workspace.json",
-   "sha256": "39eba006822b6a1d91f16f5c3d8e3d09d65602720553dd9838d9150c8ff7cd0d",
+   "sha256": "208f76a3ca91fb732f0a697bbf0f0313a738e2a6d56e1588c822c62342f864a6",
    "summary": {
     "expected": 5,
     "unexpected": 0,
@@ -125,11 +177,11 @@
    "repo": "lab",
    "kind": "playwright",
    "command": "LAB_PW_JSON=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/lab-pw-twin.json pnpm -s test:twin-e2e",
-   "startedAt": "2026-11-05T03:24:18.482Z",
-   "finishedAt": "2026-11-05T03:24:46.058Z",
+   "startedAt": "2026-11-05T04:01:32.612Z",
+   "finishedAt": "2026-11-05T04:01:58.234Z",
    "exitCode": 0,
    "file": "lab-pw-twin-coffee-journey.json",
-   "sha256": "011ef40401b2c6ca6be53d5c8ea732984211d50c8b4fa08660d450db3982bf58",
+   "sha256": "9b81fe5bab7beca2019e2eaee8ea6b7b3ae7dee8c356336fde5d2a4eb85e6f09",
    "summary": {
     "expected": 1,
     "unexpected": 0,
@@ -142,11 +194,11 @@
    "repo": "lab",
    "kind": "playwright",
    "command": "LAB_PW_JSON=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/lab-pw-twin.json pnpm -s test:twin-e2e",
-   "startedAt": "2026-11-05T03:24:18.482Z",
-   "finishedAt": "2026-11-05T03:24:46.058Z",
+   "startedAt": "2026-11-05T04:01:32.612Z",
+   "finishedAt": "2026-11-05T04:01:58.234Z",
    "exitCode": 0,
    "file": "lab-pw-twin-twin-recovery.json",
-   "sha256": "ba11a13e2f23ec001e9d9488426aa896a7f1daa4d9f80a444aa87b1edc8ee95c",
+   "sha256": "c4c8da26c9028a5e3ec50e366e7e1689c6a348ebffdcd976c42fd8e66be95136",
    "summary": {
     "expected": 1,
     "unexpected": 0,
@@ -159,11 +211,11 @@
    "repo": "lab",
    "kind": "playwright",
    "command": "LAB_PW_JSON=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/lab-pw-mock.json pnpm -s test:mock-e2e",
-   "startedAt": "2026-11-05T03:24:46.060Z",
-   "finishedAt": "2026-11-05T03:25:05.448Z",
+   "startedAt": "2026-11-05T04:01:58.236Z",
+   "finishedAt": "2026-11-05T04:02:17.829Z",
    "exitCode": 0,
    "file": "lab-pw-mock-twin-recovery.json",
-   "sha256": "05c98c5bee75b7c466d19fbf69ac31baede786488cdec5b1fd950ed960f5b83e",
+   "sha256": "e77b70fa06657e9ab58720ced40dec06963fc6bff0a2d037c2ce7410df2c9382",
    "summary": {
     "expected": 1,
     "unexpected": 0,
@@ -176,11 +228,11 @@
    "repo": "lab",
    "kind": "playwright",
    "command": "LAB_PW_JSON=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/lab-pw-mock.json pnpm -s test:mock-e2e",
-   "startedAt": "2026-11-05T03:24:46.060Z",
-   "finishedAt": "2026-11-05T03:25:05.448Z",
+   "startedAt": "2026-11-05T04:01:58.236Z",
+   "finishedAt": "2026-11-05T04:02:17.829Z",
    "exitCode": 0,
    "file": "lab-pw-mock-coffee-journey.json",
-   "sha256": "91a546291f40141eecbc7f840a17af38ef53c794f95962f7094301e8c4264c08",
+   "sha256": "c1147147d6d82fe9d02582be2a886e99bea36cc89b1b13f9ce7ad32d3b099900",
    "summary": {
     "expected": 1,
     "unexpected": 0,
@@ -193,11 +245,11 @@
    "repo": "lab",
    "kind": "playwright",
    "command": "LAB_PW_JSON=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/lab-pw-runtime.json pnpm -s test:runtime-e2e",
-   "startedAt": "2026-11-05T03:25:05.453Z",
-   "finishedAt": "2026-11-05T03:25:09.490Z",
+   "startedAt": "2026-11-05T04:02:17.830Z",
+   "finishedAt": "2026-11-05T04:02:22.283Z",
    "exitCode": 0,
    "file": "lab-pw-runtime.json",
-   "sha256": "011609d1f480534d2af7a00d58bc5e4a78ab1535070d4dfd70807f651ab99150",
+   "sha256": "676096f77b49f73844a2dd294cbe3091367abafbfbabfea624999e7a97740065",
    "summary": {
     "expected": 1,
     "unexpected": 0,
@@ -211,9 +263,8 @@
    "id": "source-typecheck",
    "repo": "source",
    "command": "pnpm -s typecheck",
-   "cwd": "source",
-   "startedAt": "2026-11-05T03:23:07.405Z",
-   "finishedAt": "2026-11-05T03:23:12.520Z",
+   "startedAt": "2026-11-05T03:57:25.630Z",
+   "finishedAt": "2026-11-05T03:57:30.700Z",
    "exitCode": 0,
    "log": "source-typecheck.log",
    "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -222,9 +273,8 @@
    "id": "source-lint",
    "repo": "source",
    "command": "pnpm -s lint",
-   "cwd": "source",
-   "startedAt": "2026-11-05T03:23:12.523Z",
-   "finishedAt": "2026-11-05T03:23:16.167Z",
+   "startedAt": "2026-11-05T03:57:30.706Z",
+   "finishedAt": "2026-11-05T03:57:34.095Z",
    "exitCode": 0,
    "log": "source-lint.log",
    "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -233,31 +283,28 @@
    "id": "source-contracts-check",
    "repo": "source",
    "command": "pnpm -s contracts:check",
-   "cwd": "source",
-   "startedAt": "2026-11-05T03:23:16.168Z",
-   "finishedAt": "2026-11-05T03:23:16.544Z",
+   "startedAt": "2026-11-05T03:57:34.096Z",
+   "finishedAt": "2026-11-05T03:57:34.478Z",
    "exitCode": 0,
    "log": "source-contracts-check.log",
    "logSha256": "3e8bf9225a03bd72709aba63c895580240a4737d43068ce350b8c0ed5e6b18cd"
   },
   {
-   "id": "source-integration",
+   "id": "source-referenced",
    "repo": "source",
-   "command": "node node_modules/vitest/vitest.mjs run tests/integration/lab-v2-mock.test.ts tests/integration/lab-v2-recovery.test.ts tests/integration/lab-v2-contracts.test.ts tests/integration/lab-v2-model.test.ts tests/integration/lab-v2-arm-model.test.ts tests/integration/lab-v2-stream.test.ts tests/integration/lab-v2-report.test.ts tests/integration/lab-v2-residuals.test.ts tests/integration/lab-runtime.test.ts tests/integration/lab-runtime-gateway.test.ts tests/integration/lab-runtime-contracts.test.ts tests/integration/lab-runtime-artifact.test.ts tests/integration/coffee-job.test.ts tests/integration/coffee-transfer.test.ts tests/integration/coffee-recovery.test.ts tests/integration/robot-admission.test.ts tests/integration/table-order-amendments.test.ts --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-integration.json",
-   "cwd": "source",
-   "startedAt": "2026-11-05T03:23:16.544Z",
-   "finishedAt": "2026-11-05T03:23:54.110Z",
+   "command": "LAB_V2_CLEAN_EXPORT=1 node node_modules/vitest/vitest.mjs run tests/integration/lab-v2-mock.test.ts tests/integration/lab-v2-recovery.test.ts tests/integration/lab-v2-contracts.test.ts tests/integration/lab-v2-model.test.ts tests/integration/lab-v2-arm-model.test.ts tests/integration/lab-v2-stream.test.ts tests/integration/lab-v2-report.test.ts tests/integration/lab-v2-residuals.test.ts tests/integration/lab-runtime.test.ts tests/integration/lab-runtime-gateway.test.ts tests/integration/lab-runtime-contracts.test.ts tests/integration/lab-runtime-artifact.test.ts tests/integration/coffee-job.test.ts tests/integration/coffee-transfer.test.ts tests/integration/coffee-recovery.test.ts tests/integration/robot-admission.test.ts tests/integration/table-order-amendments.test.ts --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-referenced.json",
+   "startedAt": "2026-11-05T03:57:34.479Z",
+   "finishedAt": "2026-11-05T03:58:10.954Z",
    "exitCode": 0,
-   "log": "source-integration.log",
-   "logSha256": "6f6c94f6f7895b3f1d5dede968af0b6e30c92ec945185612498ba5bcdc1dd263"
+   "log": "source-referenced.log",
+   "logSha256": "0577fa34c06645244fd9626ab88ed8c126daa3dc90274da102850b9f049c7172"
   },
   {
    "id": "source-unit",
    "repo": "source",
    "command": "node node_modules/vitest/vitest.mjs run tests/unit --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-unit.json",
-   "cwd": "source",
-   "startedAt": "2026-11-05T03:23:54.112Z",
-   "finishedAt": "2026-11-05T03:23:56.277Z",
+   "startedAt": "2026-11-05T03:58:10.956Z",
+   "finishedAt": "2026-11-05T03:58:12.835Z",
    "exitCode": 0,
    "log": "source-unit.log",
    "logSha256": "2c1678e2d2283042a996ba5517084161e112da4f0095e68349ecd6610db02f5d"
@@ -266,31 +313,68 @@
    "id": "source-contracts",
    "repo": "source",
    "command": "node node_modules/vitest/vitest.mjs run tests/contracts --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-contracts.json",
-   "cwd": "source",
-   "startedAt": "2026-11-05T03:23:56.278Z",
-   "finishedAt": "2026-11-05T03:23:57.228Z",
+   "startedAt": "2026-11-05T03:58:12.836Z",
+   "finishedAt": "2026-11-05T03:58:13.784Z",
    "exitCode": 0,
    "log": "source-contracts.log",
    "logSha256": "0e958da068ccb431059c36741f411b7f92b08f2c2fa628e8dc5cec8baa798219"
   },
   {
+   "id": "source-build",
+   "repo": "source",
+   "command": "pnpm -s build",
+   "startedAt": "2026-11-05T03:58:13.785Z",
+   "finishedAt": "2026-11-05T03:58:32.551Z",
+   "exitCode": 0,
+   "log": "source-build.log",
+   "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "id": "source-adapters",
+   "repo": "source",
+   "command": "node node_modules/vitest/vitest.mjs run tests/adapters --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-adapters.json",
+   "startedAt": "2026-11-05T03:58:32.554Z",
+   "finishedAt": "2026-11-05T03:58:34.427Z",
+   "exitCode": 0,
+   "log": "source-adapters.log",
+   "logSha256": "219bfaa5ab650f1ec4cbd694afcc60689080fae9ebabc3b82a2923594c0aa839"
+  },
+  {
+   "id": "source-integration",
+   "repo": "source",
+   "command": "node node_modules/vitest/vitest.mjs run tests/integration --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-integration.json",
+   "startedAt": "2026-11-05T03:58:34.428Z",
+   "finishedAt": "2026-11-05T04:01:05.175Z",
+   "exitCode": 1,
+   "log": "source-integration.log",
+   "logSha256": "6f6c94f6f7895b3f1d5dede968af0b6e30c92ec945185612498ba5bcdc1dd263"
+  },
+  {
+   "id": "source-pytest",
+   "repo": "source",
+   "command": "<workspace>/source/.venv/bin/python -m pytest robotics/agent/tests tests/hardware tests/contracts/test_schema_python.py -q --junitxml=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/source-pytest.xml",
+   "startedAt": "2026-11-05T04:01:05.179Z",
+   "finishedAt": "2026-11-05T04:01:06.438Z",
+   "exitCode": 0,
+   "log": "source-pytest.log",
+   "logSha256": "1e5fca28206e02d90271476662b2cf299de398bac95edaf9edd83452b55937a1"
+  },
+  {
    "id": "lab-check-source",
    "repo": "lab",
    "command": "pnpm -s check:source",
-   "cwd": "lab",
-   "startedAt": "2026-11-05T03:23:57.229Z",
-   "finishedAt": "2026-11-05T03:23:57.447Z",
+   "startedAt": "2026-11-05T04:01:06.440Z",
+   "finishedAt": "2026-11-05T04:01:06.669Z",
    "exitCode": 0,
    "log": "lab-check-source.log",
-   "logSha256": "ff51db72c85df3b9f9972bbd32cebede040f1723def41a2ff7dd6fb000508323"
+   "logSha256": "72e5c50dd635e6ffb29c1e02aaa15234c90c3569d23b87264c1238c6e2c24181"
   },
   {
    "id": "lab-typecheck",
    "repo": "lab",
    "command": "pnpm -s typecheck",
-   "cwd": "lab",
-   "startedAt": "2026-11-05T03:23:57.448Z",
-   "finishedAt": "2026-11-05T03:23:58.969Z",
+   "startedAt": "2026-11-05T04:01:06.669Z",
+   "finishedAt": "2026-11-05T04:01:08.192Z",
    "exitCode": 0,
    "log": "lab-typecheck.log",
    "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -299,9 +383,8 @@
    "id": "lab-vitest",
    "repo": "lab",
    "command": "<workspace>/lab/node_modules/.bin/vitest run tests/unit tests/integration --reporter=json --outputFile=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/lab-vitest.json",
-   "cwd": "lab",
-   "startedAt": "2026-11-05T03:23:58.970Z",
-   "finishedAt": "2026-11-05T03:24:01.297Z",
+   "startedAt": "2026-11-05T04:01:08.192Z",
+   "finishedAt": "2026-11-05T04:01:10.104Z",
    "exitCode": 0,
    "log": "lab-vitest.log",
    "logSha256": "ca36a027d87cf5fb8052c99708e96df2fe419df60faebfad367767119633e4df"
@@ -310,57 +393,52 @@
    "id": "lab-build",
    "repo": "lab",
    "command": "pnpm -s build",
-   "cwd": "lab",
-   "startedAt": "2026-11-05T03:24:01.298Z",
-   "finishedAt": "2026-11-05T03:24:03.452Z",
+   "startedAt": "2026-11-05T04:01:10.107Z",
+   "finishedAt": "2026-11-05T04:01:12.467Z",
    "exitCode": 0,
    "log": "lab-build.log",
-   "logSha256": "86e054147ebf08f1bb7aeda2bfbcaab5e69225a80888f6f63c7489ca4cf6be9f"
+   "logSha256": "bf7ce9d8cf328508b48280b765420e12e7928c86fb283c005bfa388241e5cdb3"
   },
   {
    "id": "lab-e2e-ui",
    "repo": "lab",
    "command": "LAB_PW_JSON=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/lab-pw-ui.json pnpm -s test:e2e -- ui.spec.ts",
-   "cwd": "lab",
-   "startedAt": "2026-11-05T03:24:03.453Z",
-   "finishedAt": "2026-11-05T03:24:18.480Z",
+   "startedAt": "2026-11-05T04:01:12.467Z",
+   "finishedAt": "2026-11-05T04:01:32.605Z",
    "exitCode": 0,
    "log": "lab-e2e-ui.log",
-   "logSha256": "a27c8a2c30a6e95999b22e6d1094fcb261db86e9f03770121772699c4f6787d0"
+   "logSha256": "874d57e81ee57eb476401f696cd15139dcdaa9af826cb250ae7f5800d8c47db0"
   },
   {
    "id": "lab-twin-e2e",
    "repo": "lab",
    "command": "LAB_PW_JSON=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/lab-pw-twin.json pnpm -s test:twin-e2e",
-   "cwd": "lab",
-   "startedAt": "2026-11-05T03:24:18.482Z",
-   "finishedAt": "2026-11-05T03:24:46.058Z",
+   "startedAt": "2026-11-05T04:01:32.612Z",
+   "finishedAt": "2026-11-05T04:01:58.234Z",
    "exitCode": 0,
    "log": "lab-twin-e2e.log",
-   "logSha256": "fd8fd8185af949114bf9a084f89bbe0995195fe35970344d732223c985ce1682"
+   "logSha256": "2cef960016032130f7dabcd9e8e1276cae34e2933ef6c32175c8c642d3e5d75b"
   },
   {
    "id": "lab-mock-e2e",
    "repo": "lab",
    "command": "LAB_PW_JSON=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/lab-pw-mock.json pnpm -s test:mock-e2e",
-   "cwd": "lab",
-   "startedAt": "2026-11-05T03:24:46.060Z",
-   "finishedAt": "2026-11-05T03:25:05.448Z",
+   "startedAt": "2026-11-05T04:01:58.236Z",
+   "finishedAt": "2026-11-05T04:02:17.829Z",
    "exitCode": 0,
    "log": "lab-mock-e2e.log",
-   "logSha256": "2691cbfc813ff3647754bd16be73e36b45b167042422c35ac13f7a5150b976a5"
+   "logSha256": "18c6a3ef246e65f2a4bd4f747678e7a926cfeacc5cb0f69a2ece07cc38606877"
   },
   {
    "id": "lab-runtime-e2e",
    "repo": "lab",
    "command": "LAB_PW_JSON=<workspace>/lab/docs/implementation/evidence/digital-twin-v2/regression/lab-pw-runtime.json pnpm -s test:runtime-e2e",
-   "cwd": "lab",
-   "startedAt": "2026-11-05T03:25:05.453Z",
-   "finishedAt": "2026-11-05T03:25:09.490Z",
+   "startedAt": "2026-11-05T04:02:17.830Z",
+   "finishedAt": "2026-11-05T04:02:22.283Z",
    "exitCode": 0,
    "log": "lab-runtime-e2e.log",
-   "logSha256": "01c19756aeb81d4028e3e59a482fcab5c719ee45a68758e50241b2e19d4bbb5a"
+   "logSha256": "c64094972df0ce48efa8d505ee983c9ebf176f41f1c99eb8ae15c9ed11d00e59"
   }
  ],
- "missing": []
+ "notRun": []
 }

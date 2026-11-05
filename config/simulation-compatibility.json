@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "purpose": "Frozen R-MOCK interfaces for plan 02 (simulation) and plan 03 (arm/hardware). A simulation/hardware provider must match these hashes or bump the provider interface version with a migration note. Freezing is not acceptance: R-MOCK is implemented/tested, not accepted.",
+ "purpose": "Frozen R-MOCK interfaces for plan 02 (simulation) and plan 03 (arm/hardware). A simulation/hardware provider must match these hashes or bump the provider interface version with a migration note. Freezing is not acceptance: R-MOCK is partially implemented and tested, not accepted (see gates and gMockBlockers).",
  "frozenAt": "2026-11-05",
  "gates": {
   "R-MOCK": "partially_implemented_tested_not_accepted",
@@ -13,17 +13,19 @@
  "codeRevisions": {
   "source": {
    "branch": "feat/lab-digital-twin-v2",
-   "artifactCommit": "a741e019fd2b3a909b6241f88d3d306d5b892312",
-   "finalHead": "a741e019fd2b3a909b6241f88d3d306d5b892312",
-   "dirty": false
+   "artifactCommit": "d473d87af4fa8481e2770976b3385aceff294b52",
+   "finalHead": "e15281409065a19669532dc1c659529d65b3959f",
+   "dirty": false,
+   "pinNote": "commits after the pin are test-only; git diff d473d87..e152814 -- packages/ is empty (verified)",
+   "packagesDiffAfterPin": "empty"
   },
   "lab": {
    "branch": "feat/robot-lab",
-   "baseCommit": "37692f217e3c32f1f80f986d994743532124cf75",
+   "baseCommit": "0c91b1e42fc1476bbc5de9956cd98105b1ca0703",
    "note": "baseCommit is the lab HEAD this file was generated on; the commit that adds this file is its child"
   },
   "artifact": {
-   "sha256": "010f5c659b184803fe939b69ea5372f2bd2bda718ea482f8736ef9a8aebd2606",
+   "sha256": "115cf27168b0ab32579a96ee728c4bcdf52c99ac94d8355e6d0b7855c19aad57",
    "entrypoint": "runtime.mjs",
    "schemaHash": "3b632d1ec0ef38dedef0a1e96b80109ebdda185cd713b47309924a48d3a3ed4e",
    "protocolMajors": [
@@ -160,6 +162,14 @@
    "algorithm": "xoshiro128**",
    "seeding": "sha256(seed:actorId)",
    "version": 1
+  },
+  "featureGate": {
+   "feature": "beverage",
+   "dependencies": [
+    "kitchen",
+    "inventory"
+   ],
+   "note": "Coffee.RegisterRecipe/ReserveJob/StartJob need the beverage feature enabled; the Lab v2 fixture enables it"
   }
  },
  "scenarios": [
@@ -240,11 +250,12 @@
   "report": "docs/implementation/evidence/digital-twin-v2/mock-report.md",
   "results": {
    "file": "docs/implementation/evidence/digital-twin-v2/F08-mock-acceptance.json",
-   "sha256": "4211de9cd1f9fa3188a6194551f79a20c1bd8ab41aa6c2d6a2611c0708c9464a"
+   "sha256": "bfb90ad17efcff0fcba183741fb29a360c06a952edce82228c5721fb6ccd4e1f"
   },
   "regression": {
    "file": "docs/implementation/evidence/digital-twin-v2/regression/manifest.json",
-   "sha256": "47f3c7f716349da25b68836774c1adb05324ce06137e66271809163e80821726"
+   "sha256": "c96383c5982734e9e7bfb0560f9534279a7d5b083c1be99536b3971a1cecbc14",
+   "recorder": "scripts/record-regression.mjs --ci"
   }
  },
  "handoff": [
@@ -284,6 +295,9 @@
   ],
   "blockedExternal": [
    "R-MOCK-linux"
+  ],
+  "openFindings": [
+   "source CI-equivalent gate: tests/integration/upgrade-recovery.test.ts \"backup verification finds corruption…\" failed in 2 of 4 full-suite runs on HEAD (passed 2/2 on base e3b616a; test and backup scripts unchanged since base); cause not proven (mock-report §5)"
   ]
  }
 }

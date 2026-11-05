@@ -1,7 +1,7 @@
 {
   "config": {
     "argv": [
-      "<home>/.nvm/versions/node/v24.22.2/bin/node",
+      "node",
       "<workspace>/lab/node_modules/@playwright/test/cli.js",
       "test",
       "coffee-journey.spec.ts"
@@ -121,12 +121,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 4260,
+                  "duration": 3987,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-05T03:24:59.698Z",
+                  "startTime": "2026-11-05T04:02:13.174Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -144,8 +144,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-05T03:24:59.471Z",
-    "duration": 5848.73,
+    "startTime": "2026-11-05T04:02:12.922Z",
+    "duration": 4843.597000000001,
     "expected": 1,
     "skipped": 0,
     "unexpected": 0,
