@@ -1,0 +1,66 @@
+// renderTwin(snapshot, viewState): a read-only 2D plan of one run (or of the preset before a run). It draws what the runtime reported;
+// it never moves anything, decides arrival or authorises an action. The 3D view (viewer/twin3d) consumes the same frame and view state.
+import type {RunReport,RunView} from '../scenarios/controls';
+import {nameOf,type TwinPreset} from '../scenarios/catalog';
+import type {Layers} from './overlays';
+import {amrFootprint,assetOf,runtimeResolved} from './amr';
+import {cellLayout,cupLocation,jobsOf} from './coffee-cell';
+import {esc} from '../ui/icons';
+import {tr} from '../i18n';
+export interface TwinFrame {preset:TwinPreset;view:RunView|null;report:RunReport|null}
+export interface ViewState {view:'2d'|'3d';layers:Layers;selected:string|null}
+export interface SceneEntity {id:string;kind:string;name:string;x:number;y:number;source:'observed'|'modeled'|'derived'|'unknown';status?:string}
+const S=100;
+/** Everything selectable, with where it is drawn. Shared by the 2D plan, the 3D view and the entity list so selection means the same thing. */
+export function sceneEntities(f:TwinFrame):SceneEntity[] {
+ const p=f.preset.project,l=cellLayout(p),v=f.view,out:SceneEntity[]=[];
+ const parking=p.world.points.filter(x=>x.kind==='parking').sort((a,b)=>a.id<b.id?-1:1);
+ p.entities.filter(e=>e.kind==='amr').forEach((e,i)=>{
+  const o=v?.entities.find(r=>r.id===e.id),park=parking[i];
+  if(o)out.push({id:e.id,kind:'amr',name:nameOf(f.preset,e.id),x:o.pose.x,y:o.pose.y,source:o.quality==='valid'?'observed':'unknown',status:o.moving?'moving':o.hold??'stopped'});
+  else if(park)out.push({id:e.id,kind:'amr',name:nameOf(f.preset,e.id),x:park.x,y:park.y,source:'modeled',status:'planned'});
+ });
+ if(l)for(const e of p.entities){
+  const at=e.kind==='coffee_machine'?l.machine:e.kind==='arm'?l.arm:e.kind==='cup_station'?l.cups:null;
+  if(at)out.push({id:e.id,kind:e.kind,name:nameOf(f.preset,e.id),x:at.x,y:at.y,source:'derived'});
+ }
+ if(v&&l)jobsOf(v).forEach((j,i)=>out.push({id:j.jobId,kind:'job',name:j.jobId,x:l.machine.x-0.3+i*0.3,y:l.machine.y+0.42,source:'observed',status:j.status}));
+ if(v)for(const c of v.coffee?.cups??[]){if(c.ownerKind==='undefined')continue;const at=cupLocation(c,p,v);out.push({id:c.cupId,kind:'cup',name:c.cupId,x:at?.x??NaN,y:at?.y??NaN,source:at?'observed':'unknown',status:`${c.ownerKind}:${c.ownerId}`});}
+ return out;
+}
+const kindLabel=(k:string)=>({amr:'AMR',arm:tr('Cánh tay','アーム','Arm'),coffee_machine:tr('Máy pha','コーヒーマシン','Coffee machine'),cup_station:tr('Trạm cốc','カップ置場','Cup station'),job:'Job',cup:tr('Cốc','カップ','Cup')})[k]??k;
+export {kindLabel};
+export function renderTwin(f:TwinFrame,vs:ViewState):string {
+ const p=f.preset.project,w=p.world,v=f.view,X=(x:number)=>x*S,Y=(y:number)=>(w.height-y)*S,pt=(x:number,y:number)=>`${X(x).toFixed(1)},${Y(y).toFixed(1)}`;
+ const ents=sceneEntities(f),sel=vs.selected,L=vs.layers;
+ const grid=Array.from({length:Math.floor(w.width)+1},(_,n)=>`<text x="${X(n)}" y="-8" text-anchor="middle" class="tw-axis">${n} m</text>`).join('');
+ const obstacles=w.obstacles.map(o=>`<rect class="tw-obstacle" x="${X(o.x)}" y="${Y(o.y+o.height)}" width="${o.width*S}" height="${o.height*S}" rx="4"><title>${esc(o.id)} · ${tr('mô hình','モデル','modeled')}</title></rect>${L.contacts?`<rect class="tw-clearance" x="${X(o.x)-8}" y="${Y(o.y+o.height)-8}" width="${o.width*S+16}" height="${o.height*S+16}" rx="10"/>`:''}`).join('');
+ const points=w.points.map(q=>`<g class="tw-point" transform="translate(${pt(q.x,q.y)})"><circle r="5"/><text y="20" text-anchor="middle">${esc(q.name)}</text></g>`).join('');
+ let overlay='';
+ if(L.footprint)for(const e of ents){
+  if(e.kind!=='amr')continue;
+  const pose=v?.entities.find(r=>r.id===e.id)?.pose??{x:e.x,y:e.y,yawRad:0},poly=amrFootprint(assetOf(p,f.preset.assets,e.id),pose),resolved=runtimeResolved(f.report,p,e.id);
+  overlay+=poly?`<polygon class="tw-footprint ${resolved===false?'unknown':''}" points="${poly.map(([x,y])=>pt(x,y)).join(' ')}"><title>${resolved===false?tr('Footprint của Lab; runtime chạy mô hình điểm (chưa rõ)','Labの形状。ランタイムは点モデル(不明)','Lab footprint; the runtime ran a point model (unknown)'):tr('Footprint mô hình','モデル形状','Modeled footprint')}</title></polygon>${resolved===false?`<text class="tw-unknown-label" x="${X(pose.x)}" y="${Y(pose.y)-34}" text-anchor="middle">? ${tr('hình học runtime','実行時形状','runtime geometry')}</text>`:''}`
+   :`<circle class="tw-footprint unknown" cx="${X(pose.x)}" cy="${Y(pose.y)}" r="30"/><text class="tw-unknown-label" x="${X(pose.x)}" y="${Y(pose.y)-36}" text-anchor="middle">? footprint</text>`;
+ }
+ if(L.path&&v)for(const r of v.entities)if(r.path.length)overlay+=`<polyline class="tw-path" points="${[[r.pose.x,r.pose.y],...r.path].map(([x,y])=>pt(x!,y!)).join(' ')}"><title>${tr('Đường đi đã lệnh','指令経路','Commanded path')}</title></polyline><circle class="tw-goal" cx="${X(r.path[r.path.length-1]![0])}" cy="${Y(r.path[r.path.length-1]![1])}" r="7"/>`;
+ if(L.contacts){const c=f.report?.metrics.collision;overlay+=`<text class="tw-contacts" x="${X(w.width)-6}" y="${Y(0)-8}" text-anchor="end">${tr('Tiếp xúc','接触','Contacts')}: ${!c?'—':c.available?String(c.contacts):`? (${esc(c.reason??'unknown')})`}</text>`;}
+ if(L.frames){
+  const axes=(x:number,y:number,yaw:number,label:string)=>{const c=Math.cos(yaw),s=Math.sin(yaw);return `<g class="tw-frame"><line x1="${X(x)}" y1="${Y(y)}" x2="${X(x+0.35*c)}" y2="${Y(y+0.35*s)}" class="x"/><line x1="${X(x)}" y1="${Y(y)}" x2="${X(x-0.35*s)}" y2="${Y(y+0.35*c)}" class="y"/><text x="${X(x+0.4*c)}" y="${Y(y+0.4*s)}">x</text><text x="${X(x-0.4*s)}" y="${Y(y+0.4*c)}">y</text><text x="${X(x)+6}" y="${Y(y)+16}" class="tw-frame-name">${esc(label)}</text></g>`;};
+  overlay+=axes(0,0,0,'map');
+  for(const r of v?.entities??[])overlay+=axes(r.pose.x,r.pose.y,r.pose.yawRad,`${r.id}/base_link`);
+  for(const h of w.handoffPoints??[])overlay+=h.yawRad===null?`<text class="tw-unknown-label" x="${X(h.position[0]!)}" y="${Y(h.position[1]!)+30}">${esc(h.id)} · yaw ?</text>`:axes(h.position[0]!,h.position[1]!,h.yawRad,h.id);
+ }
+ const marks=ents.filter(e=>Number.isFinite(e.x)).map(e=>{
+  const on=e.id===sel,label=`${kindLabel(e.kind)} ${e.name}${e.status?` · ${e.status}`:''}`;
+  const shape=e.kind==='amr'?`<circle r="17" class="tw-amr ${e.source}"/><path d="m-6 5 6-12 6 12" class="tw-amr-nose"/>`
+   :e.kind==='coffee_machine'?`<rect x="-22" y="-16" width="44" height="32" rx="5" class="tw-cell ${e.source}"/><text y="4" text-anchor="middle" class="tw-glyph">CM</text>`
+   :e.kind==='arm'?`<circle r="14" class="tw-cell ${e.source}"/><text y="4" text-anchor="middle" class="tw-glyph">A</text>`
+   :e.kind==='cup_station'?`<rect x="-12" y="-12" width="24" height="24" rx="4" class="tw-cell ${e.source}"/>`
+   :e.kind==='cup'?`<circle r="8" class="tw-cup ${e.source}"/>`
+   :`<rect x="-13" y="-9" width="26" height="18" rx="4" class="tw-job ${e.status==='needs_attention'?'attention':''}"/><text y="4" text-anchor="middle" class="tw-glyph">${e.status==='needs_attention'?'!':esc(e.id.split('-').pop()!)}</text>`;
+  const rot=e.kind==='amr'?` rotate(${-((v?.entities.find(r=>r.id===e.id)?.pose.yawRad??0)*180/Math.PI-90)})`:'';
+  return `<g class="tw-entity ${on?'selected':''}" data-action="twin-pick" data-value="${esc(e.id)}" data-entity="${esc(e.id)}" data-selected="${on}" data-source="${e.source}" role="button" tabindex="0" aria-pressed="${on}" aria-label="${esc(label)}" transform="translate(${pt(e.x,e.y)})">${on?'<circle r="27" class="tw-ring"/>':''}<g transform="${rot.trim()||'rotate(0)'}">${shape}</g>${e.kind==='cup'||e.kind==='job'?'':`<text y="${e.kind==='amr'?-26:e.kind==='cup_station'?-18:30}" text-anchor="${e.kind==='cup_station'?'end':'middle'}" class="tw-name">${esc(e.name)}</text>`}<title>${esc(label)}</title></g>`;
+ }).join('');
+ return `<svg class="twin-plan" viewBox="-30 -30 ${w.width*S+60} ${w.height*S+60}" role="group" aria-label="${esc(tr(`Mặt bằng twin ${w.width} × ${w.height} m`,`ツイン平面図 ${w.width} × ${w.height} m`,`Twin plan ${w.width} × ${w.height} m`))}"><rect class="tw-floor" width="${w.width*S}" height="${w.height*S}"/>${grid}${obstacles}${points}${overlay}${marks}</svg>`;
+}

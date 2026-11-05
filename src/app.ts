@@ -11,12 +11,15 @@ import { locale, setLocale, tr } from "./i18n";
 import { icon, esc } from "./ui/icons";
 import type { Viewer } from "./viewer/robot";
 import { robotSvg } from "./viewer/fallback";
+import { TwinWorkspace } from "./ui/workspace";
 
-type Page = "design" | "restaurant" | "scenarios" | "results" | "deployment";
+type Page = "design" | "restaurant" | "scenarios" | "twin" | "results" | "deployment";
+const PAGES: Page[] = ["design", "restaurant", "scenarios", "twin", "results", "deployment"];
 const names = () => ({
   design: tr("Thiết kế", "設計", "Design"),
   restaurant: tr("Mặt bằng", "レストラン", "Restaurant"),
   scenarios: tr("Kịch bản", "シナリオ", "Scenarios"),
+  twin: tr("Bản sao số", "デジタルツイン", "Digital twin"),
   results: tr("Kết quả", "結果", "Results"),
   deployment: tr("Triển khai", "デプロイ", "Deployment"),
 });
@@ -86,6 +89,7 @@ export class LabApp {
   private runSeed = 42;
   private backendCompatible = false;
   private faultKind = "blocked";
+  private twin = new TwinWorkspace(() => this.render());
   constructor(host: HTMLElement) {
     this.host = host;
     this.bind();
@@ -194,7 +198,7 @@ export class LabApp {
     )
       .map(
         ([key, label], i) =>
-          `<a href="#${key}" class="nav-item ${this.page === key ? "active" : ""}" ${this.page === key ? 'aria-current="page"' : ""}>${icon(["design", "map", "play", "result", "deploy"][i]!)}<span>${label}</span>
+          `<a href="#${key}" class="nav-item ${this.page === key ? "active" : ""}" ${this.page === key ? 'aria-current="page"' : ""}>${icon(["design", "map", "play", "cube", "result", "deploy"][i]!)}<span>${label}</span>
 <span class="nav-number" aria-hidden="true">0${i + 1}</span>
 </a>`,
       )
@@ -216,7 +220,7 @@ export class LabApp {
 <div>
 <div class="eyebrow">${tr("THIẾT KẾ. KIỂM CHỨNG. TRIỂN KHAI.", "設計。検証。運用。", "DESIGN. VALIDATE. DEPLOY.")}</div>
 <h1>${this.page === "design" ? tr("Robot của bạn, từng chi tiết.", "ロボットを、細部まで。", "Your robot, down to the details.") : ns[this.page]}</h1>
-<p>${this.page === "design" ? tr("Lắp ráp cấu hình phục vụ phù hợp với không gian của bạn.", "店舗に合ったサービスロボットを構成。", "Build a service robot around the way your space works.") : this.page === "restaurant" ? tr("Một mặt bằng chung cho thiết kế và kiểm chứng nghiệp vụ.", "設計と業務検証のための共通レイアウト。", "A shared layout for design and workflow validation.") : this.page === "scenarios" ? tr("Mỗi kết quả bắt đầu từ một lần chạy có nguồn gốc rõ ràng.", "根拠のある実行から結果が生まれます。", "Every result begins with a traceable run.") : this.page === "results" ? tr("Bằng chứng phần mềm, phạm vi được ghi rõ.", "範囲を明示したソフトウェア検証記録。", "Software evidence, with its limits in view.") : tr("Gói cấu hình dự thảo. Robot thật cần nghiệm thu riêng.", "設定ドラフト。実機は別途受入試験が必要です。", "A configuration draft. Physical robots require commissioning.")}</p>
+<p>${this.page === "design" ? tr("Lắp ráp cấu hình phục vụ phù hợp với không gian của bạn.", "店舗に合ったサービスロボットを構成。", "Build a service robot around the way your space works.") : this.page === "restaurant" ? tr("Một mặt bằng chung cho thiết kế và kiểm chứng nghiệp vụ.", "設計と業務検証のための共通レイアウト。", "A shared layout for design and workflow validation.") : this.page === "scenarios" ? tr("Mỗi kết quả bắt đầu từ một lần chạy có nguồn gốc rõ ràng.", "根拠のある実行から結果が生まれます。", "Every result begins with a traceable run.") : this.page === "twin" ? tr("Cùng một lần chạy cho người vận hành và kỹ sư: quan sát, lệnh và mô hình được tách rõ.", "オペレーターとエンジニアが同じ実行を見る。観測・指令・モデルを区別。", "One run for operators and engineers: observed, commanded and modeled kept apart.") : this.page === "results" ? tr("Bằng chứng phần mềm, phạm vi được ghi rõ.", "範囲を明示したソフトウェア検証記録。", "Software evidence, with its limits in view.") : tr("Gói cấu hình dự thảo. Robot thật cần nghiệm thu riêng.", "設定ドラフト。実機は別途受入試験が必要です。", "A configuration draft. Physical robots require commissioning.")}</p>
 </div>
 <div class="heading-actions">${btn(tr("Hoàn tác", "元に戻す", "Undo"), "undo", "undo", "quiet", this.history.length ? "" : "disabled")}${btn(tr("Làm lại", "やり直す", "Redo"), "redo", "rotate", "quiet", this.future.length ? "" : "disabled")}${btn(tr("Xuất dự án", "プロジェクト出力", "Export project"), "export-project", "download", "secondary")}</div>
 </div>
@@ -232,7 +236,7 @@ export class LabApp {
 <button aria-label="${tr("Đóng", "閉じる", "Dismiss")}" data-action="dismiss">${icon("cross", 16)}</button>
 </div>`
         : ""
-    }${this.page === "design" ? this.design() : this.page === "restaurant" ? this.restaurant() : this.page === "scenarios" ? this.scenarios() : this.page === "results" ? this.results() : this.deployment()}<footer class="main-footer">
+    }${this.page === "design" ? this.design() : this.page === "restaurant" ? this.restaurant() : this.page === "scenarios" ? this.scenarios() : this.page === "twin" ? this.twin.html() : this.page === "results" ? this.results() : this.deployment()}<footer class="main-footer">
 <span>MEKONIQ ROBOT LAB <span class="footer-divider">/</span> ${tr("Không gian kỹ thuật mở", "オープンエンジニアリング", "An open engineering workspace")}</span>
 <span>${icon("info", 13)} ${tr("Mô hình minh họa · chưa nghiệm thu phần cứng", "参考モデル · 実機未検証", "Illustrative model · hardware unvalidated")}</span>
 </footer>
@@ -902,6 +906,8 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
       const stage = document.getElementById("robot-stage")!;
       void this.mountViewer(stage, generation);
     }
+    if (this.page === "twin") this.twin.mounted();
+    else this.twin.leave();
     if (focusId)
       document.getElementById(focusId)?.focus({ preventScroll: true });
     else if (focusAction) {
@@ -941,28 +947,18 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
   private bind() {
     const route = () => {
       const h = location.hash.slice(1);
-      this.page = [
-        "design",
-        "restaurant",
-        "scenarios",
-        "results",
-        "deployment",
-      ].includes(h)
-        ? (h as Page)
-        : "design";
+      this.page = PAGES.includes(h as Page) ? (h as Page) : "design";
       this.render();
     };
     window.addEventListener("hashchange", route);
     const h = location.hash.slice(1);
-    if (
-      ["design", "restaurant", "scenarios", "results", "deployment"].includes(h)
-    )
-      this.page = h as Page;
+    if (PAGES.includes(h as Page)) this.page = h as Page;
     this.host.addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>("[data-action]");
       if (!b) return;
       const a = b.dataset.action,
         v = b.dataset.value;
+      if (a?.startsWith("twin-")) return this.twin.click(a, v);
       if (a === "locale") {
         setLocale(v as Locale);
         this.render();
@@ -1104,6 +1100,7 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
     });
     this.host.addEventListener("change", (e) => {
       const input = e.target as HTMLInputElement;
+      if (input.id.startsWith("twin-")) return this.twin.change(input.id, input.value);
       if (input.id === "import-project" && input.files?.[0]) {
         const file = input.files[0];
         void this.operation(async () => {
@@ -1165,6 +1162,7 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
     this.host.addEventListener("submit", (e) => {
       e.preventDefault();
       const form = e.target as HTMLFormElement;
+      if (this.twin.submit(form)) return;
       if (form.id === "pair-form") {
         const token = (
           document.getElementById("pair-token") as HTMLInputElement
@@ -1243,6 +1241,11 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
       });
     });
     this.host.addEventListener("keydown", (e) => {
+      const entity = (e.target as Element).closest<SVGElement>('[data-action="twin-pick"]');
+      if (entity && (e.key === "Enter" || e.key === " ")) {
+        e.preventDefault();
+        return this.twin.click("twin-pick", entity.dataset.value);
+      }
       const point = (e.target as HTMLElement).closest<HTMLElement>(
         "[data-point]",
       );
