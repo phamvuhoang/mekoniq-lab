@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Request } from "@playwright/test";
 import { readFile, writeFile } from "node:fs/promises";
-// Against the real exported source runtime (scripts/test-twin-e2e.mjs): live SSE telemetry and business events, stale vs heartbeat,
+// Against the real pinned source runtime (scripts/test-mock-e2e.mjs): live SSE telemetry and business events, stale vs heartbeat,
 // acknowledged pause, dropped stream and reconnect, read-only replay with trace, A/B compare, exports, and a lost session.
 const token = process.env.LAB_TEST_PAIRING_TOKEN;
 const shots = process.env.LAB_EVIDENCE_DIR;
@@ -14,7 +14,7 @@ async function report(page: Page): Promise<Report> {
 const commands = (r: Report) => [r.effects.reduce((n, e) => n + e.attempts, 0), r.businessEvents.length];
 
 test("telemetry stream, stale/frozen states, reconnect, read-only replay, compare, export and a lost session", async ({ browser }) => {
-  test.skip(!token, "Run scripts/test-twin-e2e.mjs: it exports the source runtime and supplies its one-time token.");
+  test.skip(!token, "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.");
   test.setTimeout(240000);
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
   const page = await context.newPage();
@@ -106,7 +106,7 @@ test("telemetry stream, stale/frozen states, reconnect, read-only replay, compar
     // browser memory with the stream open (Chrome only, approximate): recorded, not asserted
     // MemoryInfo exposes getters on its prototype: copy the fields explicitly (JSON.stringify of the object is {})
     const heap = await page.evaluate(() => { const m = (performance as unknown as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } }).memory; return m ? { usedJSHeapSizeMiB: +(m.usedJSHeapSize / 2 ** 20).toFixed(1), totalJSHeapSizeMiB: +(m.totalJSHeapSize / 2 ** 20).toFixed(1), jsHeapSizeLimitMiB: +(m.jsHeapSizeLimit / 2 ** 20).toFixed(0), note: "Chrome performance.memory is coarse (bucketed) without --enable-precise-memory-info" } : null; });
-    await writeFile(`${shots}/F06-browser-memory.json`, JSON.stringify({ capturedAt: new Date().toISOString(), browser: browser.version(), command: "node scripts/test-twin-e2e.mjs --evidence twin-recovery.spec.ts", scenario: "FD01 completed, replayed, second run started; 2D view, both SSE streams open", heap }, null, 2) + "\n");
+    await writeFile(`${shots}/F06-browser-memory.json`, JSON.stringify({ capturedAt: new Date().toISOString(), browser: browser.version(), command: "node scripts/test-mock-e2e.mjs --evidence twin-recovery.spec.ts", scenario: "FD01 completed, replayed, second run started; 2D view, both SSE streams open", heap }, null, 2) + "\n");
   }
 
   // lost session (as after a runtime restart): the stream reconnect is refused with 401 -> re-pair prompt; the last report stays viewable

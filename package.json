@@ -18,7 +18,9 @@
     "check:source": "node scripts/check-source.mjs",
     "runtime": "node scripts/start-runtime.mjs",
     "test:runtime-e2e": "node scripts/test-runtime-e2e.mjs",
-    "test:twin-e2e": "node scripts/test-twin-e2e.mjs"
+    "test:twin-e2e": "node scripts/test-mock-e2e.mjs twin-workspace.spec.ts coffee-journey.spec.ts twin-recovery.spec.ts",
+    "lab:mock": "node scripts/start-mock.mjs",
+    "test:mock-e2e": "node scripts/test-mock-e2e.mjs"
   },
   "dependencies": {
     "three": "0.180.0"

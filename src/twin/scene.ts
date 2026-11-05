@@ -25,7 +25,7 @@ export function sceneEntities(f:TwinFrame):SceneEntity[] {
   if(at)out.push({id:e.id,kind:e.kind,name:nameOf(f.preset,e.id),x:at.x,y:at.y,source:'derived'});
  }
  if(v&&l)jobsOf(v).forEach((j,i)=>out.push({id:j.jobId,kind:'job',name:j.jobId,x:l.machine.x-0.3+i*0.3,y:l.machine.y+0.42,source:'observed',status:j.status}));
- if(v)for(const c of v.coffee?.cups??[]){if(c.ownerKind==='undefined')continue;const at=cupLocation(c,p,v);out.push({id:c.cupId,kind:'cup',name:c.cupId,x:at?.x??NaN,y:at?.y??NaN,source:at?'observed':'unknown',status:`${c.ownerKind}:${c.ownerId}`});}
+ if(v)for(const c of v.coffee?.cups??[]){const at=cupLocation(c,p,v);out.push({id:c.cupId,kind:'cup',name:c.cupId,x:at?.x??NaN,y:at?.y??NaN,source:at?'observed':'unknown',status:`${c.ownerKind}:${c.ownerId}`});}
  return out;
 }
 const kindLabel=(k:string)=>({amr:'AMR',arm:tr('Cánh tay','アーム','Arm'),coffee_machine:tr('Máy pha','コーヒーマシン','Coffee machine'),cup_station:tr('Trạm cốc','カップ置場','Cup station'),job:'Job',cup:tr('Cốc','カップ','Cup')})[k]??k;

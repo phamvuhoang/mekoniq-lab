@@ -15,6 +15,41 @@ pnpm dev
 
 Mở **http://127.0.0.1:4175**. Thiết kế, mặt bằng, lưu IndexedDB và xuất dự thảo dùng được khi chưa mở runtime. `pnpm build` tạo website tĩnh trong `dist/`. Trình xem 3D tải khi cần; điện thoại mặc định dùng 2D. Catalog là giả định thiết kế, giá còn thiếu hiển thị rõ; preset Valetudo không tự nhận thông số cơ khí chưa đo.
 
+## Chạy digital twin mock bằng một lệnh
+
+Lần đầu trên máy mới (cần mạng một lần để tải dependencies đúng lockfile; runtime source được cài từ artifact đã export):
+
+```sh
+pnpm install --frozen-lockfile        # Node 24 (.node-version), pnpm 10.32.1
+node scripts/import-runtime.mjs <artifact-dir>   # artifact export từ source sạch, xem bên dưới
+pnpm check:source
+```
+
+Sau đó, mỗi lần dùng (không cần mạng):
+
+```sh
+pnpm lab:mock
+```
+
+Launcher chạy **runtime source đã pin** (chỉ backend `mock_amr`, `mock_coffee`, `mock_arm`; không kết nối robot thật) trên `127.0.0.1:4176` và giao diện trên `127.0.0.1:4175`, rồi in mã ghép nối một lần ngay trong terminal. Mở http://127.0.0.1:4175, vào **Twin**, nhập mã (hết hạn sau 5 phút, không nằm trong URL, không lưu vào dự án hay journal), chọn FD01 giao món hoặc BV01 cà phê. Journal nằm trong `runs/` (không commit). `Ctrl-C` chỉ dừng runtime và UI mà launcher đã khởi động.
+
+Launcher không tự tải hay cài gì khi khởi động, không mở bản mô phỏng thay thế khi thiếu runtime, và không bao giờ dừng tiến trình khác. Nó dừng với mã lỗi rõ ràng:
+
+| Thông báo | Nghĩa và cách xử lý |
+|---|---|
+| `UNSUPPORTED_NODE` | Không phải Node 24. Dùng phiên bản trong `.node-version` (`nvm use`). |
+| `UNSUPPORTED_OS` | Chỉ hỗ trợ macOS và Linux (Linux chưa kiểm trên máy mới). |
+| `RUNTIME_NOT_INSTALLED` … *preview only* | Chưa cài runtime. Lab chỉ mở ở chế độ xem trước (thiết kế, mặt bằng; không có run/kết quả). Cài bằng `import-runtime.mjs`. |
+| `ARTIFACT_HASH_MISMATCH` | Artifact trong `.runtime/` bị sửa. Import lại từ export sạch. |
+| `DIRTY_SOURCE_ARTIFACT` | Artifact build từ source có thay đổi chưa commit; bị từ chối. Export lại từ source sạch. |
+| `RUNTIME_PROTOCOL_V2_REQUIRED` | Lock đang trỏ artifact chỉ có protocol v1 (S01). Import artifact v2. |
+| `DEPENDENCIES_NOT_INSTALLED` | Chạy `pnpm install --frozen-lockfile` một lần. |
+| `PORT_IN_USE:4175/4176` | Có tiến trình khác giữ cổng (ví dụ `pnpm dev`/`pnpm runtime` đang chạy). Tự dừng tiến trình đó; launcher không dừng giúp. Kiểm tra: `lsof -nP -iTCP:4176 -sTCP:LISTEN`. |
+| `BACKEND_UNAVAILABLE:<id>` / `NON_MOCK_BACKEND_ENABLED:<id>` | Runtime không bật đủ backend mock hoặc bật backend ngoài danh sách mock; launcher dừng runtime vừa mở. |
+| `RUNTIME_IDENTITY_MISMATCH` | Runtime đang chạy không khớp commit/schema trong lock. |
+
+Lab không bao giờ dùng cổng `1880`/`1884` (`FORBIDDEN_PORT`). `--ui-port/--runtime-port/--data-dir/--root` chỉ dành cho kiểm thử; runtime source chỉ nhận trình duyệt từ `127.0.0.1:4175`. `node scripts/start-mock.mjs --boot-only` khởi động tới trạng thái sẵn sàng rồi dừng (đo boot-to-ready). Hệ điều hành đã kiểm: macOS (Apple Silicon); Linux chưa kiểm, xem [bằng chứng F07](docs/implementation/evidence/digital-twin-v2/F07-launcher.md).
+
 ## Chạy S01 qua source
 
 Runtime được cài riêng trong `.runtime/` và khóa bằng commit/schema/SHA-256 tại [source-runtime.lock.json](config/source-runtime.lock.json). Thư mục runtime và journal không commit vào Git.
@@ -39,7 +74,7 @@ Runtime chỉ bind `127.0.0.1:4176`; Vite proxy cùng origin. Không dùng cổn
 
 ### Cài hoặc cập nhật runtime
 
-Ngày 2026-11-04, Lab được cập nhật từ baseline W06 `a2f271c` lên **source/main W00–W11**, commit `a07877718196ffc88832044fad97b027cedd53f4`. Protocol vẫn là v1, schema hash không đổi; artifact runtime đã đổi và được khóa lại. Runtime chỉ dùng revision trong lock, không tự theo HEAD của source.
+Ngày 2026-11-05 (F07), lock được cập nhật lên source `2be6d1591f4c481cef60fcb6058782544a5ca2d7` (nhánh `feat/lab-digital-twin-v2`): artifact có **protocol 1/2** (S01 v1 vẫn chạy; twin dùng v2), schema hash mới. Lock trước đó (W11 `a0787771…`, protocol 1) được giữ trong `.runtime/rollback.lock.json`. Runtime chỉ dùng revision trong lock, không tự theo HEAD của source.
 
 Dùng Node 24, dependencies của source và một checkout sạch. Chạy **từ thư mục source**:
 
@@ -47,7 +82,7 @@ Dùng Node 24, dependencies của source và một checkout sạch. Chạy **t�
 node scripts/export-lab-runtime.mjs /tmp/mekoniq-source-runtime-artifact
 ```
 
-Nếu `../source/` có thay đổi chưa commit, tạo clone tạm của committed `main` rồi cài dependencies bằng `pnpm install --frozen-lockfile` trong clone trước khi export; không dùng `--allow-dirty` cho artifact sẽ import. Clone chỉ chứa code đã commit, không bao gồm thay đổi đang làm dở.
+Nếu `../source/` có thay đổi chưa commit, thêm `--clean-checkout`: exporter tạo git worktree tạm tại `HEAD` đã commit, cài dependencies `--frozen-lockfile --offline` từ store pnpm cục bộ, export rồi xóa worktree; không đụng tới thay đổi đang làm dở. Không dùng `--allow-dirty` cho artifact sẽ import. Exporter cũng từ chối bundle import thứ khác ngoài built-in của Node hoặc chứa mẫu khóa bí mật.
 
 Từ `lab/`:
 
@@ -56,7 +91,7 @@ node scripts/import-runtime.mjs /tmp/mekoniq-source-runtime-artifact
 pnpm check:source
 ```
 
-Importer kiểm SHA-256, Node major và metadata; từ chối artifact build từ source bẩn. Sau mỗi lần đổi lock, chạy `pnpm test`, `pnpm build` và `pnpm test:runtime-e2e`. `pnpm check:source` kiểm tính toàn vẹn artifact đã pin, không kiểm đó có phải HEAD mới nhất hay không. Runtime đóng gói chạy độc lập, không đọc source đang được chỉnh sửa ở bên cạnh. Xem thêm [README runtime source](../source/packages/lab-runtime/README.md) và [bằng chứng cập nhật W11](docs/implementation/evidence/2026-11-04-source-w11.md).
+Importer là một giao dịch: kiểm metadata, protocol major (Lab hỗ trợ 1 và 2; major lạ bị từ chối `UNSUPPORTED_PROTOCOL`), SHA-256 runtime, băm lại các schema hợp đồng đi kèm so với `schemaHash`, chép vào `.runtime/<sha256>/` qua thư mục staging rồi mới đổi lock bằng một lần rename. Lỗi ở bất kỳ bước nào giữ nguyên lock và artifact cũ; từ chối artifact build từ source bẩn. Quay lại pin trước: `node scripts/import-runtime.mjs --rollback` (artifact cũ vẫn nằm trong `.runtime/`). Sau mỗi lần đổi lock, chạy `pnpm test`, `pnpm build` và `pnpm test:runtime-e2e`. `pnpm check:source` kiểm tính toàn vẹn artifact đã pin, không kiểm đó có phải HEAD mới nhất hay không. Runtime đóng gói chạy độc lập, không đọc source đang được chỉnh sửa ở bên cạnh. Xem thêm [README runtime source](../source/packages/lab-runtime/README.md) và [bằng chứng cập nhật W11](docs/implementation/evidence/2026-11-04-source-w11.md).
 
 ## Kiểm thử
 
@@ -66,10 +101,12 @@ pnpm test:unit
 pnpm test:integration
 pnpm test:e2e -- ui.spec.ts
 pnpm test:runtime-e2e
+pnpm test:mock-e2e
+pnpm test:twin-e2e
 pnpm build
 ```
 
-`test:runtime-e2e` tự mở runtime đã pin với journal tạm, pairing, chạy hành trình thật trên trình duyệt và kiểm report/candidate, sau đó đóng đúng tiến trình và dọn journal của test. Cổng `4176` phải trống; script không tắt runtime của người dùng. Playwright dùng Chrome trên macOS; máy khác đặt `CHROME_PATH` tới Chromium/Chrome. Test S01 trong lệnh Playwright thông thường sẽ được skip nếu thiếu token; chỉ lệnh chuyên dụng ở trên kiểm được tích hợp runtime đầu cuối.
+`test:mock-e2e` chạy đúng `pnpm lab:mock` với journal tạm cho từng spec, tự lấy mã ghép nối từ terminal của launcher (không nhập tay, mã được che trong log) và chạy FD01 giao món (`twin-recovery.spec.ts`) và BV01 cà phê (`coffee-journey.spec.ts`) qua journal source thật, rồi `Ctrl-C` launcher. `test:twin-e2e` dùng cùng cách cho cả ba spec twin. `test:runtime-e2e` tự mở runtime đã pin với journal tạm, pairing, chạy hành trình thật trên trình duyệt và kiểm report/candidate, sau đó đóng đúng tiến trình và dọn journal của test. Cổng `4176` phải trống; script không tắt runtime của người dùng. Playwright dùng Chrome trên macOS; máy khác đặt `CHROME_PATH` tới Chromium/Chrome. Test S01 trong lệnh Playwright thông thường sẽ được skip nếu thiếu token; chỉ lệnh chuyên dụng ở trên kiểm được tích hợp runtime đầu cuối.
 
 ## Phạm vi và bước kế tiếp
 

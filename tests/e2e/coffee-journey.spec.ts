@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
-// Against the real exported source runtime (scripts/test-twin-e2e.mjs). The runtime latches attention for the life of a run, so the
+// Against the real pinned source runtime (scripts/test-mock-e2e.mjs). The runtime latches attention for the life of a run, so the
 // correction after a missing cup is: reconcile the affected job (human confirmation), then a new run with the same locked inputs.
 const token = process.env.LAB_TEST_PAIRING_TOKEN;
 const shots = process.env.LAB_EVIDENCE_DIR;
 test("missing cup: visible reason and entity, confirmed reconcile, corrected run completes", async ({ page }) => {
-  test.skip(!token, "Run scripts/test-twin-e2e.mjs: it exports the source runtime and supplies its one-time token.");
+  test.skip(!token, "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.");
   test.setTimeout(180000);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/#twin");

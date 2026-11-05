@@ -12,7 +12,7 @@ import type {RunView,RunReport,TwinHealth} from '../../src/scenarios/controls';
 const coffee=presetById('coffee')!;
 const view=(o:Partial<RunView>={}):RunView=>({run:{schemaVersion:2,id:'r1',mode:'mock',access:'simulated',backendSetId:'mock-default',backends:['mock_amr','mock_coffee','mock_arm'],status:'running',runRevision:3,eventCursor:null,telemetryCursor:null,fidelity:'modeled',ageMs:0,sourceCommit:'d'.repeat(40),scenarioId:'BV01',scenarioRevision:1,seed:42},
  tick:250,simTimeNs:'5000000000',model:'mock_kinematic',entities:[{id:'amr-1',kind:'amr',pose:{x:0.8,y:0.8,yawRad:0},quality:'valid',moving:true,hold:null,goal:{commandId:'robot-command-abc',state:'executing'},path:[[2,0.8],[3,1]],distanceM:1.2}],
- workload:[],awaiting:[],attention:[],served:'0',coffee:{jobs:[{jobId:'coffee-job-1',status:'dispensing',recipeId:'espresso',cupId:'cup-1',attentionReason:null},{jobId:'coffee-job-2',status:'undefined',recipeId:'undefined',cupId:'cup-2',attentionReason:null}],cups:[{cupId:'cup-1',ownerKind:'cell',ownerId:'coffee-1'},{cupId:'cup-2',ownerKind:'undefined',ownerId:'undefined'}]},...o});
+ workload:[],awaiting:[],attention:[],served:'0',coffee:{jobs:[{jobId:'coffee-job-1',status:'dispensing',recipeId:'espresso',cupId:'cup-1',attentionReason:null}],cups:[{cupId:'cup-1',ownerKind:'cell',ownerId:'coffee-1'}]},...o});
 const health:TwinHealth={protocolMajors:[1,2],sourceCommit:'d'.repeat(40),schemaHash:'a'.repeat(64),scenarioIds:['FD01','FD07','BV01'],
  backends:['mock_amr','mock_coffee','mock_arm'].map(id=>({id,modes:['mock'],installed:true,compatible:true,reachable:true,commissioned:true,enabled:true})),backendSets:[{id:'mock-default',mode:'mock',access:'simulated',backends:['mock_amr','mock_coffee','mock_arm']},{id:'mock-amr',mode:'mock',access:'simulated',backends:['mock_amr']}]};
 test('renderTwin is read-only and marks the shared selection',()=>{
@@ -21,9 +21,6 @@ test('renderTwin is read-only and marks the shared selection',()=>{
  expect(JSON.stringify(f)).toBe(before);
  expect(svg).toContain('data-entity="cup-1" data-selected="true"');
  expect(svg).toContain('data-entity="amr-1" data-selected="false"');
- // a job the runtime has not created yet ("undefined" strings) is not drawn or listed
- expect(sceneEntities(f).map(e=>e.id)).not.toContain('cup-2');
- expect(sceneEntities(f).map(e=>e.id)).not.toContain('coffee-job-2');
 });
 test('layers toggle overlays and the legend names modeled, observed and unknown',()=>{
  const f={preset:coffee,view:view(),report:null},on=defaultLayers();

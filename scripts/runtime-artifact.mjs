@@ -1,12 +1,28 @@
-import {readFile,writeFile,mkdir,rename,stat} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,rename,stat,rm,readdir} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 export const digest=(value)=>createHash('sha256').update(value).digest('hex');
+// Protocol majors this Lab speaks: v1 (S01 business_sim) and v2 (twin, FD01/BV01). An artifact offering anything else needs a Lab update first.
+export const LAB_PROTOCOL_MAJORS=[1,2];
+const SCHEMA_NAME=/^[a-z0-9][a-z0-9.-]*\.json$/;
 export function validateManifest(m) {
  if(m?.dirty!==false)throw new Error('DIRTY_SOURCE_ARTIFACT');
- if(!m||typeof m!=='object'||m.protocolMajor!==1||m.nodeMajor!==24||typeof m.packageVersion!=='string'||!/^v?24\.\d+\.\d+$/.test(m.toolchain?.node)||m.entrypoint!=='runtime.mjs'||!/^[a-f0-9]{40}$/.test(m.sourceCommit)||!/^[a-f0-9]{64}$/.test(m.schemaHash)||!/^[a-f0-9]{64}$/.test(m.artifactSha256)) throw new Error('INVALID_RUNTIME_MANIFEST');
+ if(!m||typeof m!=='object'||!Number.isInteger(m.protocolMajor)||m.nodeMajor!==24||typeof m.packageVersion!=='string'||!/^v?24\.\d+\.\d+$/.test(m.toolchain?.node)||m.entrypoint!=='runtime.mjs'||!/^[a-f0-9]{40}$/.test(m.sourceCommit)||!/^[a-f0-9]{64}$/.test(m.schemaHash)||!/^[a-f0-9]{64}$/.test(m.artifactSha256)) throw new Error('INVALID_RUNTIME_MANIFEST');
+ const majors=m.protocolMajors??[m.protocolMajor];
+ if(!Array.isArray(majors)||!majors.includes(m.protocolMajor)||!majors.every(n=>LAB_PROTOCOL_MAJORS.includes(n)))throw new Error(`UNSUPPORTED_PROTOCOL:${majors}`);
+ if(m.schemas!==undefined&&(!Array.isArray(m.schemas)||m.schemas.length>256||!m.schemas.every(n=>typeof n==='string'&&SCHEMA_NAME.test(n))))throw new Error('INVALID_RUNTIME_MANIFEST');
  return m;
 }
+const lockOf=(m)=>({dirty:false,packageVersion:m.packageVersion,toolchain:{node:m.toolchain.node},sourceCommit:m.sourceCommit,schemaHash:m.schemaHash,protocolMajor:m.protocolMajor,...(m.protocolMajors?{protocolMajors:m.protocolMajors}:{}),nodeMajor:m.nodeMajor,artifactSha256:m.artifactSha256,entrypoint:m.entrypoint});
+async function writeLock(root,lock){
+ await mkdir(join(root,'config'),{recursive:true});
+ const tmp=join(root,'config',`.source-lock-${randomUUID()}.json`);
+ await writeFile(tmp,JSON.stringify(lock,null,2)+'\n');
+ await rename(tmp,join(root,'config','source-runtime.lock.json'));
+}
+const readLock=async(root)=>{try{return JSON.parse(await readFile(join(root,'config/source-runtime.lock.json'),'utf8'));}catch(e){if(e.code==='ENOENT')return null;throw e;}};
+/** One transaction: manifest/protocol check, runtime hash, contract schemas re-hashed against the manifest, staged content-addressed copy, then one atomic lock rename.
+ * Any failure leaves the current lock and installed artifacts untouched. The previous lock is kept in .runtime/rollback.lock.json (its artifact stays installed). */
 export async function installRuntime(from,destination) {
  const input=resolve(from),root=resolve(destination);
  if((await stat(join(input,'manifest.json'))).size>65536) throw new Error('INVALID_RUNTIME_MANIFEST');
@@ -14,17 +30,36 @@ export async function installRuntime(from,destination) {
  if((await stat(join(input,'runtime.mjs'))).size>64*1024*1024) throw new Error('ARTIFACT_TOO_LARGE');
  const bytes=await readFile(join(input,'runtime.mjs'));
  if(digest(bytes)!==manifest.artifactSha256)throw new Error('ARTIFACT_HASH_MISMATCH');
- // Immutable content-addressed install, then one atomic lock update. A failed install preserves previous selection.
- const directory=join(root,'.runtime',manifest.artifactSha256);
- await mkdir(directory,{recursive:true});
- await writeFile(join(directory,'runtime.mjs'),bytes);
- await writeFile(join(directory,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
- await mkdir(join(root,'config'),{recursive:true});
- const lock={dirty:false,packageVersion:manifest.packageVersion,toolchain:{node:manifest.toolchain.node},sourceCommit:manifest.sourceCommit,schemaHash:manifest.schemaHash,protocolMajor:manifest.protocolMajor,nodeMajor:manifest.nodeMajor,artifactSha256:manifest.artifactSha256,entrypoint:manifest.entrypoint};
- const tmp=join(root,'config',`.source-lock-${randomUUID()}.json`);
- await writeFile(tmp,JSON.stringify(lock,null,2)+'\n');
- await rename(tmp,join(root,'config','source-runtime.lock.json'));
+ const schemas=[];
+ if(manifest.schemas){
+  const names=[...manifest.schemas].sort(),hash=createHash('sha256');
+  if(JSON.stringify((await readdir(join(input,'schemas'))).filter(n=>n.endsWith('.json')).sort())!==JSON.stringify(names))throw new Error('SCHEMA_SET_MISMATCH');
+  for(const name of names){const b=await readFile(join(input,'schemas',name));hash.update(name+'\n').update(b);schemas.push([name,b]);}
+  if(hash.digest('hex')!==manifest.schemaHash)throw new Error('SCHEMA_HASH_MISMATCH');
+ }
+ const runtimes=join(root,'.runtime'),directory=join(runtimes,manifest.artifactSha256),staging=join(runtimes,`.staging-${randomUUID()}`);
+ await mkdir(join(staging,'schemas'),{recursive:true});
+ try{
+  await writeFile(join(staging,'runtime.mjs'),bytes);
+  await writeFile(join(staging,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
+  for(const [name,b] of schemas)await writeFile(join(staging,'schemas',name),b);
+  await rm(directory,{recursive:true,force:true});
+  await rename(staging,directory);
+ }finally{await rm(staging,{recursive:true,force:true});}
+ const previous=await readLock(root),lock=lockOf(manifest);
+ if(previous&&previous.artifactSha256!==lock.artifactSha256)await writeFile(join(runtimes,'rollback.lock.json'),JSON.stringify(previous,null,2)+'\n');
+ await writeLock(root,lock);
  return lock;
+}
+/** Re-select the previously pinned artifact (swap with the current one) after verifying it is still installed intact. */
+export async function rollbackRuntime(destination) {
+ const root=resolve(destination),file=join(root,'.runtime/rollback.lock.json');
+ const previous=validateManifest(JSON.parse(await readFile(file,'utf8').catch(()=>{throw new Error('NO_ROLLBACK_RUNTIME');})));
+ if(digest(await readFile(join(root,'.runtime',previous.artifactSha256,previous.entrypoint)))!==previous.artifactSha256)throw new Error('ARTIFACT_HASH_MISMATCH');
+ const current=await readLock(root);
+ await writeLock(root,previous);
+ if(current)await writeFile(file,JSON.stringify(current,null,2)+'\n');
+ return previous;
 }
 export async function checkedRuntime(root) {
  const lock=validateManifest(JSON.parse(await readFile(join(root,'config/source-runtime.lock.json'),'utf8')));

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-// Runtime tests drive the real exported source runtime (scripts/test-twin-e2e.mjs supplies the one-use token); they share one paired page.
+// Runtime tests drive the real pinned source runtime (scripts/test-mock-e2e.mjs supplies the one-use token); they share one paired page.
 const token = process.env.LAB_TEST_PAIRING_TOKEN;
 const shots = process.env.LAB_EVIDENCE_DIR;
 const shot = async (page: Page, name: string) => { if (shots) await page.screenshot({ path: `${shots}/F05-${name}.png`, fullPage: true }); };
@@ -30,7 +30,7 @@ test("WebGL disabled and reduced motion fall back to a 2D twin with the same con
 });
 
 test.describe.serial("paired source runtime", () => {
-  test.skip(!token, "Run scripts/test-twin-e2e.mjs: it exports the source runtime and supplies its one-time token.");
+  test.skip(!token, "Run scripts/test-mock-e2e.mjs: it starts the pinned source runtime via the launcher and supplies its one-time token.");
   test.describe.configure({ timeout: 120000 });
   let page: Page;
   test.beforeAll(async ({ browser }) => { page = await browser.newPage({ viewport: { width: 1440, height: 900 } }); });

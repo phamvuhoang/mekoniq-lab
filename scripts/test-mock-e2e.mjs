@@ -1,0 +1,33 @@
+// pnpm test:mock-e2e — end to end through the pinned source runtime via the real launcher: for each spec, start `start-mock.mjs` with a fresh temp
+// journal, hand Playwright the one-use pairing code from the launcher's terminal output (no manual entry), then Ctrl-C the launcher.
+// Default: FD01 food (twin-recovery.spec.ts) and BV01 coffee (coffee-journey.spec.ts). Usage: node scripts/test-mock-e2e.mjs [--evidence] [spec ...]
+import {spawn} from 'node:child_process';
+import {mkdtemp,rm,mkdir} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
+const root=fileURLToPath(new URL('../',import.meta.url));
+const args=process.argv.slice(2),specs=args.filter(a=>!a.startsWith('--'));
+const {CI:_ci,...env}=process.env;// Playwright must reuse the launcher's UI, not start its own
+if(args.includes('--evidence')){env.LAB_EVIDENCE_DIR=join(root,'docs/implementation/evidence/digital-twin-v2');await mkdir(env.LAB_EVIDENCE_DIR,{recursive:true});}
+const work=await mkdtemp(join(tmpdir(),'mekoniq-mock-e2e-'));
+let launcher,runner;
+const stop=()=>{runner?.kill('SIGTERM');launcher?.kill('SIGINT');};
+process.once('SIGINT',stop);process.once('SIGTERM',stop);
+try{
+ for(const spec of specs.length?specs:['twin-recovery.spec.ts','coffee-journey.spec.ts']){
+  launcher=spawn(process.execPath,[join(root,'scripts/start-mock.mjs'),'--data-dir',join(work,`runs-${spec}`)],{cwd:root,stdio:['ignore','pipe','inherit'],env});
+  const exited=new Promise(r=>launcher.once('exit',c=>r(c??1)));
+  const token=await new Promise((ok,fail)=>{let out='';launcher.stdout.on('data',c=>{out+=c;process.stdout.write(String(c).replace(/(pairing code[^:]*: )\S+/,'$1<redacted>'));const m=/one-use pairing code \(expires in 5 minutes\): (\S+)[\s\S]*Ready in/.exec(out);if(m)ok(m[1]);});void exited.then(c=>fail(new Error(`Launcher exited before ready: ${c}`)));});
+  console.log(`Running ${spec} through pnpm lab:mock with a fresh journal.`);
+  runner=spawn('pnpm',['exec','playwright','test',spec],{cwd:root,stdio:'inherit',env:{...env,LAB_TEST_PAIRING_TOKEN:token}});
+  const code=await new Promise((ok,fail)=>{runner.once('error',fail);runner.once('exit',c=>ok(c??1));});
+  runner=undefined;launcher.kill('SIGINT');const stopped=await exited;launcher=undefined;
+  if(stopped!==0){console.error(`Launcher did not stop cleanly: ${stopped}`);process.exitCode=1;break;}
+  if(code){process.exitCode=code;break;}
+ }
+}finally{
+ stop();
+ await rm(work,{recursive:true,force:true});
+ process.removeListener('SIGINT',stop);process.removeListener('SIGTERM',stop);
+}

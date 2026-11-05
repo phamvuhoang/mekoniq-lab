@@ -19,13 +19,12 @@ export function cupLocation(cup:CupView,project:LabProjectV2,view:RunView):XY|nu
  return null;
 }
 const FINAL=['delivered','quarantined','cancelled'];
-/** The cup that matters now: the first whose job is not final, else the last one. Only cups the runtime reports (owner known) count. */
+/** The cup that matters now: the first whose job is not final, else the last one. */
 export function currentCup(view:RunView|null):CupView|null {
  const c=view?.coffee;if(!c)return null;
- const cups=c.cups.filter(x=>x.ownerKind!=='undefined');
- return cups.find(x=>!FINAL.includes(c.jobs.find(j=>j.cupId===x.cupId)?.status??''))??cups[cups.length-1]??null;
+ return c.cups.find(x=>!FINAL.includes(c.jobs.find(j=>j.cupId===x.cupId)?.status??''))??c.cups[c.cups.length-1]??null;
 }
-export const jobsOf=(view:RunView|null)=>(view?.coffee?.jobs??[]).filter(j=>j.status!=='undefined');
+export const jobsOf=(view:RunView|null)=>view?.coffee?.jobs??[];
 /** Waiting -> observed -> rule -> available action, for the reasons the mock cell and AMR raise. Unlisted codes still show the code. */
 export function explain(a:Attention):{waiting:string;observed:string;rule:string;action:string;entities:string[]} {
  const s=a.subjectId??'',cup=s.startsWith('coffee-job-')?`cup-${s.slice(11)}`:'';
