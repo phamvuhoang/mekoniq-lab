@@ -6,14 +6,21 @@
 //   default: the Lab/source suites the R-MOCK coverage table references (no Supabase needed)
 //   --ci:    adds the source CI-equivalent gate (build, unit, contracts, adapters, the full integration suite, pytest); the integration suite
 //            needs the repo's local Supabase already running (`pnpm supabase:start` in source). This script never starts or stops services.
+//   LAB_PYTHON: optional Python executable (absolute, or relative to source/); defaults to source/.venv/bin/python.
 import {spawnSync,execFileSync} from 'node:child_process';
 import {readFileSync,writeFileSync,mkdirSync,existsSync,rmSync,mkdtempSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 import os from 'node:os';
+import {captureRegressionIdentity,assertRecordableIdentity,assertStableRecording,LAB_EVIDENCE_MUTABLE_PATHS} from '../../source/tests/support/regression-identity.ts';
 const LAB=resolve(fileURLToPath(new URL('..',import.meta.url))),W=resolve(LAB,'..'),SRC=resolve(W,'source'),OUT=resolve(LAB,'docs/implementation/evidence/digital-twin-v2/regression');
 const ci=process.argv.includes('--ci');
+const python=resolve(SRC,process.env.LAB_PYTHON||'.venv/bin/python');
+// Freeze before replacing prior evidence. Node 24 loads the shared, erasable-TypeScript test helper directly.
+const startIdentity=captureRegressionIdentity(SRC,LAB);assertRecordableIdentity(startIdentity);
+const identityCheckpoints=[];
+function identityCheckpoint(id){const identity=captureRegressionIdentity(SRC,LAB);assertStableRecording(startIdentity,identity);identityCheckpoints.push({id,identity});}
 rmSync(OUT,{recursive:true,force:true});mkdirSync(OUT,{recursive:true});
 const env={...process.env,LAB_V2_REQUIRE_LAB_FIXTURES:'1'};
 const sha=f=>createHash('sha256').update(readFileSync(f)).digest('hex');
@@ -30,6 +37,7 @@ function summarize(kind,text){
  return kind==='vitest'?{passed:j.numPassedTests,failed:j.numFailedTests,skipped:j.numPendingTests+(j.numTodoTests??0),total:j.numTotalTests}:{expected:j.stats.expected,unexpected:j.stats.unexpected,skipped:j.stats.skipped,flaky:j.stats.flaky};
 }
 function run(id,repo,cmd,args,{kind=null,files=[],extraEnv={}}={}){
+ identityCheckpoint(`${id}:before`);
  const cwd=repo==='source'?SRC:LAB,startedAt=new Date().toISOString(),r=spawnSync(cmd,args,{cwd,env:{...env,...extraEnv},encoding:'utf8',maxBuffer:1<<28}),finishedAt=new Date().toISOString();
  const log=`${id}.log`;writeFileSync(`${OUT}/${log}`,scrub((r.stdout??'')+(r.stderr??'')));
  const command=scrub(`${Object.entries(extraEnv).map(([k,v])=>`${k}=${v}`).join(' ')} ${cmd} ${args.join(' ')}`.trim());
@@ -39,7 +47,7 @@ function run(id,repo,cmd,args,{kind=null,files=[],extraEnv={}}={}){
   const text=scrub(readFileSync(`${OUT}/${f}`,'utf8'));writeFileSync(`${OUT}/${f}`,text);
   runs.push({id:`${id}:${f}`,repo,kind,command,startedAt,finishedAt,exitCode:r.status,file:f,sha256:sha(`${OUT}/${f}`),summary:summarize(kind,text)});
  }
- console.log(id,'exit',r.status);
+ identityCheckpoint(`${id}:after`);console.log(id,'exit',r.status);
 }
 const V='node_modules/vitest/vitest.mjs',out=f=>`--outputFile=${OUT}/${f}`;
 const referenced=['lab-v2-mock','lab-v2-recovery','lab-v2-contracts','lab-v2-model','lab-v2-arm-model','lab-v2-stream','lab-v2-report','lab-v2-residuals','lab-runtime','lab-runtime-gateway','lab-runtime-contracts','lab-runtime-artifact','coffee-job','coffee-transfer','coffee-recovery','coffee-review','coffee-policy','coffee-conservation','lab-v2-runtime-review','lab-v2-software-gaps','lab-v2-mixed','lab-v2-arm-safety-model','lab-v2-arm-faults','lab-v2-arm-scene','lab-v2-arm-inactive-scene','lab-v2-checkpoint-compat','lab-v2-reclaim-targets','robot-admission','table-order-amendments'].map(f=>`tests/integration/${f}.test.ts`);
@@ -53,8 +61,8 @@ if(ci){
  run('source-build','source','pnpm',['-s','build']);
  run('source-adapters','source',process.execPath,[V,'run','tests/adapters','--reporter=json',out('source-adapters.json')],{kind:'vitest',files:['source-adapters.json']});
  run('source-integration','source',process.execPath,[V,'run','tests/integration','--reporter=json',out('source-integration.json')],{kind:'vitest',files:['source-integration.json']});
- if(existsSync(`${SRC}/.venv/bin/python`))run('source-pytest','source',`${SRC}/.venv/bin/python`,['-m','pytest','robotics/agent/tests','tests/hardware','tests/contracts/test_schema_python.py','-q',`--junitxml=${OUT}/source-pytest.xml`],{kind:'junit',files:['source-pytest.xml']});
- else notRun.push({id:'source-pytest',reason:'source/.venv missing (python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt)'});
+ if(existsSync(python))run('source-pytest','source',python,['-m','pytest','robotics/agent/tests','tests/hardware','tests/contracts/test_schema_python.py','-q',`--junitxml=${OUT}/source-pytest.xml`],{kind:'junit',files:['source-pytest.xml']});
+ else notRun.push({id:'source-pytest',reason:scrub(`Python executable missing: ${python}; provide LAB_PYTHON or create source/.venv with requirements-dev.txt`)});
 }
 run('lab-check-source','lab','pnpm',['-s','check:source']);
 run('lab-typecheck','lab','pnpm',['-s','typecheck']);
@@ -71,11 +79,13 @@ try{
  run('lab-offline-build','lab',process.execPath,['scripts/build-offline.mjs','--out',bundle]);
  run('lab-offline-e2e','lab',process.execPath,['scripts/test-mock-e2e.mjs','twin-recovery.spec.ts','coffee-journey.spec.ts'],{kind:'playwright',files:['lab-pw-offline-twin-recovery.json','lab-pw-offline-coffee-journey.json'],extraEnv:{LAB_TEST_OFFLINE_ROOT:bundle,LAB_PW_JSON:`${OUT}/lab-pw-offline.json`}});
 }finally{rmSync(offline,{recursive:true,force:true});}
-const git=(d,a)=>execFileSync('git',['-C',d,...a]).toString().trim();
+const endIdentity=captureRegressionIdentity(SRC,LAB);assertStableRecording(startIdentity,endIdentity);
 writeFileSync(`${OUT}/manifest.json`,JSON.stringify({schema:'lab-v2-regression/1',recorder:'lab/scripts/record-regression.mjs'+(ci?' --ci':''),
  note:'Synthetic test data only; absolute paths scrubbed to <workspace>/<home>/<tmp>, key/token shapes to <jwt>/<supabase-key>. sha256 is of the stored (scrubbed) file.',
- host:{platform:os.platform(),release:os.release(),arch:os.arch(),cpu:os.cpus()[0]?.model,cpus:os.cpus().length,memGiB:Math.round(os.totalmem()/2**30),node:process.version,pnpm:execFileSync('pnpm',['-v']).toString().trim()},
- revisions:{source:git(SRC,['rev-parse','HEAD']),sourceDirty:git(SRC,['status','--porcelain'])!=='',lab:git(LAB,['rev-parse','HEAD']),labDirty:git(LAB,['status','--porcelain','--','.',':!docs/implementation/evidence'])!==''},
+ host:{platform:os.platform(),release:os.release(),arch:os.arch(),cpu:os.cpus()[0]?.model,cpus:os.cpus().length,memGiB:Math.round(os.totalmem()/2**30),node:process.version,pnpm:execFileSync('pnpm',['-v']).toString().trim(),python:existsSync(python)?{executable:scrub(python),version:execFileSync(python,['--version'],{encoding:'utf8'}).trim()}:null},
+ revisions:{source:startIdentity.source.commit,sourceDirty:false,lab:startIdentity.lab.commit,labDirty:false},
+ identity:{schema:'regression-identity/1',mutableLabPaths:LAB_EVIDENCE_MUTABLE_PATHS,start:startIdentity,end:endIdentity,checkpoints:identityCheckpoints,
+  observation:'Identity is sampled at start, before and after every command, and at end; this is not continuous filesystem monitoring.'},
  runs,commands,notRun},null,1)+'\n');
 const failed=commands.filter(c=>c.exitCode!==0);
 console.log(JSON.stringify({results:runs.map(r=>[r.id,r.summary]),failed:failed.map(c=>c.id),notRun}));

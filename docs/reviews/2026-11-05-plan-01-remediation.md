@@ -51,7 +51,7 @@ The table records implemented behavior and its checks. Final pass rows belong to
 | CAMPAIGN-FD02+FD07+BV01+BV03 | Versioned two-AMR food/coffee contention workload with two identified cups; queue/travel/human-wait/cell-busy KPIs. It ends after customer handoffs; parking is covered by separate scenarios. | Source `lab-v2-mixed`, `tests/unit/lab-process-metrics.test.ts`, `lab-v2-report` |
 | ARM03 | Conservative capsule swept collision checks and declared project/AMR scene integration with bounded geometry evidence. | Source `lab-v2-arm-safety-model`, `lab-v2-arm-scene`; Lab `arm-scene-scope` |
 | ARM05 | Modeled following-error/stop/E-stop states; reset preserves uncertain program and cup custody. | Source `lab-v2-arm-safety-model`, `lab-v2-arm-faults` |
-| SYS01-render | Fixed-seed/fixed-step journal independence across 15/60 FPS and actual Chrome frozen lifecycle. | Lab browser `twin-plan01.spec.ts`; final pinned execution pending |
+| SYS01-render | Fixed-seed/fixed-step journal independence across measured 15/60 FPS and acknowledged CDP debugger suspension with zero draws; no OS background-tab policy claim. | Lab browser `twin-plan01.spec.ts`; final pinned execution pending |
 | SYS02-reclaim | Proof-protected durable reclaim; exact stored project/seed; view/reconcile fencing; explicit target selection for multiple robots. | Source `lab-v2-stream`, `lab-v2-reclaim-targets`; Lab `workspace-reclaim` |
 | SYS03-reorder | Delay/reorder real observations while retaining identity and preventing duplicate serving/execution. | Source `lab-v2-software-gaps` |
 | UX-05-reset-speed | New immutable run at tick zero; preserved old evidence; wall-clock pacing with fixed simulation steps. | Lab `workspace-replay-freshness`; browser `twin-inputs.spec.ts` |
@@ -111,3 +111,9 @@ The cell-adapter contract change requires `lab-v2-provider/2`. The final compati
 | G-HW-READY / G-HW-ACCEPT / G-VENUE | Require calibrated/native/physical and venue evidence. No robot, servo, grip, spill or physical stopping validation is claimed. |
 
 No acceptance status, historical failure, final runtime pin or evidence checksum is silently replaced by this document.
+
+## Evidence guard closure
+
+The final evidence audit found and resolved four additional tooling issues: expanded parameterized test names failed source-only lookup; empty/failed renderer captures could pass; stored results did not bind Lab code identity; and the FPS test did not assert actual suspension. The recorder now verifies clean source/Lab identities before and after each command, rejects revision drift, and only permits explicit Lab documentation/evidence paths to differ after recording. Capture validity requires real render calls, nonempty positive percentiles, adequate samples and no page errors. SYS01 measures actual cadence and an acknowledged debugger pause with zero draws. Chrome lifecycle freeze alone did not suspend rendering on this host and is no longer claimed as evidence.
+
+[Identity implementation](plan01-remediation-details/evidence-identity-report.md) and [independent evidence review](plan01-remediation-details/evidence-guard-review.md) record focused validation. Final release results remain in the evidence fields above.

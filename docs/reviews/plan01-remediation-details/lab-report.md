@@ -151,3 +151,31 @@ New file `tests/unit/replay-arm-collision.test.ts` has six actual projection/ins
 - `arm stop replay hides future collision and reset events and reconstructs the observed latch at the cursor`.
 
 Verification: `node node_modules/vitest/vitest.mjs run tests/unit/replay-arm-collision.test.ts tests/unit/workspace-replay-freshness.test.ts tests/unit/arm-scene-scope.test.ts tests/unit/report-replay.test.ts tests/unit/workspace-reclaim.test.ts` — **34 passed**, 5 files. The new six-test file passed again after correcting its synthetic final check count. Lab TypeScript and `git diff --check` passed. No source implementation, fixed-port services, acceptance records, staging or commits were changed. Documentation prepared separately remains unchanged by this fix; final pin/CI/evidence fields remain pending. Edits frozen for the arm reviewer's re-check.
+
+
+## Performance and SYS01 evidence audit follow-up (2026-11-05, 16:20 local)
+
+The prior performance comparison allowed `workspacePaint.p95Ms=null` to coerce to a passing number, and SYS01 recorded draw counts without checking them. The new pure `scripts/ui-performance-validation.mjs` rejects empty/nonfinite/nonpositive percentiles, short capture/request durations, missing/page-error records, wrong workload/profile, insufficient frame samples, paint counts outside 90–110% of the 10 Hz schedule, and missing actual renders. A legitimate slow capture remains valid measurement but fails its target. Source acceptance independently enforces the same checks. Twelve validator cases ran against the previous comparison: eleven failed before the fix; all twelve now pass.
+
+`measure-twin-ui.mjs` requires at least 60 seconds and verifies each measured paint: native WebGL draw calls with a sized canvas for 3D, or a freshly generated SVG with both AMRs and the arm for 2D. Page errors make evidence invalid. The resulting JSON includes `renderedPaints`, `pageErrors`, validation errors and validity; older captures without those fields are no longer accepted. The final recorder must regenerate them.
+
+SYS01 now asserts actual populated render output, no page errors, meaningful draw counts and measured cadence near configured 15/60 FPS. It records every draw's absolute timestamp. The strengthened first run **failed** because Chrome `Page.setWebLifecycleState(frozen)` continued rendering about 60 frames in its purported frozen interval. Headless/headed and focus/background probes reproduced this; earlier lifecycle-freeze claims are superseded. With the owner's approved correction, the test uses acknowledged CDP `Debugger.pause` to suspend real page JavaScript while independent HTTP requests drive source, then resumes it. The RAF callback is not disabled by the harness. The test and acceptance row are renamed to **debugger-paused**, with no OS background-tab throttling claim.
+
+Fresh pinned-runtime browser verification:
+
+```sh
+# Node 24.22.2; temporary evidence output, no checked-in evidence overwritten
+LAB_EVIDENCE_DIR=<temporary-directory> node scripts/test-mock-e2e.mjs twin-plan01.spec.ts
+```
+
+**1 passed**, 22.9 seconds, against source pin `7e4999033aff1d00ed696f80d26a013f726ec27b`. Exact title: `SYS01: normalized journal/effects are identical at 15/60 FPS and while the browser renderer is debugger-paused`. Measured active rates were 14.99 and 60.00 FPS; resumed/pre-pause segments were 60.04 and 61.00 FPS (timestamp quantization/short segment). There were **zero draws during the 1040 ms acknowledged suspension**, no page errors, and all three normalized reports were identical. This proves backend independence from renderer suspension, not browser-owned Auto-run scheduling during suspension.
+
+Fresh hardened performance harness:
+
+```sh
+node scripts/measure-twin-ui.mjs --duration-ms 60000 --output <temporary-output.json>
+```
+
+Both host profiles passed: desktop 3D frame p95 **16.8 ms**, paint p95 **19.9 ms**; emulated tablet 2D frame p95 **16.7 ms**, paint p95 **1.4 ms**. Each recorded 600 actual paints over at least 60 seconds with no page errors. This remains synthetic renderer load on the recorded Mac, not physical-tablet or runtime-throughput evidence. Final release evidence remains root-owned and must be regenerated after the evidence tooling commit.
+
+Additional checks: validator plus workspace-replay suite **23 passed**; Lab and source TypeScript checks passed; both repository diff checks passed. The source edit is confined to measurement validation and the SYS01 title/description; the other evidence-identity changes belong to the coordinated arm-scene agent. Fixed launcher ports 4175/4176 and ephemeral measurement services are released. No commits or staging. Changes frozen for independent evidence re-review.
