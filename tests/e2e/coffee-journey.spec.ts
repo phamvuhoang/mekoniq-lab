@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import runtimeLock from "../../config/source-runtime.lock.json" with { type: "json" };
 // Against the real pinned source runtime (scripts/test-mock-e2e.mjs). The runtime latches attention for the life of a run, so the
 // correction after a missing cup is: reconcile the affected job (human confirmation), then a new run with the same locked inputs.
 const token = process.env.LAB_TEST_PAIRING_TOKEN;
@@ -13,6 +14,7 @@ test("missing cup: visible reason and entity, confirmed reconcile, corrected run
   await page.getByRole("button", { name: "Cà phê sữa đá" }).click();
   await page.getByRole("button", { name: "Chạy mock" }).click();
   await expect(page.getByTestId("mode-badge")).toContainText("MOCK");
+  await expect(page.getByTestId("run-identity")).toContainText(`source ${runtimeLock.sourceCommit.slice(0,7)}`);
   await expect(page.getByTestId("cup-owner")).toHaveText("Trạm cà phê");
   const firstRun = await page.getByTestId("run-id").textContent();
   // the cup is under the nozzle while brewing: remove it
@@ -30,12 +32,12 @@ test("missing cup: visible reason and entity, confirmed reconcile, corrected run
   await expect(page.getByTestId("cycle-queue")).toContainText("CUP_REMOVED");
   if (shots) await page.screenshot({ path: `${shots}/F05-missing-cup-desktop-vi.png`, fullPage: true });
   // reconcile needs an explicit human confirmation; cancelling the dialog changes nothing
-  await page.getByRole("button", { name: "Đối soát" }).click();
+  await page.getByTestId("next-action").getByRole("button", { name: "Đối soát", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("coffee-job-1");
   await dialog.getByRole("button", { name: "Hủy" }).click();
   await expect(page.getByTestId("cycle-queue")).not.toContainText("Đã cách ly");
-  await page.getByRole("button", { name: "Đối soát" }).click();
+  await page.getByTestId("next-action").getByRole("button", { name: "Đối soát", exact: true }).click();
   await dialog.getByRole("button", { name: "Xác nhận đã kiểm tra" }).click();
   await expect(page.getByTestId("cycle-queue")).toContainText("Đã cách ly");
   // the run itself stays in attention: it is not relabelled completed

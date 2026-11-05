@@ -69,7 +69,7 @@ run('lab-check-source','lab','pnpm',['-s','check:source']);
 run('lab-typecheck','lab','pnpm',['-s','typecheck']);
 run('lab-vitest','lab',`${LAB}/node_modules/.bin/vitest`,['run','tests/unit','tests/integration','--reporter=json',out('lab-vitest.json')],{kind:'vitest',files:['lab-vitest.json']});
 run('lab-build','lab','pnpm',['-s','build']);
-run('lab-e2e-ui','lab','pnpm',['-s','test:e2e','--','ui.spec.ts'],{kind:'playwright',files:['lab-pw-ui.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-ui.json`}});
+run('lab-e2e-ui','lab','pnpm',['exec','playwright','test','ui.spec.ts'],{kind:'playwright',files:['lab-pw-ui.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-ui.json`}});
 run('lab-twin-e2e','lab','pnpm',['-s','test:twin-e2e','--evidence'],{kind:'playwright',files:['lab-pw-twin-twin-workspace.json','lab-pw-twin-coffee-journey.json','lab-pw-twin-twin-recovery.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-twin.json`}});
 run('lab-mock-e2e','lab','pnpm',['-s','test:mock-e2e'],{kind:'playwright',files:['lab-pw-mock-twin-recovery.json','lab-pw-mock-coffee-journey.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-mock.json`}});
 run('lab-runtime-e2e','lab','pnpm',['-s','test:runtime-e2e'],{kind:'playwright',files:['lab-pw-runtime.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-runtime.json`}});

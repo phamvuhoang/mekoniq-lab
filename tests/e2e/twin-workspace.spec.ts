@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import runtimeLock from "../../config/source-runtime.lock.json" with { type: "json" };
 // Runtime tests drive the real pinned source runtime (scripts/test-mock-e2e.mjs supplies the one-use token); they share one paired page.
 const token = process.env.LAB_TEST_PAIRING_TOKEN;
 const shots = process.env.LAB_EVIDENCE_DIR;
@@ -44,12 +45,12 @@ test.describe.serial("paired source runtime", () => {
     await page.getByRole("button", { name: "Cà phê sữa đá" }).click();
     await page.getByRole("button", { name: "Chạy mock" }).click();
     await expect(page.getByTestId("mode-badge")).toContainText("MOCK");
-    await expect(page.getByTestId("cup-owner")).toHaveText("Coffee cell");
+    await expect(page.getByTestId("cup-owner")).toHaveText("Trạm cà phê");
     await expect(page.getByTestId("run-identity")).toContainText("mock-default");
     await expect(page.getByTestId("run-identity")).toContainText("BV01");
     await expect(page.getByTestId("run-identity")).toContainText("seed 42");
     await expect(page.getByTestId("run-identity")).toContainText("mock_kinematic");
-    await expect(page.getByTestId("run-identity")).toContainText(/source [0-9a-f]{7}/);
+    await expect(page.getByTestId("run-identity")).toContainText(`source ${runtimeLock.sourceCommit.slice(0,7)}`);
     await expect(page.getByTestId("next-action")).toBeVisible();
     await expect(page.getByRole("button", { name: /e-?stop|dừng khẩn/i })).toHaveCount(0);
     await shot(page, "coffee-run-desktop-vi");
