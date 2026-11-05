@@ -3,7 +3,7 @@
  "purpose": "Frozen R-MOCK interfaces for plan 02 (simulation) and plan 03 (arm/hardware). A simulation/hardware provider must match these hashes or bump the provider interface version with a migration note. Freezing is not acceptance: R-MOCK is implemented/tested, not accepted.",
  "frozenAt": "2026-11-05",
  "gates": {
-  "R-MOCK": "implemented_tested_not_accepted",
+  "R-MOCK": "partially_implemented_tested_not_accepted",
   "R-SIM": "blocked_external",
   "G-SIM-NAV": "blocked_external",
   "G-SIM-ARM": "blocked_external",
@@ -13,17 +13,17 @@
  "codeRevisions": {
   "source": {
    "branch": "feat/lab-digital-twin-v2",
-   "artifactCommit": "76960de6f34a8aed544e283edfc65404193a77cd",
-   "finalHead": "76960de6f34a8aed544e283edfc65404193a77cd",
+   "artifactCommit": "a741e019fd2b3a909b6241f88d3d306d5b892312",
+   "finalHead": "a741e019fd2b3a909b6241f88d3d306d5b892312",
    "dirty": false
   },
   "lab": {
    "branch": "feat/robot-lab",
-   "baseCommit": "a816217b1a6df90472c57130025a3b9ac3c1e6f2",
+   "baseCommit": "37692f217e3c32f1f80f986d994743532124cf75",
    "note": "baseCommit is the lab HEAD this file was generated on; the commit that adds this file is its child"
   },
   "artifact": {
-   "sha256": "70197e40e7fb2cc98f53a6dc80b2042a9b496276e95623fe40b3164a6cb5cbe4",
+   "sha256": "010f5c659b184803fe939b69ea5372f2bd2bda718ea482f8736ef9a8aebd2606",
    "entrypoint": "runtime.mjs",
    "schemaHash": "3b632d1ec0ef38dedef0a1e96b80109ebdda185cd713b47309924a48d3a3ed4e",
    "protocolMajors": [
@@ -240,12 +240,50 @@
   "report": "docs/implementation/evidence/digital-twin-v2/mock-report.md",
   "results": {
    "file": "docs/implementation/evidence/digital-twin-v2/F08-mock-acceptance.json",
-   "sha256": "65bb614282988f1f8d919d02a21afc65e83d76ce62cad619c271a2e04f29f625"
+   "sha256": "4211de9cd1f9fa3188a6194551f79a20c1bd8ab41aa6c2d6a2611c0708c9464a"
+  },
+  "regression": {
+   "file": "docs/implementation/evidence/digital-twin-v2/regression/manifest.json",
+   "sha256": "47f3c7f716349da25b68836774c1adb05324ce06137e66271809163e80821726"
   }
  },
  "handoff": [
   "Plans 02/03 bind to the source domain/adapter contracts above; mock results are not physical evidence.",
   "Do not use the old simulator 1000 ms completion timing or mock_kinematic durations as a physical cycle-time baseline.",
   "ARM03 has no collision checker yet: G-SIM-ARM and R-SIM require one."
- ]
+ ],
+ "gMockBlockers": {
+  "note": "Mock-capable rows still NOT_IMPLEMENTED (G-MOCK blockers unless the owner waives them) and NEEDS_HUMAN items; see mock-report.md section 8.",
+  "notImplemented": [
+   "QA-02b",
+   "QA-09b",
+   "FD02-cups",
+   "BV02-capacity",
+   "BV04-outlier",
+   "BV06-capacity",
+   "BV07-timeout",
+   "BV08-milk-policy",
+   "CAMPAIGN-FD02+FD07+BV01+BV03",
+   "ARM05",
+   "SYS01-render",
+   "SYS02-reclaim",
+   "SYS03-reorder",
+   "UX-05-reset-speed",
+   "UX-18-speed",
+   "R-MOCK-offline-bundle",
+   "UI-perf-p95"
+  ],
+  "requiredByGMockOnlyWithChecker": [
+   "ARM03"
+  ],
+  "needsHuman": [
+   "UX-01-time",
+   "R-MOCK-fresh-macos",
+   "R-MOCK-network-off",
+   "R-MOCK-cold-boot"
+  ],
+  "blockedExternal": [
+   "R-MOCK-linux"
+  ]
+ }
 }

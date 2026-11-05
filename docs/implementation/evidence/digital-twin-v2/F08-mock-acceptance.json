@@ -1,10 +1,10 @@
 {
  "schema": "lab-v2-mock-acceptance/1",
- "generatedAt": "2026-11-05T03:03:04.973Z",
- "note": "Synthetic mock data only. pass = assertions executed: self rows in this run, source/lab rows in the regression run recorded in mock-report.md.",
+ "generatedAt": "2026-11-05T03:26:54.489Z",
+ "note": "Synthetic mock data only. pass = assertions executed: self rows in this run (records = run traces), source/lab rows = PASSED entries in the stored regression results (regression/manifest.json with sha256).",
  "counts": {
-  "pass": 77,
-  "not_run:NOT_IMPLEMENTED": 16,
+  "pass": 78,
+  "not_run:NOT_IMPLEMENTED": 18,
   "not_run:UNSUPPORTED_FIDELITY": 4,
   "not_run:NEEDS_HUMAN": 4,
   "not_run:BLOCKED_EXTERNAL": 1
@@ -13,25 +13,60 @@
   {
    "id": "QA-01",
    "level": "runner",
-   "expected": "every assertion row names its requirement, scenario revision, backend/model level, expected/actual and evidence refs",
+   "expected": "runner/gateway rows resolve to records with scenario id/revision/hash, backend set and backend versions, expected text, actual outcome and digest; suite-only rows resolve to stored machine-readable results with command, timestamp and sha256",
    "tests": [
-    "source:tests/acceptance/lab-v2-mock.acceptance.test.ts::coverage table: every pass row has an executed assertion",
-    "source:tests/integration/lab-v2-mock.test.ts::FD01: same seed and inputs give the same canonical outcome, built from journal events and three observed legs"
+    "self:QA-01 evidence records: every runner/gateway pass row resolves to records with scenario revision, backend set and versions, expected and actual outcome"
    ],
    "status": "pass",
+   "note": "granularity is one record per check, not per expect(); raw refs are trace keys in F08-mock-acceptance.json and files in regression/manifest.json",
+   "records": {},
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
-   "id": "QA-02",
+   "id": "QA-02a",
    "level": "runner",
-   "expected": "manifest holds project/world/scenario/source/backend/asset hashes, seed, PRNG and clock",
+   "expected": "run manifest holds project/world/scenario/source/backend set/backend versions/asset content hashes, seed, PRNG and clock",
    "tests": [
     "source:tests/integration/lab-v2-mock.test.ts::FD01: same seed and inputs give the same canonical outcome, built from journal events and three observed legs",
-    "self:SYS01 runner: step granularity, pauses and interleaved reads never change the canonical outcome"
+    "self:SYS01 runner: step granularity, pauses and interleaved reads never change the canonical outcome",
+    "self:QA-01 evidence records: every runner/gateway pass row resolves to records with scenario revision, backend set and versions, expected and actual outcome"
    ],
    "status": "pass",
-   "note": "calibration/profile revisions: the mock has no calibration profile; nothing calibrated is claimed",
+   "records": {
+    "SYS01": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "2fbf00d6e6d6c8a22d31f4fcb467ee2d0a86d7f55183e97c2798acd9dbf0c2c3"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
+  },
+  {
+   "id": "QA-02b",
+   "level": "runner",
+   "expected": "run manifest holds design, recipe, adapter and config hashes plus calibration/profile revisions",
+   "tests": [],
+   "status": "not_run",
+   "reason": "NOT_IMPLEMENTED",
+   "note": "RunReport.manifest has no design/recipe/adapter/config hash (recipe revision+hash sit on each coffee job, not in the manifest); the mock has no calibration/profile revision",
+   "records": {},
+   "storedResults": [],
+   "actual": "not executed"
   },
   {
    "id": "QA-03",
@@ -42,6 +77,107 @@
     "self:QA-03 deterministic scenarios: FD07, BV01, FD03, FD04-reopen repeat 3 times to one digest (seed is provenance only)"
    ],
    "status": "pass",
+   "records": {
+    "FD01-seed-1000": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "b3f4cb446324bcec5aa9f608fab02e34b09b95bdad97ef07988f38d1c23d6890"
+    },
+    "FD02-seed-1000": {
+     "scenario": {
+      "id": "FD02",
+      "revision": 1,
+      "hash": "4581308265f7fae8a860dc9bb7ddf584dcc632db416446b1f87fecdd04b799e8"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "3"
+     },
+     "digest": "adbc6d529e1a61afb22087c1fbe6fb38187c967fb5584907abffdfdbd7ba620c"
+    },
+    "FD07@77": {
+     "scenario": {
+      "id": "FD07",
+      "revision": 1,
+      "hash": "532ac5b0f7ca1e968f2715d2f5382b18e4e2a2a2d12b742c82af34c7b0f798f1"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419"
+    },
+    "BV01@77": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c"
+    },
+    "FD03@77": {
+     "scenario": {
+      "id": "FD03",
+      "revision": 1,
+      "hash": "f04ddbae90b79d2a88f84e67329c12c86fc42f3091623a32c8933561000f55be"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0"
+    },
+    "FD04-reopen@77": {
+     "scenario": {
+      "id": "FD04-reopen",
+      "revision": 1,
+      "hash": "1f62e04470ef50ae8c466b03f5ed0813abc39df6c2522235ddca48b604ed447c"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -53,6 +189,25 @@
    ],
    "status": "pass",
    "note": "browser render rate / tab visibility not varied in a test: see SYS01-render",
+   "records": {
+    "SYS01": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "2fbf00d6e6d6c8a22d31f4fcb467ee2d0a86d7f55183e97c2798acd9dbf0c2c3"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -69,6 +224,115 @@
     "source:tests/integration/lab-v2-arm-model.test.ts::joint limits are enforced: a target reachable only outside the limits is JOINT_LIMIT"
    ],
    "status": "pass",
+   "records": {
+    "SYS03": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "91c62de4c7be3cf89e84a957f94157a6297b8fc1037a5cc828aeb658dd5c2a24"
+    },
+    "BV05-ack-dup": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "1f392d30f1674ac613d2dc2ffb144afae26c009740690b0790ba2e5e7c1cb8cb"
+    },
+    "BV05-reboot": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "7989c2a5d9589d7971625275c2426efeae3662bd0fa2ff57666274e9d1d5b976"
+    },
+    "FD04-blocked": {
+     "scenario": {
+      "id": "FD04-blocked",
+      "revision": 1,
+      "hash": "d99b6c8548959e647688a4e70f95721ef8183e175bc131f638621132577030e3"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "a4e075ed70718f5cd468481a4812b3186c34df7f0f93e57523e3ad80e3aceac0"
+    },
+    "BV02-nocup": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "running",
+      "served": "0"
+     },
+     "digest": "da52adf615d7921e5d047d7c16b5c49927c1acb608007f8232d5e5e027f7d4de"
+    },
+    "SYS06-created": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "ready",
+      "served": "0"
+     },
+     "digest": "1e35220de1f73d5571ab11c7820dd41439ab4de31c6db05f6d7d7921c99e4d9a"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -82,17 +346,65 @@
    ],
    "status": "pass",
    "note": "payment/print effects do not exist in the Lab runtime; spies cover net/http/https/dgram/child_process",
+   "records": {
+    "QA-06": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "10e86d30fbb5f0d2cc476b126d76c323b80d00e834b84e9f8198356c0664292c"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json",
+    "regression/lab-vitest.json"
+   ],
    "actual": "assertions passed"
   },
   {
    "id": "QA-07",
    "level": "gateway",
-   "expected": "missing backend/capability is blocked with a reason; no fallback; no skip-to-pass",
+   "expected": "missing backend/capability/runtime is blocked with a reason; no fallback to a pass",
    "tests": [
     "self:SYS06 gateway: missing/wrong backend or identity is blocked with a reason, never a fallback; a run cannot change mode",
-    "source:tests/acceptance/lab-v2-mock.acceptance.test.ts::coverage table: every pass row has an executed assertion"
+    "lab:tests/integration/mock-launcher.test.ts::an unavailable mock backend fails explicitly and stops the runtime it started",
+    "lab:tests/integration/mock-launcher.test.ts::missing runtime says preview only and how to install; never starts a stand-in"
    ],
    "status": "pass",
+   "records": {
+    "SYS06-created": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "ready",
+      "served": "0"
+     },
+     "digest": "1e35220de1f73d5571ab11c7820dd41439ab4de31c6db05f6d7d7921c99e4d9a"
+    }
+   },
+   "storedResults": [
+    "regression/lab-vitest.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -105,6 +417,45 @@
     "self:Timing: two runs compare wait/travel/brew/transfer and interventions against thresholds fixed before the run"
    ],
    "status": "pass",
+   "records": {
+    "Timing-BV01@11": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "d9266c5757e93573450c7ad5629864029ea07cdaee66dcf42012a82569a79d4b"
+    },
+    "Timing-FD01@11": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "40862969c6efe7683cad2de5a9359e39c7ff0fdad189bdc4429ef9c6264197e1"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -116,6 +467,10 @@
     "lab:tests/integration/project-v2-migration.test.ts::an interruption mid-transaction leaves no half-save: backup, v2 and the readable v1 are as before"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/lab-vitest.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -126,6 +481,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "v2 runs lock their inputs (UX-16) but no scope-based staleness marking of stored v2 evidence exists yet",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -139,6 +496,11 @@
     "lab:tests/unit/twin-workspace.test.ts::inspector separates observed from commanded, keeps units and leaves unknown unknown"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/lab-vitest.json",
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -151,6 +513,11 @@
     "lab:tests/e2e/ui.spec.ts::desktop workshop screenshot and WebGL context loss retain configuration"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/lab-pw-twin-twin-recovery.json",
+    "regression/lab-pw-ui.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -165,6 +532,48 @@
    ],
    "status": "pass",
    "note": "the hardware gate content itself (identity, calibration, owner signature) is H-only: blocked_external",
+   "records": {
+    "SYS06-created": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "ready",
+      "served": "0"
+     },
+     "digest": "1e35220de1f73d5571ab11c7820dd41439ab4de31c6db05f6d7d7921c99e4d9a"
+    },
+    "QA-06": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "10e86d30fbb5f0d2cc476b126d76c323b80d00e834b84e9f8198356c0664292c"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json",
+    "regression/lab-vitest.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -176,6 +585,57 @@
     "self:QA-03 stochastic: FD01 and FD02 over 20 fixed seeds hold every invariant; each seed repeats to the same digest 3 times"
    ],
    "status": "pass",
+   "records": {
+    "FD01": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "c2f0d6d7cf4ff22c25d75bc734ae1d085dd971e6cb2d812c54270e74483e8305"
+    },
+    "FD01-seed-1000": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "b3f4cb446324bcec5aa9f608fab02e34b09b95bdad97ef07988f38d1c23d6890"
+    },
+    "FD02-seed-1000": {
+     "scenario": {
+      "id": "FD02",
+      "revision": 1,
+      "hash": "4581308265f7fae8a860dc9bb7ddf584dcc632db416446b1f87fecdd04b799e8"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "3"
+     },
+     "digest": "adbc6d529e1a61afb22087c1fbe6fb38187c967fb5584907abffdfdbd7ba620c"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -187,6 +647,57 @@
     "self:QA-03 stochastic: FD01 and FD02 over 20 fixed seeds hold every invariant; each seed repeats to the same digest 3 times"
    ],
    "status": "pass",
+   "records": {
+    "FD02": {
+     "scenario": {
+      "id": "FD02",
+      "revision": 1,
+      "hash": "4581308265f7fae8a860dc9bb7ddf584dcc632db416446b1f87fecdd04b799e8"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "3"
+     },
+     "digest": "15b30c2e0e9517b667bdca4c303f96849ddd8b61240963ac3f339447e7dc48c5"
+    },
+    "FD01-seed-1000": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "b3f4cb446324bcec5aa9f608fab02e34b09b95bdad97ef07988f38d1c23d6890"
+    },
+    "FD02-seed-1000": {
+     "scenario": {
+      "id": "FD02",
+      "revision": 1,
+      "hash": "4581308265f7fae8a860dc9bb7ddf584dcc632db416446b1f87fecdd04b799e8"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "3"
+     },
+     "digest": "adbc6d529e1a61afb22087c1fbe6fb38187c967fb5584907abffdfdbd7ba620c"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -197,6 +708,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "coffee missions carry one cup each; a mixed food+coffee batch is not modelled by the runner (cup ids stay separate per BV01)",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -209,6 +722,91 @@
    ],
    "status": "pass",
    "note": "person = scheduled 0.4 m obstacle stepping 0.2 m every 15 ticks; avoidance is the mock hold/replan rule on a geometric grid, not sensing",
+   "records": {
+    "FD03": {
+     "scenario": {
+      "id": "FD03",
+      "revision": 1,
+      "hash": "f04ddbae90b79d2a88f84e67329c12c86fc42f3091623a32c8933561000f55be"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "9fc35b2da278492c6bde66619a46aafca7e3d230164defe4c7a48dc548159f7d"
+    },
+    "FD07@77": {
+     "scenario": {
+      "id": "FD07",
+      "revision": 1,
+      "hash": "532ac5b0f7ca1e968f2715d2f5382b18e4e2a2a2d12b742c82af34c7b0f798f1"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419"
+    },
+    "BV01@77": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c"
+    },
+    "FD03@77": {
+     "scenario": {
+      "id": "FD03",
+      "revision": 1,
+      "hash": "f04ddbae90b79d2a88f84e67329c12c86fc42f3091623a32c8933561000f55be"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0"
+    },
+    "FD04-reopen@77": {
+     "scenario": {
+      "id": "FD04-reopen",
+      "revision": 1,
+      "hash": "1f62e04470ef50ae8c466b03f5ed0813abc39df6c2522235ddca48b604ed447c"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -219,6 +817,8 @@
    "status": "not_run",
    "reason": "UNSUPPORTED_FIDELITY",
    "note": "mock_kinematic has no sensors or dynamics; S/H only (G-SIM-NAV blocked_external on this host)",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -229,6 +829,25 @@
     "self:FD04 runner: chair on the destination: no false arrival, rejected with UNREACHABLE, nothing served"
    ],
    "status": "pass",
+   "records": {
+    "FD04": {
+     "scenario": {
+      "id": "FD04",
+      "revision": 1,
+      "hash": "ba082db82be5c7e2f23085dcacd018f86b5d9150a0f095a55d5175c3962b87dd"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "8f676a51da3e40720fc32d8bacdd363b237243269bb0c9c75c0118377deb6eaa"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -239,6 +858,25 @@
     "self:FD04 runner: lane closed while travelling: hold, then NO_PATH attention; never arrives, no contact, no teleport"
    ],
    "status": "pass",
+   "records": {
+    "FD04-blocked": {
+     "scenario": {
+      "id": "FD04-blocked",
+      "revision": 1,
+      "hash": "d99b6c8548959e647688a4e70f95721ef8183e175bc131f638621132577030e3"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "a4e075ed70718f5cd468481a4812b3186c34df7f0f93e57523e3ad80e3aceac0"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -250,6 +888,91 @@
     "self:QA-03 deterministic scenarios: FD07, BV01, FD03, FD04-reopen repeat 3 times to one digest (seed is provenance only)"
    ],
    "status": "pass",
+   "records": {
+    "FD04-reopen": {
+     "scenario": {
+      "id": "FD04-reopen",
+      "revision": 1,
+      "hash": "1f62e04470ef50ae8c466b03f5ed0813abc39df6c2522235ddca48b604ed447c"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "484cd0e5ef638eebf88ea9ebeb72ca071e9cbc7556537431e2f053a25576ffde"
+    },
+    "FD07@77": {
+     "scenario": {
+      "id": "FD07",
+      "revision": 1,
+      "hash": "532ac5b0f7ca1e968f2715d2f5382b18e4e2a2a2d12b742c82af34c7b0f798f1"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419"
+    },
+    "BV01@77": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c"
+    },
+    "FD03@77": {
+     "scenario": {
+      "id": "FD03",
+      "revision": 1,
+      "hash": "f04ddbae90b79d2a88f84e67329c12c86fc42f3091623a32c8933561000f55be"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0"
+    },
+    "FD04-reopen@77": {
+     "scenario": {
+      "id": "FD04-reopen",
+      "revision": 1,
+      "hash": "1f62e04470ef50ae8c466b03f5ed0813abc39df6c2522235ddca48b604ed447c"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -260,6 +983,25 @@
     "self:FD05-payload runner: refused before any native start with OVERLOADED; no robot command, nothing served"
    ],
    "status": "pass",
+   "records": {
+    "FD05-payload": {
+     "scenario": {
+      "id": "FD05-payload",
+      "revision": 1,
+      "hash": "bb5022e0a5319cdbe99df0676a3b708c36bbb98e59393389dd756d047ee503ee"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "4d0832a4c1c070d3e0551af35c5e2a3488cc23ddcc46f9fb97a19fcc388f5acb"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -270,6 +1012,25 @@
     "self:FD05-battery runner: refused before any native start with BATTERY_LOW; no robot command, nothing served"
    ],
    "status": "pass",
+   "records": {
+    "FD05-battery": {
+     "scenario": {
+      "id": "FD05-battery",
+      "revision": 1,
+      "hash": "ef0b3d953b75d9d4bdb04f95c3880669b473233e9e1fa5538086c4952b54c626"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "30345ed1ad7744aea08e68338379d2bdc392ebfa9502430afe31ae05a7a27e37"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -280,6 +1041,25 @@
     "self:FD05-capability runner: refused before any native start with CAPABILITY_UNSUPPORTED; no robot command, nothing served"
    ],
    "status": "pass",
+   "records": {
+    "FD05-capability": {
+     "scenario": {
+      "id": "FD05-capability",
+      "revision": 1,
+      "hash": "a39e77c9a54413cb5068e8e931cde033fea09eb1f63d2b744c12ba4bf4525f05"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "0a4e643b8466eaad73d58ddd2bfcedfa2c903c8431cdb859a1bd823336726775"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -290,6 +1070,25 @@
     "self:FD05-binding runner: refused before any native start with TARGET_UNBOUND; no robot command, nothing served"
    ],
    "status": "pass",
+   "records": {
+    "FD05-binding": {
+     "scenario": {
+      "id": "FD05-binding",
+      "revision": 1,
+      "hash": "df67cf7d4c300293449548427adb1b2f268cbf27dda3a3cb5d491a00c3cf828a"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "2e4ebcd13dea625d9cbe81bf325b9d0dd2caad290bb43f128d42919729a4368d"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -300,6 +1099,25 @@
     "self:FD06 runner: cancel while the robot holds the dish: return stop, staff confirms the return, cargo returned, never delivered"
    ],
    "status": "pass",
+   "records": {
+    "FD06": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "cancelled",
+      "served": "0"
+     },
+     "digest": "66c92353299a4bce5ec97f7edd82dca9091703a55a91d36d17c61310a445b44b"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -311,19 +1129,122 @@
    ],
    "status": "pass",
    "note": "domain level only: the Lab action schema has no retarget action, so no runner check",
+   "records": {},
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
    "id": "FD07",
    "level": "runner",
-   "expected": "one corridor owner by policy, no undetected deadlock, unknown not released by TTL",
+   "expected": "one corridor owner by policy, no undetected deadlock, both deliver",
    "tests": [
     "self:FD07 runner: two robots, one narrow corridor: one owner at a time, no undetected deadlock, both deliver",
-    "source:tests/integration/lab-v2-recovery.test.ts::an expired command is never sent; the run needs attention instead of retrying",
     "self:QA-03 deterministic scenarios: FD07, BV01, FD03, FD04-reopen repeat 3 times to one digest (seed is provenance only)"
    ],
    "status": "pass",
    "note": "the simulator profile serialises on the venue-wide movement zone; granular per-corridor zones are not enabled",
+   "records": {
+    "FD07": {
+     "scenario": {
+      "id": "FD07",
+      "revision": 1,
+      "hash": "532ac5b0f7ca1e968f2715d2f5382b18e4e2a2a2d12b742c82af34c7b0f798f1"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "0de1d09947109ad3cd0bc709b295c84af83843551f819884b6eb98e980b437db"
+    },
+    "FD07@77": {
+     "scenario": {
+      "id": "FD07",
+      "revision": 1,
+      "hash": "532ac5b0f7ca1e968f2715d2f5382b18e4e2a2a2d12b742c82af34c7b0f798f1"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419"
+    },
+    "BV01@77": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c"
+    },
+    "FD03@77": {
+     "scenario": {
+      "id": "FD03",
+      "revision": 1,
+      "hash": "f04ddbae90b79d2a88f84e67329c12c86fc42f3091623a32c8933561000f55be"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0"
+    },
+    "FD04-reopen@77": {
+     "scenario": {
+      "id": "FD04-reopen",
+      "revision": 1,
+      "hash": "1f62e04470ef50ae8c466b03f5ed0813abc39df6c2522235ddca48b604ed447c"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13"
+    }
+   },
+   "storedResults": [],
+   "actual": "assertions passed"
+  },
+  {
+   "id": "FD07-ttl",
+   "level": "domain",
+   "expected": "an unknown reservation is not released by TTL",
+   "tests": [
+    "source:tests/integration/robot-admission.test.ts::an unknown reservation is not released on TTL; a known idle holder lapses"
+   ],
+   "status": "pass",
+   "note": "domain level only: the mock runner never produces an unknown zone reservation",
+   "records": {},
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -334,6 +1255,25 @@
     "self:FD08 runner: localization lost before arrival: goal unknown, attention, last pose stale, no arrival"
    ],
    "status": "pass",
+   "records": {
+    "FD08-localization": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "167d59b130e31ae58463b7ad34012bc037dc7a26e624c240b401df5dd4dc852e"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -344,6 +1284,25 @@
     "self:FD08 runner: map revision changes at a stop: the next leg is refused (MAP_MISMATCH) by the adapter, pose stale, nothing served"
    ],
    "status": "pass",
+   "records": {
+    "FD08-map": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "9d09f8261aa0ed3238e18291c32065abdc6fe0dde0904bbe0302dc3b822b1e2f"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -355,6 +1314,10 @@
    ],
    "status": "pass",
    "note": "domain level: the Lab runner has no map-report/rebind action",
+   "records": {},
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -367,6 +1330,95 @@
     "self:QA-03 deterministic scenarios: FD07, BV01, FD03, FD04-reopen repeat 3 times to one digest (seed is provenance only)"
    ],
    "status": "pass",
+   "records": {
+    "BV01": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "9b59e2998aff536574f72b13eb87d58026032a6ffe015e1094e21f4933ae93d5"
+    },
+    "FD07@77": {
+     "scenario": {
+      "id": "FD07",
+      "revision": 1,
+      "hash": "532ac5b0f7ca1e968f2715d2f5382b18e4e2a2a2d12b742c82af34c7b0f798f1"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419"
+    },
+    "BV01@77": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c"
+    },
+    "FD03@77": {
+     "scenario": {
+      "id": "FD03",
+      "revision": 1,
+      "hash": "f04ddbae90b79d2a88f84e67329c12c86fc42f3091623a32c8933561000f55be"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0"
+    },
+    "FD04-reopen@77": {
+     "scenario": {
+      "id": "FD04-reopen",
+      "revision": 1,
+      "hash": "1f62e04470ef50ae8c466b03f5ed0813abc39df6c2522235ddca48b604ed447c"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -377,6 +1429,27 @@
     "self:BV02 runner: no cup under the nozzle before start: the job never starts and no brew command is issued"
    ],
    "status": "pass",
+   "records": {
+    "BV02-nocup": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "running",
+      "served": "0"
+     },
+     "digest": "da52adf615d7921e5d047d7c16b5c49927c1acb608007f8232d5e5e027f7d4de"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -387,6 +1460,27 @@
     "self:BV02 runner: cup removed mid-brew: step fails CUP_REMOVED, job held, the drink never becomes ready"
    ],
    "status": "pass",
+   "records": {
+    "BV02-removed": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "3e3cfc45d3c2d8a3c10444521d8c0796fa410aa3a2428fdda43fb489d26d7675"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -398,6 +1492,10 @@
    ],
    "status": "pass",
    "note": "domain level (CUP_TYPE_MISMATCH, CUP_MISMATCH); no runner fault places a wrong cup",
+   "records": {},
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -408,6 +1506,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "recipes and cups carry no capacity/headspace model yet",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -418,6 +1518,27 @@
     "self:BV03 runner: milk runs out: espresso still served, iced milk coffee held with its reason; consumed beans/ice kept, no blind retry"
    ],
    "status": "pass",
+   "records": {
+    "BV03-milk": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "1"
+     },
+     "digest": "3d86fafc0702f51227ea4190712dbc492df05f1bc76b662d8d323875a4413575"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -429,6 +1550,45 @@
     "self:BV03 runner: ice dispenser jams mid-dispense: the partial amount is measured and kept, the job is held, no second ice command"
    ],
    "status": "pass",
+   "records": {
+    "BV03-ice-before": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "1"
+     },
+     "digest": "e17fc81ab02715e2d73e396ae0fda00809c2a8cee36c5fedacc65e0a856889c1"
+    },
+    "BV03-ice-mid": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "1"
+     },
+     "digest": "a18aad51566252a18eb13625d4116f1d4c9417258650203c8326ab9078dd9c56"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -440,6 +1600,29 @@
     "source:tests/integration/coffee-job.test.ts::reservation is atomic and resources are exclusive"
    ],
    "status": "pass",
+   "records": {
+    "BV03-contention": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "1333d16d988b17642b35a3b36f6d13cea675b83decc6b5ad505c0098455c6dd4"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -453,6 +1636,65 @@
     "source:tests/integration/coffee-job.test.ts::unknown or out-of-tolerance quantity cannot pass automatic quality; missing measurement needs attention"
    ],
    "status": "pass",
+   "records": {
+    "BV04-dose-low": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "5cba9e548e7e68add827400e5927068d55780527566a93c7119357c9a7f6a784"
+    },
+    "BV04-measure-unknown": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "ffa72e8ca4ef044cad9f7013f71fc5c1949582330a2e0c8f6eb5d6ea1f71ebf9"
+    },
+    "BV04-measure-missing": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "168338626ce641e243f8d07bc0627cb1302fd8d3c1fdd31d8806a96d89772722"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -464,6 +1706,29 @@
     "source:tests/integration/coffee-job.test.ts::a silent device times out its step from the recipe timeout on the command clock: needs attention, no resend"
    ],
    "status": "pass",
+   "records": {
+    "BV03-ice-before": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "1"
+     },
+     "digest": "e17fc81ab02715e2d73e396ae0fda00809c2a8cee36c5fedacc65e0a856889c1"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -474,6 +1739,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "no outlier fault or plausibility filter in mock_process",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -485,6 +1752,47 @@
     "source:tests/integration/coffee-recovery.test.ts::BV05 on mock-default: a cell reboot mid-brew leaves the outcome unknown, never resends, keeps the cup; a human reconcile quarantines it"
    ],
    "status": "pass",
+   "records": {
+    "BV05-ack-dup": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "1f392d30f1674ac613d2dc2ffb144afae26c009740690b0790ba2e5e7c1cb8cb"
+    },
+    "BV05-reboot": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "7989c2a5d9589d7971625275c2426efeae3662bd0fa2ff57666274e9d1d5b976"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -498,6 +1806,10 @@
    ],
    "status": "pass",
    "note": "domain level: the runner always submits the locked recipe, so no runner fault produces a mismatch",
+   "records": {},
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -508,6 +1820,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "no capacity/headspace model (same gap as BV02-capacity)",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -518,6 +1832,27 @@
     "self:BV07 runner: arm drops the cup during pick: transfer fails, the cup is never on the robot, the robot is not released from the load stop"
    ],
    "status": "pass",
+   "records": {
+    "BV07-drop": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "515dbdf8b089c4f8f63aa3af90475fad5b86edf6eed08a13deb770a20734ed3f"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -528,6 +1863,27 @@
     "self:BV07 runner: robot docked out of tolerance: no tray transfer, the cup stays with the arm, the robot is held at the load stop"
    ],
    "status": "pass",
+   "records": {
+    "BV07-dock": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "running",
+      "served": "0"
+     },
+     "digest": "a6fe91cc14099583a9534d109f7f591f1d34915fb275649664910252ec7e78ac"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -538,6 +1894,27 @@
     "self:BV07 runner: cancel mid-cycle: the job is cancelled or held with a reason and disposition, nothing is delivered"
    ],
    "status": "pass",
+   "records": {
+    "BV07-cancel": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "8036b3f5941eeb05a294f756e3c45890de87eb8ab1be44e301d0baa5410909c8"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -548,6 +1925,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "no pickup/handoff timeout exists in the coffee driver or domain; the robot waits indefinitely (held, never released)",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -555,9 +1934,30 @@
    "level": "runner",
    "expected": "machine not ready blocks the step; only renewed readiness opens it",
    "tests": [
-    "self:BV08 runner: machine not ready blocks the cup check/start with a reason; only renewed readiness opens the brew step"
+    "self:BV08 runner: machine not ready between StartJob and the brew step: the step waits visibly with MACHINE_NOT_READY (no latch) and opens only once readiness returns"
    ],
    "status": "pass",
+   "records": {
+    "BV08": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "b055d6e3c4836318c00f539f62c9183987deee4f8968c307215f3374438ff78e"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -568,6 +1968,10 @@
     "source:tests/integration/coffee-recovery.test.ts::cleaning overdue and stale interlocks block the cell with a reason until an audited cleaning is recorded"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -578,6 +1982,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "no milk batch/open-time/cold-handling metadata in recipes or devices; mock reboot keeps device status, so the reboot case is not exercised",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -588,6 +1994,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "no combined food+coffee scenario definition; each part runs and is measured separately",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -600,6 +2008,29 @@
     "self:BV01 runner: both recipes run their own step order; espresso has no ice/milk; one cup owner; served only after the final handoff"
    ],
    "status": "pass",
+   "records": {
+    "BV01": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "9b59e2998aff536574f72b13eb87d58026032a6ffe015e1094e21f4933ae93d5"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -612,6 +2043,10 @@
     "source:tests/integration/lab-v2-arm-model.test.ts::FK refuses wrong joint vectors and source-unit models"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -622,6 +2057,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "no geometric collision checker exists (report coverage armCollisionChecker:false); G-MOCK allows PASS only with a checker",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -635,6 +2072,10 @@
    ],
    "status": "pass",
    "note": "acceleration limits are not modelled",
+   "records": {},
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -645,6 +2086,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "mock_arm has no following-error or stop model; G-MOCK does not list ARM05",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -656,6 +2099,29 @@
     "source:tests/integration/coffee-transfer.test.ts::arm outcome unknown during transfer holds the cup with its last known owner and the job needs attention"
    ],
    "status": "pass",
+   "records": {
+    "ARM06": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "6b358b2acb4a1a51d9b9da8acd982a87e0ee69d5a22a278f0d7e5089e31e4ccf"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -667,6 +2133,91 @@
     "self:QA-03 deterministic scenarios: FD07, BV01, FD03, FD04-reopen repeat 3 times to one digest (seed is provenance only)"
    ],
    "status": "pass",
+   "records": {
+    "SYS01": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "2fbf00d6e6d6c8a22d31f4fcb467ee2d0a86d7f55183e97c2798acd9dbf0c2c3"
+    },
+    "FD07@77": {
+     "scenario": {
+      "id": "FD07",
+      "revision": 1,
+      "hash": "532ac5b0f7ca1e968f2715d2f5382b18e4e2a2a2d12b742c82af34c7b0f798f1"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419"
+    },
+    "BV01@77": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c"
+    },
+    "FD03@77": {
+     "scenario": {
+      "id": "FD03",
+      "revision": 1,
+      "hash": "f04ddbae90b79d2a88f84e67329c12c86fc42f3091623a32c8933561000f55be"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0"
+    },
+    "FD04-reopen@77": {
+     "scenario": {
+      "id": "FD04-reopen",
+      "revision": 1,
+      "hash": "1f62e04470ef50ae8c466b03f5ed0813abc39df6c2522235ddca48b604ed447c"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -677,6 +2228,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "no browser test varies render rate or tab visibility; the UI is not a clock source by construction (runtime ticks only on step actions)",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -688,6 +2241,27 @@
     "source:tests/integration/lab-v2-recovery.test.ts::crash after journal commit and before checkpoint reopens as needs_attention, keeps cargo and never resends"
    ],
    "status": "pass",
+   "records": {
+    "SYS02": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "47d86acf8599e51741e64f8da1f06ca9cc0dae90f7ecda55e0732ff21f6ce51c"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -698,6 +2272,10 @@
     "lab:tests/e2e/twin-recovery.spec.ts::telemetry stream, stale/frozen states, reconnect, read-only replay, compare, export and a lost session"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/lab-pw-twin-twin-recovery.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -708,6 +2286,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "POST /runs/:id/reclaim answers 501; a restarted runtime needs re-pairing and a new run",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -719,6 +2299,61 @@
     "self:BV05 runner: lost ACK, duplicate completion and a reboot mid-brew: one effect each, unknown is held, no second brew, cup kept"
    ],
    "status": "pass",
+   "records": {
+    "SYS03": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "91c62de4c7be3cf89e84a957f94157a6297b8fc1037a5cc828aeb658dd5c2a24"
+    },
+    "BV05-ack-dup": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "1f392d30f1674ac613d2dc2ffb144afae26c009740690b0790ba2e5e7c1cb8cb"
+    },
+    "BV05-reboot": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "7989c2a5d9589d7971625275c2426efeae3662bd0fa2ff57666274e9d1d5b976"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -729,6 +2364,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "no reorder/delay fault in the plant adapters (duplicate/stale only)",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -742,6 +2379,11 @@
    ],
    "status": "pass",
    "note": "scope-based staleness of old v2 reports: see QA-09b",
+   "records": {},
+   "storedResults": [
+    "regression/lab-vitest.json",
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -755,6 +2397,45 @@
     "lab:tests/unit/core-deployment.test.ts::rejects live state, credentials and forged validation in candidate inputs"
    ],
    "status": "pass",
+   "records": {
+    "SYS05": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "running",
+      "served": "0"
+     },
+     "digest": "62437840e4ab1af2fc398a7675219e9dcf9bef43903efbcbcbc2309c9c98b664"
+    },
+    "QA-06": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "10e86d30fbb5f0d2cc476b126d76c323b80d00e834b84e9f8198356c0664292c"
+    }
+   },
+   "storedResults": [
+    "regression/lab-vitest.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -767,6 +2448,79 @@
     "self:FD08 runner: localization lost before arrival: goal unknown, attention, last pose stale, no arrival"
    ],
    "status": "pass",
+   "records": {
+    "SYS06-created": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "ready",
+      "served": "0"
+     },
+     "digest": "1e35220de1f73d5571ab11c7820dd41439ab4de31c6db05f6d7d7921c99e4d9a"
+    },
+    "BV05-ack-dup": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "1f392d30f1674ac613d2dc2ffb144afae26c009740690b0790ba2e5e7c1cb8cb"
+    },
+    "BV05-reboot": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "7989c2a5d9589d7971625275c2426efeae3662bd0fa2ff57666274e9d1d5b976"
+    },
+    "FD08-localization": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "167d59b130e31ae58463b7ad34012bc037dc7a26e624c240b401df5dd4dc852e"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -778,6 +2532,11 @@
     "lab:tests/integration/mock-launcher.test.ts::missing runtime says preview only and how to install; never starts a stand-in"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/lab-pw-twin-twin-workspace.json",
+    "regression/lab-vitest.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -788,6 +2547,8 @@
    "status": "not_run",
    "reason": "NEEDS_HUMAN",
    "note": "guided usability with representative users cannot be performed by an agent",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -798,6 +2559,10 @@
     "lab:tests/e2e/twin-workspace.spec.ts::layers, legend and one shared selection survive a 3D to 2D switch"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/lab-pw-twin-twin-workspace.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -809,6 +2574,11 @@
     "lab:tests/e2e/twin-workspace.spec.ts::layers, legend and one shared selection survive a 3D to 2D switch"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/lab-vitest.json",
+    "regression/lab-pw-twin-twin-workspace.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -820,19 +2590,40 @@
     "lab:tests/e2e/service-journey.spec.ts::paired source runtime drives arrival then human load and handoff"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/lab-pw-twin-coffee-journey.json",
+    "regression/lab-pw-runtime.json"
+   ],
    "actual": "assertions passed"
   },
   {
    "id": "UX-05",
    "level": "browser",
-   "expected": "run/pause/step by capability; pause is not stop",
+   "expected": "run/pause/step; an acknowledged pause of the mock clock is not a stop",
    "tests": [
     "lab:tests/e2e/twin-recovery.spec.ts::telemetry stream, stale/frozen states, reconnect, read-only replay, compare, export and a lost session",
     "lab:tests/e2e/coffee-journey.spec.ts::missing cup: visible reason and entity, confirmed reconcile, corrected run completes"
    ],
    "status": "pass",
-   "note": "reset and speed control are not offered for v2 runs (a new run is created instead)",
+   "records": {},
+   "storedResults": [
+    "regression/lab-pw-twin-twin-recovery.json",
+    "regression/lab-pw-twin-coffee-journey.json"
+   ],
    "actual": "assertions passed"
+  },
+  {
+   "id": "UX-05-reset-speed",
+   "level": "browser",
+   "expected": "reset and run-speed control offered by capability mode",
+   "tests": [],
+   "status": "not_run",
+   "reason": "NOT_IMPLEMENTED",
+   "note": "v2 runs have no reset or speed action (a new run is created instead); the Lab action schema has neither",
+   "records": {},
+   "storedResults": [],
+   "actual": "not executed"
   },
   {
    "id": "UX-06",
@@ -843,6 +2634,10 @@
    ],
    "status": "pass",
    "note": "one-shot faults from the UI; schedules exist only as server scenario data (FD03/FD04)",
+   "records": {},
+   "storedResults": [
+    "regression/lab-pw-twin-coffee-journey.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -854,6 +2649,11 @@
     "lab:tests/e2e/twin-workspace.spec.ts::engineering panel shows units, observed versus commanded and data age"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/lab-vitest.json",
+    "regression/lab-pw-twin-twin-workspace.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -865,6 +2665,10 @@
    ],
    "status": "pass",
    "note": "the 2-minute find-the-cause target is UX-01-time (NEEDS_HUMAN)",
+   "records": {},
+   "storedResults": [
+    "regression/lab-vitest.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -877,6 +2681,29 @@
     "self:QA-06 transport deny: a full coffee run through the gateway opens no robot/cell socket, process or datagram; hardware sets stay denied"
    ],
    "status": "pass",
+   "records": {
+    "QA-06": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "10e86d30fbb5f0d2cc476b126d76c323b80d00e834b84e9f8198356c0664292c"
+    }
+   },
+   "storedResults": [
+    "regression/lab-vitest.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -888,6 +2715,11 @@
     "source:tests/integration/lab-v2-report.test.ts::compareRuns refuses to rank mock against hardware, and different scenarios, with explicit reasons"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/lab-vitest.json",
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -900,6 +2732,11 @@
     "lab:tests/e2e/ui.spec.ts::mobile and reduced-motion fallback remain accessible without horizontal overflow"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/lab-pw-twin-twin-workspace.json",
+    "regression/lab-pw-ui.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -912,6 +2749,11 @@
    ],
    "status": "pass",
    "note": "old-run badge against the current configuration: QA-09b",
+   "records": {},
+   "storedResults": [
+    "regression/lab-vitest.json",
+    "regression/lab-pw-ui.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -923,6 +2765,11 @@
     "lab:tests/integration/project-v2-migration.test.ts::the catalog fixture, the compiled footprint and the viewer source agree"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/source-integration.json",
+    "regression/lab-vitest.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -934,6 +2781,11 @@
     "lab:tests/unit/twin-telemetry.test.ts::orders samples per provider by bootId+seq: a late older sample never overwrites a newer one; duplicates are ignored"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/source-integration.json",
+    "regression/lab-vitest.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -946,6 +2798,28 @@
     "self:FD01 runner: arrival from observations, three legs, served only after handoff, parked not charged"
    ],
    "status": "pass",
+   "records": {
+    "FD01": {
+     "scenario": {
+      "id": "FD01",
+      "revision": 1,
+      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "1"
+     },
+     "digest": "c2f0d6d7cf4ff22c25d75bc734ae1d085dd971e6cb2d812c54270e74483e8305"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json",
+    "regression/lab-vitest.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -957,6 +2831,11 @@
     "lab:tests/unit/twin-workspace.test.ts::locked identity shows recipe and project revisions as the runtime reported them, never preset constants"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/source-integration.json",
+    "regression/lab-vitest.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -969,6 +2848,12 @@
     "lab:tests/e2e/twin-recovery.spec.ts::telemetry stream, stale/frozen states, reconnect, read-only replay, compare, export and a lost session"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/source-integration.json",
+    "regression/lab-vitest.json",
+    "regression/lab-pw-twin-twin-recovery.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -982,6 +2867,59 @@
    ],
    "status": "pass",
    "note": "speed-limit changes: see UX-18-speed",
+   "records": {
+    "FD04": {
+     "scenario": {
+      "id": "FD04",
+      "revision": 1,
+      "hash": "ba082db82be5c7e2f23085dcacd018f86b5d9150a0f095a55d5175c3962b87dd"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "8f676a51da3e40720fc32d8bacdd363b237243269bb0c9c75c0118377deb6eaa"
+    },
+    "FD05-payload": {
+     "scenario": {
+      "id": "FD05-payload",
+      "revision": 1,
+      "hash": "bb5022e0a5319cdbe99df0676a3b708c36bbb98e59393389dd756d047ee503ee"
+     },
+     "backendSetId": "mock-amr",
+     "backends": [
+      "mock_amr@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "needs_attention",
+      "served": "0"
+     },
+     "digest": "4d0832a4c1c070d3e0551af35c5e2a3488cc23ddcc46f9fb97a19fcc388f5acb"
+    },
+    "BV01": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "9b59e2998aff536574f72b13eb87d58026032a6ffe015e1094e21f4933ae93d5"
+    }
+   },
+   "storedResults": [],
    "actual": "assertions passed"
   },
   {
@@ -992,6 +2930,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "mock_amr speed is a fixed illustrative 0.5 m/s; scenario speed limits are not wired into the plant",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -1003,17 +2943,67 @@
     "self:QA-06 transport deny: a full coffee run through the gateway opens no robot/cell socket, process or datagram; hardware sets stay denied"
    ],
    "status": "pass",
+   "records": {
+    "QA-06": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "10e86d30fbb5f0d2cc476b126d76c323b80d00e834b84e9f8198356c0664292c"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json"
+   ],
    "actual": "assertions passed"
   },
   {
    "id": "UX-20",
    "level": "model",
-   "expected": "measurement/calibration provenance; mock values labelled illustrative/assumed",
+   "expected": "mock values and measurements carry illustrative/modelled/unknown provenance, never calibrated",
    "tests": [
-    "source:tests/integration/lab-v2-contracts.test.ts::coffee recipes use exact decimal strings and never allow automatic retry",
+    "source:tests/integration/coffee-job.test.ts::lab recipe fixtures equal the server recipes, are schema-valid and carry their content hash",
+    "source:tests/integration/lab-v2-model.test.ts::migrateV1Project keeps handoff coordinates, backs the design into amr-1 and marks geometry illustrative",
+    "self:BV01 runner: both recipes run their own step order; espresso has no ice/milk; one cup owner; served only after the final handoff",
     "lab:tests/e2e/ui.spec.ts::all three locales fit tablet and desktop, with explicit unmeasured Valetudo values"
    ],
    "status": "pass",
+   "note": "calibration records for real hardware do not exist (H only)",
+   "records": {
+    "BV01": {
+     "scenario": {
+      "id": "BV01",
+      "revision": 1,
+      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+     },
+     "backendSetId": "mock-default",
+     "backends": [
+      "mock_amr@1/mock_kinematic",
+      "mock_coffee@1/mock_process",
+      "mock_arm@1/mock_kinematic"
+     ],
+     "actual": {
+      "status": "completed",
+      "served": "2"
+     },
+     "digest": "9b59e2998aff536574f72b13eb87d58026032a6ffe015e1094e21f4933ae93d5"
+    }
+   },
+   "storedResults": [
+    "regression/source-integration.json",
+    "regression/lab-pw-ui.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -1025,6 +3015,10 @@
     "lab:tests/integration/mock-launcher.test.ts::a non-mock backend enabled by the runtime is refused"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/lab-vitest.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -1035,6 +3029,10 @@
     "lab:tests/e2e/service-journey.spec.ts::paired source runtime drives arrival then human load and handoff"
    ],
    "status": "pass",
+   "records": {},
+   "storedResults": [
+    "regression/lab-pw-runtime.json"
+   ],
    "actual": "assertions passed"
   },
   {
@@ -1045,6 +3043,8 @@
    "status": "not_run",
    "reason": "NEEDS_HUMAN",
    "note": "needs a separate clean user profile on this machine (F07 not_run)",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -1055,6 +3055,8 @@
    "status": "not_run",
    "reason": "BLOCKED_EXTERNAL",
    "note": "no Linux host available (F07 not_run)",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -1065,6 +3067,8 @@
    "status": "not_run",
    "reason": "NEEDS_HUMAN",
    "note": "turning off host networking is outside agent scope (F07 not_run); the transport-deny check (QA-06) covers the runtime side",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -1075,6 +3079,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "no vendored offline bundle exists (F07 not_run)",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -1085,6 +3091,8 @@
    "status": "not_run",
    "reason": "NEEDS_HUMAN",
    "note": "requires rebooting the host (F07 not_run; warm p95 608 ms recorded without a pass badge)",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -1095,6 +3103,8 @@
    "status": "not_run",
    "reason": "NOT_IMPLEMENTED",
    "note": "no frame-time capture harness; F06 measured telemetry latency and heap only",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -1105,6 +3115,8 @@
    "status": "not_run",
    "reason": "UNSUPPORTED_FIDELITY",
    "note": "mock proves no physics (report coverage physicalGrip/armTorque/fluidModel/physicalStop false)",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -1115,6 +3127,8 @@
    "status": "not_run",
    "reason": "UNSUPPORTED_FIDELITY",
    "note": "process model + synthetic measurements only (provenance modelled)",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   },
   {
@@ -1125,6 +3139,8 @@
    "status": "not_run",
    "reason": "UNSUPPORTED_FIDELITY",
    "note": "mock_kinematic: no dynamics; contacts are geometric overlaps in the model",
+   "records": {},
+   "storedResults": [],
    "actual": "not executed"
   }
  ],
@@ -1134,120 +3150,200 @@
     {
      "seed": 1000,
      "digest": "b3f4cb446324bcec5aa9f608fab02e34b09b95bdad97ef07988f38d1c23d6890",
+     "seedlessDigest": "efa062c2dfbc60a2b5169e8034ae866ca0415f111f6fe15df45bc126dab6aa58",
+     "atTicks": [
+      227
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1001,
      "digest": "2a9b800fa69da3c1fc020fdaed632b9d2cddc16a2adf7738652dcfd36de5c84f",
+     "seedlessDigest": "d117a72017b3a27327465b0ab2720a969b7943e9966c519cd0c44a571bc091fb",
+     "atTicks": [
+      427
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1002,
      "digest": "248a7e32e30c4e5ccdd7c23719058dcde8be8dd357d6f43416f3ff03ea4ba7c5",
+     "seedlessDigest": "b2a7d321fc73eb255c0ea2eabfa29fcd68dd5949cb0d7c6a2d736e7ecd16f04d",
+     "atTicks": [
+      242
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1003,
      "digest": "1784424498a9de41b7f79d399974debbecf013e4f50954ce48a2d862143c3c8d",
+     "seedlessDigest": "f6813f5e4257eaf6c69830b0de9a9df7ffae05eeef112e99349f21f837a7e77a",
+     "atTicks": [
+      403
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1004,
      "digest": "ca7db2fed296e12d36f8565a29fe9f4b95334bc3e7044e9cb005f7c1e0984726",
+     "seedlessDigest": "4c50f004f6a70dfcc945a3bd5273f8aa8317db119339eae58be321f77c9c9228",
+     "atTicks": [
+      39
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1005,
      "digest": "c07697d581ceae96cbaa602d27727fb12064da2bd609256e6c93b2fddf57c6d0",
+     "seedlessDigest": "cc6d0494f496547ce330d2e9cac99513332cf81a8ff255a88558bc428dece7c5",
+     "atTicks": [
+      266
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1006,
      "digest": "17a1953441364e8f18c50a15887ca0f300dcdf87e45a356a0c66e3eec02b469d",
+     "seedlessDigest": "9d5948e192de710a861175929ea89a864e8f2dff811e28bfd823d685ce371531",
+     "atTicks": [
+      402
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1007,
      "digest": "0d60e722208695bec53d10d8f504841639285ee63999518bc9e3d1ab0543785f",
+     "seedlessDigest": "5f75a299656287ba005e4407567a96b8c2a9ca557b25656f6b92a194a3e8f56f",
+     "atTicks": [
+      118
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1008,
      "digest": "0bfa4d9dd89debe6f05f3b5a446d6bc9d3b8c3fdddf6d83f4a2998911c84ea56",
+     "seedlessDigest": "196627aade35d4d015e6a46e99164188748de6e80ce0ef1ada0d29a2ef05314b",
+     "atTicks": [
+      48
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1009,
      "digest": "f64bb098f294ceaf84d2574347fb79a145c450da893fdb9c1439448fb28ee7ad",
+     "seedlessDigest": "f05f6d11ef00112080ae105c91f37083cbed2a6fa50717c4a5e3359fb84ab36f",
+     "atTicks": [
+      77
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1010,
      "digest": "862d3401e46cd0b0e76ec20b585c8e0d1b4722c5ec863d09b45a4b59d93e3a53",
+     "seedlessDigest": "95837f2f48402607664a6cee578bba97acfd9f7278417f3045da0a4d1f0c8f6b",
+     "atTicks": [
+      298
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1011,
      "digest": "e05cccf3a03c21fddf4666e31ca1f3ca21757b3d891cf0c8b9a9fec9e7ba8911",
+     "seedlessDigest": "085c6f500089fb8da96986f2285744f7a9d18234c363c137620e7f2486884c59",
+     "atTicks": [
+      125
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1012,
      "digest": "c37f6e4244348ff40b64410d24788d0eece78aaacc4a5127b94200c644d14bcd",
+     "seedlessDigest": "0316c2231f2f1e44710e00a39b54bfdc2f8089942ab31523b5e888f2759d1950",
+     "atTicks": [
+      391
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1013,
      "digest": "e2f03822bc8321b2ed28ca0ac3eb4e9519e2dbbef1393af542d4ab98aeee34eb",
+     "seedlessDigest": "9c5f1c1c62586422f7ff6d73ab4438b48db7b7ff535e7a1dd3fad7e471d0f184",
+     "atTicks": [
+      394
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1014,
      "digest": "c535260bf4b76b6da10768715df46c05c771a774e2e51376c08c0da50c668a41",
+     "seedlessDigest": "d38d16e26aa27d8b378ae3604e4cc7c79644fb69ac1124d0c0643c74b05bacdc",
+     "atTicks": [
+      72
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1015,
      "digest": "f3001246805c6316ba83939cb076d44730f1db1f4c263b91eb9287a6966df585",
+     "seedlessDigest": "6274971bb9692c616ab4e32f2f2b5932109a5630a3c2736d435101c805f0e6a9",
+     "atTicks": [
+      54
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1016,
      "digest": "5b98876fc3d25a36566415a45ca9e66614b3bdded894a0e3191a067200f119b9",
+     "seedlessDigest": "34ee3987f5e8765af4693f8c1f25a17a15f0492ab9827ec089e49aec83dd55ee",
+     "atTicks": [
+      330
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1017,
      "digest": "17b1cfa3d9e3c8833a15904ad2540d6fde499603c7aa110a32ee6d38bf2e9095",
+     "seedlessDigest": "ebd782fbd31b613d3dc41f4ac503e5979e9f255e901ab5d95bf5dd46e3365d27",
+     "atTicks": [
+      210
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1018,
      "digest": "8ef303bbd8b1d7b281d4e96b02a597dbd4a24a7fc3717c4f5fd391f406a2b644",
+     "seedlessDigest": "00e329c3432ed31eca7a64dbb8bebfe8cfb49248d21241e5ec5e9dc15bc87031",
+     "atTicks": [
+      360
+     ],
      "status": "completed",
      "served": "1"
     },
     {
      "seed": 1019,
      "digest": "c6dbca79fe3e917c563e5c9dc8df8cf40603f5e788519f656555782896088d86",
+     "seedlessDigest": "6dd3985c1c9e5da984bd559540ef7ba0e65cef89cca71bd78578c90406731b5b",
+     "atTicks": [
+      196
+     ],
      "status": "completed",
      "served": "1"
     }
@@ -1256,120 +3352,220 @@
     {
      "seed": 1000,
      "digest": "adbc6d529e1a61afb22087c1fbe6fb38187c967fb5584907abffdfdbd7ba620c",
+     "seedlessDigest": "2ee3305de3cb319469159a5420239c9d14236349076169404b81895b6805195a",
+     "atTicks": [
+      91,
+      142
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1001,
      "digest": "6606c9abaf699fe4eaf6e76d97d853bebfb59b53344b0704a7237f08b6e8a897",
+     "seedlessDigest": "9ceb7baadb047db024cea2d86d4c499ea05307d3c2373de02b087beebd9610c4",
+     "atTicks": [
+      171,
+      132
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1002,
      "digest": "9278d808fbd5e506815fbc9b787822c3c5262752904e3251ae3f7663ac8b2500",
+     "seedlessDigest": "484e4537d1b81fcc5ca27a57a72fcd06c8d0c680d0aa8833853825497e2ba719",
+     "atTicks": [
+      97,
+      17
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1003,
      "digest": "265c6ed6c90f709c15044d0152f64374e86d4454e975a1fa9af511f3371611a3",
+     "seedlessDigest": "1b196958845b6a9d687b9b5db1bd7a71e17b692f2dbbf8ed7188fe020e1e5a44",
+     "atTicks": [
+      161,
+      58
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1004,
      "digest": "4e655c517be30e624a73a90cde5841a9866359c30df8c22b1217cd2c139fb0d1",
+     "seedlessDigest": "4467f3a1612a91998c838910b7e7a0ff5a551814a7c1a53f7f1ee6487fa3f7c6",
+     "atTicks": [
+      15,
+      117
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1005,
      "digest": "02248cec99fe32e1a1d7ff4b5af789a79321bc1653df48c6b2b3447f6e97967d",
+     "seedlessDigest": "de508b642bd55643c8ff6791dd70df674e991a91c90ffb8f90ff91e158bab3fb",
+     "atTicks": [
+      106,
+      87
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1006,
      "digest": "a926c25162adb44dc9dea5a9364130f8abf421b7e7623d201d86c7ddd2b90f63",
+     "seedlessDigest": "bb57aab7a2785578e80cbe109f0441c29daf5dccf4b21351bb38bce807913629",
+     "atTicks": [
+      161,
+      140
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1007,
      "digest": "62e16430edd1229ef3ab266758d32da2931af40495cfc23cd966dd35116dfa4e",
+     "seedlessDigest": "72ea0a8fa054e326fcd6339cf48d7bbb8fc9a1e3f920cf6cdb7a47100775e5db",
+     "atTicks": [
+      47,
+      32
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1008,
      "digest": "efb9026c88634e0e507f9d515b965b1e4f6aaeb3e9ff9b0999c5a067617b77c1",
+     "seedlessDigest": "b5a4a4b8be5552e9a9346f7f24b9581d264288ee3fe8eb65ea58bd91dbd0b9a2",
+     "atTicks": [
+      19,
+      144
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1009,
      "digest": "91b6ea1584e285520c77822039da004b9a5977e34f4e025d164a6781b38c11e9",
+     "seedlessDigest": "72165db8e6efb1d83224c8ba6ae76253ca6712eb896da6c49229d04979d3ccb0",
+     "atTicks": [
+      31,
+      124
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1010,
      "digest": "14706d95a7841a6f7e104c14142f9d734e067d5058f5e0f26606fb0fcea1dec3",
+     "seedlessDigest": "67c1d0cd5b16bc29fe0f99b4d9569c6a761f21a32491fa2f8afb106d12152f6d",
+     "atTicks": [
+      119,
+      64
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1011,
      "digest": "70f7b031a131485ac30c75e9ecd9776099ffbb321e92cbcb24b676ac8b804313",
+     "seedlessDigest": "6e7602fe8da8e8dd7862527fa09abc9d83f189a2735cdb788526e73108e76c62",
+     "atTicks": [
+      50,
+      200
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1012,
      "digest": "58c449121b2bf08f0515118dfa7c546cd029e56b086a2bf4f94c0f95a6576873",
+     "seedlessDigest": "98237adf0f2f02ce5a817aef2917c01e50aa6b35232a888121ad5b8347688a75",
+     "atTicks": [
+      156,
+      47
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1013,
      "digest": "23b47673503dcd092af39414eab4db847179a65928ce788e255df8e65433128b",
+     "seedlessDigest": "e2ec3fc41d4dc13d0143726a84f943f9e05d061aec348da34f3e2450ad9eff02",
+     "atTicks": [
+      158,
+      174
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1014,
      "digest": "1f9484947460ae0b827a011b1070414312d43aca6beabd2b77a0d0709823cf8f",
+     "seedlessDigest": "13d550d5fa05d6f8010b54cbfd5ca99529e1984c0eded2dd7df8fa5aa5e3b412",
+     "atTicks": [
+      28,
+      163
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1015,
      "digest": "73d1901a8f5697e4bdc8e5d7f48b93aa29df39b807fab108ce1f03fdc9ef2109",
+     "seedlessDigest": "c2e9c585babef205230ca6cc2a87fd7d4fa7f335e626d52952ae556e249272e4",
+     "atTicks": [
+      21,
+      149
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1016,
      "digest": "2464fc857a40ffbded97e53733e5e3863111941363626a7cb96eece6189f1d68",
+     "seedlessDigest": "924e81402d8723dc4bcf46a56cab58384da9b1405a20890b0010fa1e441e371b",
+     "atTicks": [
+      132,
+      23
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1017,
      "digest": "073d068b8aa6835102851a582e8d31927693ecdff5b9eeed452dd36ad937be8c",
+     "seedlessDigest": "3432a3e9fdd646329e68bd383861bb736f58d2e5d1d91f4e2876d11cf914fade",
+     "atTicks": [
+      84,
+      35
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1018,
      "digest": "03c0ec4307e120b90d202e03f538603f3e964c4952163d5ff5cc45a11d9c3694",
+     "seedlessDigest": "ec607bdc44cf8aa2e195801e2de9945e420db8f741ba2445fce5f039ae3015ba",
+     "atTicks": [
+      144,
+      154
+     ],
      "status": "completed",
      "served": "3"
     },
     {
      "seed": 1019,
      "digest": "bbbd09defce153f117a00ba0a28be3796423a515c28e99c4f272ae9ac3363004",
+     "seedlessDigest": "ed8c22c51937552bffa3adf879578f2f3b21c91b960b488b7f09f455da984bed",
+     "atTicks": [
+      78,
+      74
+     ],
      "status": "completed",
      "served": "3"
     }
@@ -1414,6 +3610,10 @@
      "revision": 1,
      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 42,
     "outcome": {
      "status": "completed",
@@ -1437,6 +3637,10 @@
      "revision": 1,
      "hash": "4581308265f7fae8a860dc9bb7ddf584dcc632db416446b1f87fecdd04b799e8"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "completed",
@@ -1460,6 +3664,10 @@
      "revision": 1,
      "hash": "f04ddbae90b79d2a88f84e67329c12c86fc42f3091623a32c8933561000f55be"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "completed",
@@ -1625,6 +3833,10 @@
      "revision": 1,
      "hash": "ba082db82be5c7e2f23085dcacd018f86b5d9150a0f095a55d5175c3962b87dd"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -1662,6 +3874,10 @@
      "revision": 1,
      "hash": "d99b6c8548959e647688a4e70f95721ef8183e175bc131f638621132577030e3"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -1705,6 +3921,10 @@
      "revision": 1,
      "hash": "1f62e04470ef50ae8c466b03f5ed0813abc39df6c2522235ddca48b604ed447c"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "completed",
@@ -1750,6 +3970,10 @@
      "revision": 1,
      "hash": "bb5022e0a5319cdbe99df0676a3b708c36bbb98e59393389dd756d047ee503ee"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -1779,6 +4003,10 @@
      "revision": 1,
      "hash": "ef0b3d953b75d9d4bdb04f95c3880669b473233e9e1fa5538086c4952b54c626"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -1808,6 +4036,10 @@
      "revision": 1,
      "hash": "a39e77c9a54413cb5068e8e931cde033fea09eb1f63d2b744c12ba4bf4525f05"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -1837,6 +4069,10 @@
      "revision": 1,
      "hash": "df67cf7d4c300293449548427adb1b2f268cbf27dda3a3cb5d491a00c3cf828a"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -1866,6 +4102,10 @@
      "revision": 1,
      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 5,
     "outcome": {
      "status": "cancelled",
@@ -1889,6 +4129,10 @@
      "revision": 1,
      "hash": "532ac5b0f7ca1e968f2715d2f5382b18e4e2a2a2d12b742c82af34c7b0f798f1"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 3,
     "outcome": {
      "status": "completed",
@@ -1912,6 +4156,10 @@
      "revision": 1,
      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 2,
     "outcome": {
      "status": "needs_attention",
@@ -1949,6 +4197,10 @@
      "revision": 1,
      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 2,
     "outcome": {
      "status": "needs_attention",
@@ -1986,6 +4238,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 42,
     "outcome": {
      "status": "completed",
@@ -2052,6 +4310,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -2130,6 +4394,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "running",
@@ -2342,6 +4612,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -2421,6 +4697,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -2499,6 +4781,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -2571,12 +4859,90 @@
      "minSeparationM": 0.3930294850975074
     }
    },
+   "BV03-contention": {
+    "scenario": {
+     "id": "BV01",
+     "revision": 1,
+     "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+    },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
+    "seed": 7,
+    "outcome": {
+     "status": "completed",
+     "served": "2"
+    },
+    "digest": "1333d16d988b17642b35a3b36f6d13cea675b83decc6b5ad505c0098455c6dd4",
+    "attention": [],
+    "faults": [],
+    "rejectedObservations": [
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#2",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 11
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#3",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 36
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#4",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 61
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#5",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 86
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#6",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 111
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#7",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 136
+     }
+    ],
+    "reconciliations": [],
+    "holds": [],
+    "collision": {
+     "available": true,
+     "contacts": 0,
+     "minSeparationM": 0.3930294850975074
+    }
+   },
    "BV04-dose-low": {
     "scenario": {
      "id": "BV01",
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -2656,6 +5022,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -2735,6 +5107,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -2813,6 +5191,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 3,
     "outcome": {
      "status": "completed",
@@ -2890,6 +5274,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 3,
     "outcome": {
      "status": "needs_attention",
@@ -2968,6 +5358,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -3047,6 +5443,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "running",
@@ -3119,6 +5521,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "needs_attention",
@@ -3191,6 +5599,12 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 2,
     "outcome": {
      "status": "needs_attention",
@@ -3269,16 +5683,22 @@
      "revision": 1,
      "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
     },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
     "seed": 1,
     "outcome": {
      "status": "completed",
      "served": "2"
     },
-    "digest": "4850ad7c4e4158a2406e7949a807adb99734f13c7c6c9c444070af08cb4d7b4f",
+    "digest": "b055d6e3c4836318c00f539f62c9183987deee4f8968c307215f3374438ff78e",
     "attention": [],
     "faults": [
      {
-      "tick": 200,
+      "tick": 162,
       "faultId": "machine-not-ready",
       "entityId": "coffee-1"
      }
@@ -3335,12 +5755,43 @@
      "minSeparationM": 0.3930294850975074
     }
    },
+   "SYS01": {
+    "scenario": {
+     "id": "FD01",
+     "revision": 1,
+     "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+    },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
+    "seed": 9,
+    "outcome": {
+     "status": "completed",
+     "served": "1"
+    },
+    "digest": "2fbf00d6e6d6c8a22d31f4fcb467ee2d0a86d7f55183e97c2798acd9dbf0c2c3",
+    "attention": [],
+    "faults": [],
+    "rejectedObservations": [],
+    "reconciliations": [],
+    "holds": [],
+    "collision": {
+     "available": true,
+     "contacts": 0,
+     "minSeparationM": 0.01802948509750718
+    }
+   },
    "SYS02": {
     "scenario": {
      "id": "FD01",
      "revision": 1,
      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 42,
     "outcome": {
      "status": "needs_attention",
@@ -3375,6 +5826,10 @@
      "revision": 1,
      "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
     },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
     "seed": 4,
     "outcome": {
      "status": "completed",
@@ -3401,14 +5856,14 @@
     ],
     "rejectedObservations": [
      {
-      "eventId": "838ba889-c859-4a9a-ad4b-ced254b07c9b-5",
+      "eventId": "f20a9d8a-b271-444c-b9f9-6b1dc48ef780-5",
       "commandId": "robot-command-b89f9563bb8198e188c22d7861f22993",
       "type": "completed",
       "code": "STALE_ROBOT_EVENT",
       "tick": 880
      },
      {
-      "eventId": "838ba889-c859-4a9a-ad4b-ced254b07c9b-9",
+      "eventId": "f20a9d8a-b271-444c-b9f9-6b1dc48ef780-9",
       "commandId": "robot-command-32110e69affbb968b44c93f7dd3e8bd1",
       "type": "completed",
       "code": "STOP_NOT_FOUND",
@@ -3422,8 +5877,854 @@
      "contacts": 0,
      "minSeparationM": 0.01802948509750718
     }
+   },
+   "SYS05": {
+    "scenario": {
+     "id": "FD01",
+     "revision": 1,
+     "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+    },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
+    "seed": 6,
+    "outcome": {
+     "status": "running",
+     "served": "0"
+    },
+    "digest": "62437840e4ab1af2fc398a7675219e9dcf9bef43903efbcbcbc2309c9c98b664",
+    "attention": [],
+    "faults": [],
+    "rejectedObservations": [],
+    "reconciliations": [],
+    "holds": [],
+    "collision": {
+     "available": true,
+     "contacts": 0,
+     "minSeparationM": null
+    }
+   },
+   "SYS06-created": {
+    "scenario": {
+     "id": "BV01",
+     "revision": 1,
+     "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+    },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
+    "seed": 42,
+    "outcome": {
+     "status": "ready",
+     "served": "0"
+    },
+    "digest": "1e35220de1f73d5571ab11c7820dd41439ab4de31c6db05f6d7d7921c99e4d9a",
+    "attention": [],
+    "faults": [],
+    "rejectedObservations": [],
+    "reconciliations": [],
+    "holds": [],
+    "collision": {
+     "available": true,
+     "contacts": 0,
+     "minSeparationM": null
+    }
+   },
+   "QA-06": {
+    "scenario": {
+     "id": "BV01",
+     "revision": 1,
+     "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+    },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
+    "seed": 42,
+    "outcome": {
+     "status": "completed",
+     "served": "2"
+    },
+    "digest": "10e86d30fbb5f0d2cc476b126d76c323b80d00e834b84e9f8198356c0664292c",
+    "attention": [],
+    "faults": [],
+    "rejectedObservations": [
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#2",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 11
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#3",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 36
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#4",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 61
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#5",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 86
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#6",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 111
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#7",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 136
+     }
+    ],
+    "reconciliations": [],
+    "holds": [],
+    "collision": {
+     "available": true,
+     "contacts": 0,
+     "minSeparationM": 0.3930294850975074
+    }
+   },
+   "FD01-seed-1000": {
+    "scenario": {
+     "id": "FD01",
+     "revision": 1,
+     "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+    },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
+    "seed": 1000,
+    "outcome": {
+     "status": "completed",
+     "served": "1"
+    },
+    "digest": "b3f4cb446324bcec5aa9f608fab02e34b09b95bdad97ef07988f38d1c23d6890",
+    "attention": [],
+    "faults": [],
+    "rejectedObservations": [],
+    "reconciliations": [],
+    "holds": [],
+    "collision": {
+     "available": true,
+     "contacts": 0,
+     "minSeparationM": 0.01802948509750718
+    }
+   },
+   "FD02-seed-1000": {
+    "scenario": {
+     "id": "FD02",
+     "revision": 1,
+     "hash": "4581308265f7fae8a860dc9bb7ddf584dcc632db416446b1f87fecdd04b799e8"
+    },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
+    "seed": 1000,
+    "outcome": {
+     "status": "completed",
+     "served": "3"
+    },
+    "digest": "adbc6d529e1a61afb22087c1fbe6fb38187c967fb5584907abffdfdbd7ba620c",
+    "attention": [],
+    "faults": [],
+    "rejectedObservations": [],
+    "reconciliations": [],
+    "holds": [],
+    "collision": {
+     "available": true,
+     "contacts": 0,
+     "minSeparationM": 0.01802948509750718
+    }
+   },
+   "FD07@77": {
+    "scenario": {
+     "id": "FD07",
+     "revision": 1,
+     "hash": "532ac5b0f7ca1e968f2715d2f5382b18e4e2a2a2d12b742c82af34c7b0f798f1"
+    },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
+    "seed": 77,
+    "outcome": {
+     "status": "completed",
+     "served": "2"
+    },
+    "digest": "b31f1ab0349726c7cf922d1bfd03a936061c8fa0affb74ddfe1042df7d176419",
+    "attention": [],
+    "faults": [],
+    "rejectedObservations": [],
+    "reconciliations": [],
+    "holds": [],
+    "collision": {
+     "available": true,
+     "contacts": 0,
+     "minSeparationM": 0.01802948509750718
+    }
+   },
+   "BV01@77": {
+    "scenario": {
+     "id": "BV01",
+     "revision": 1,
+     "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+    },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
+    "seed": 77,
+    "outcome": {
+     "status": "completed",
+     "served": "2"
+    },
+    "digest": "006a6c8288bfc53da7e1fe39b54e274ffa8a5a7fa526957b2e707d861c421a3c",
+    "attention": [],
+    "faults": [],
+    "rejectedObservations": [
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#2",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 11
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#3",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 36
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#4",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 61
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#5",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 86
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#6",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 111
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#7",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 136
+     }
+    ],
+    "reconciliations": [],
+    "holds": [],
+    "collision": {
+     "available": true,
+     "contacts": 0,
+     "minSeparationM": 0.3930294850975074
+    }
+   },
+   "FD03@77": {
+    "scenario": {
+     "id": "FD03",
+     "revision": 1,
+     "hash": "f04ddbae90b79d2a88f84e67329c12c86fc42f3091623a32c8933561000f55be"
+    },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
+    "seed": 77,
+    "outcome": {
+     "status": "completed",
+     "served": "1"
+    },
+    "digest": "13afb2fe109d8a6b79ce048d45667e74e6d82daf31ad4a650cca44e4a9db95d0",
+    "attention": [],
+    "faults": [
+     {
+      "tick": 375,
+      "faultId": "obstacle:person-0:on",
+      "entityId": null
+     },
+     {
+      "tick": 390,
+      "faultId": "obstacle:person-0:off",
+      "entityId": null
+     },
+     {
+      "tick": 390,
+      "faultId": "obstacle:person-1:on",
+      "entityId": null
+     },
+     {
+      "tick": 405,
+      "faultId": "obstacle:person-1:off",
+      "entityId": null
+     },
+     {
+      "tick": 405,
+      "faultId": "obstacle:person-2:on",
+      "entityId": null
+     },
+     {
+      "tick": 420,
+      "faultId": "obstacle:person-2:off",
+      "entityId": null
+     },
+     {
+      "tick": 420,
+      "faultId": "obstacle:person-3:on",
+      "entityId": null
+     },
+     {
+      "tick": 435,
+      "faultId": "obstacle:person-3:off",
+      "entityId": null
+     },
+     {
+      "tick": 435,
+      "faultId": "obstacle:person-4:on",
+      "entityId": null
+     },
+     {
+      "tick": 450,
+      "faultId": "obstacle:person-4:off",
+      "entityId": null
+     },
+     {
+      "tick": 450,
+      "faultId": "obstacle:person-5:on",
+      "entityId": null
+     },
+     {
+      "tick": 465,
+      "faultId": "obstacle:person-5:off",
+      "entityId": null
+     },
+     {
+      "tick": 465,
+      "faultId": "obstacle:person-6:on",
+      "entityId": null
+     },
+     {
+      "tick": 480,
+      "faultId": "obstacle:person-6:off",
+      "entityId": null
+     },
+     {
+      "tick": 480,
+      "faultId": "obstacle:person-7:on",
+      "entityId": null
+     },
+     {
+      "tick": 495,
+      "faultId": "obstacle:person-7:off",
+      "entityId": null
+     },
+     {
+      "tick": 495,
+      "faultId": "obstacle:person-8:on",
+      "entityId": null
+     },
+     {
+      "tick": 510,
+      "faultId": "obstacle:person-8:off",
+      "entityId": null
+     },
+     {
+      "tick": 510,
+      "faultId": "obstacle:person-9:on",
+      "entityId": null
+     },
+     {
+      "tick": 525,
+      "faultId": "obstacle:person-9:off",
+      "entityId": null
+     },
+     {
+      "tick": 525,
+      "faultId": "obstacle:person-10:on",
+      "entityId": null
+     },
+     {
+      "tick": 540,
+      "faultId": "obstacle:person-10:off",
+      "entityId": null
+     },
+     {
+      "tick": 540,
+      "faultId": "obstacle:person-11:on",
+      "entityId": null
+     },
+     {
+      "tick": 555,
+      "faultId": "obstacle:person-11:off",
+      "entityId": null
+     }
+    ],
+    "rejectedObservations": [],
+    "reconciliations": [],
+    "holds": [
+     {
+      "at": "2026-11-01T00:00:08.600Z",
+      "robotId": "amr-1",
+      "hold": "PATH_BLOCKED"
+     },
+     {
+      "at": "2026-11-01T00:00:09.320Z",
+      "robotId": "amr-1",
+      "hold": null
+     },
+     {
+      "at": "2026-11-01T00:00:09.400Z",
+      "robotId": "amr-1",
+      "hold": "PATH_BLOCKED"
+     },
+     {
+      "at": "2026-11-01T00:00:09.620Z",
+      "robotId": "amr-1",
+      "hold": null
+     }
+    ],
+    "collision": {
+     "available": true,
+     "contacts": 0,
+     "minSeparationM": 0.005998727883860522
+    }
+   },
+   "FD04-reopen@77": {
+    "scenario": {
+     "id": "FD04-reopen",
+     "revision": 1,
+     "hash": "1f62e04470ef50ae8c466b03f5ed0813abc39df6c2522235ddca48b604ed447c"
+    },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
+    "seed": 77,
+    "outcome": {
+     "status": "completed",
+     "served": "1"
+    },
+    "digest": "c61f5019474e87982afd030fd95398b7f964f5bc46c6b1f6faf35c9209293b13",
+    "attention": [],
+    "faults": [
+     {
+      "tick": 400,
+      "faultId": "obstacle:lane-closed:on",
+      "entityId": null
+     },
+     {
+      "tick": 590,
+      "faultId": "obstacle:lane-closed:off",
+      "entityId": null
+     }
+    ],
+    "rejectedObservations": [],
+    "reconciliations": [],
+    "holds": [
+     {
+      "at": "2026-11-01T00:00:11.480Z",
+      "robotId": "amr-a",
+      "hold": "PATH_BLOCKED"
+     },
+     {
+      "at": "2026-11-01T00:00:11.820Z",
+      "robotId": "amr-a",
+      "hold": null
+     }
+    ],
+    "collision": {
+     "available": true,
+     "contacts": 0,
+     "minSeparationM": 0.007797104720415338
+    }
+   },
+   "Timing-BV01@11": {
+    "scenario": {
+     "id": "BV01",
+     "revision": 1,
+     "hash": "4bee2981b8992bd1426ce0013c50650cc165dd863761af321c8f5cf506d29412"
+    },
+    "backendSetId": "mock-default",
+    "backends": [
+     "mock_amr@1/mock_kinematic",
+     "mock_coffee@1/mock_process",
+     "mock_arm@1/mock_kinematic"
+    ],
+    "seed": 11,
+    "outcome": {
+     "status": "completed",
+     "served": "2"
+    },
+    "digest": "d9266c5757e93573450c7ad5629864029ea07cdaee66dcf42012a82569a79d4b",
+    "attention": [],
+    "faults": [],
+    "rejectedObservations": [
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#2",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 11
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#3",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 36
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#4",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 61
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#5",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 86
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#6",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 111
+     },
+     {
+      "eventId": "coffee-1:cup#boot-0:cup_sensor#7",
+      "commandId": "",
+      "type": "cup",
+      "code": "MACHINE_NOT_READY",
+      "tick": 136
+     }
+    ],
+    "reconciliations": [],
+    "holds": [],
+    "collision": {
+     "available": true,
+     "contacts": 0,
+     "minSeparationM": 0.3930294850975074
+    }
+   },
+   "Timing-FD01@11": {
+    "scenario": {
+     "id": "FD01",
+     "revision": 1,
+     "hash": "602d9e643cff7b70457aef44050b674c6c01053d9ec937a07add2521823fa875"
+    },
+    "backendSetId": "mock-amr",
+    "backends": [
+     "mock_amr@1/mock_kinematic"
+    ],
+    "seed": 11,
+    "outcome": {
+     "status": "completed",
+     "served": "1"
+    },
+    "digest": "40862969c6efe7683cad2de5a9359e39c7ff0fdad189bdc4429ef9c6264197e1",
+    "attention": [],
+    "faults": [],
+    "rejectedObservations": [],
+    "reconciliations": [],
+    "holds": [],
+    "collision": {
+     "available": true,
+     "contacts": 0,
+     "minSeparationM": 0.01802948509750718
+    }
    }
   },
+  "traceByCheck": {
+   "FD01 runner: arrival from observations, three legs, served only after handoff, parked not charged": [
+    "FD01"
+   ],
+   "FD02 runner: one batched mission for two tables; confirming table A hands off only A, B stays loaded for its own stop": [
+    "FD02"
+   ],
+   "FD03 runner: a scheduled pedestrian crosses the route; the robot waits/replans in the model, no contact, resumes with a recorded cause": [
+    "FD03"
+   ],
+   "FD04 runner: chair on the destination: no false arrival, rejected with UNREACHABLE, nothing served": [
+    "FD04"
+   ],
+   "FD04 runner: lane closed while travelling: hold, then NO_PATH attention; never arrives, no contact, no teleport": [
+    "FD04-blocked"
+   ],
+   "FD04 runner: lane reopened inside the hold window: the robot resumes by policy (hold then clear) and delivers": [
+    "FD04-reopen"
+   ],
+   "FD05-payload runner: refused before any native start with OVERLOADED; no robot command, nothing served": [
+    "FD05-payload"
+   ],
+   "FD05-battery runner: refused before any native start with BATTERY_LOW; no robot command, nothing served": [
+    "FD05-battery"
+   ],
+   "FD05-capability runner: refused before any native start with CAPABILITY_UNSUPPORTED; no robot command, nothing served": [
+    "FD05-capability"
+   ],
+   "FD05-binding runner: refused before any native start with TARGET_UNBOUND; no robot command, nothing served": [
+    "FD05-binding"
+   ],
+   "FD06 runner: cancel while the robot holds the dish: return stop, staff confirms the return, cargo returned, never delivered": [
+    "FD06"
+   ],
+   "FD07 runner: two robots, one narrow corridor: one owner at a time, no undetected deadlock, both deliver": [
+    "FD07"
+   ],
+   "FD08 runner: localization lost before arrival: goal unknown, attention, last pose stale, no arrival": [
+    "FD08-localization"
+   ],
+   "FD08 runner: map revision changes at a stop: the next leg is refused (MAP_MISMATCH) by the adapter, pose stale, nothing served": [
+    "FD08-map"
+   ],
+   "BV01 runner: both recipes run their own step order; espresso has no ice/milk; one cup owner; served only after the final handoff": [
+    "BV01"
+   ],
+   "BV02 runner: cup removed mid-brew: step fails CUP_REMOVED, job held, the drink never becomes ready": [
+    "BV02-removed"
+   ],
+   "BV02 runner: no cup under the nozzle before start: the job never starts and no brew command is issued": [
+    "BV02-nocup"
+   ],
+   "BV03 runner: milk runs out: espresso still served, iced milk coffee held with its reason; consumed beans/ice kept, no blind retry": [
+    "BV03-milk"
+   ],
+   "BV03 runner: ice dispenser jammed before its step: the dispense is refused, the step times out on the recipe clock, job held, never resent": [
+    "BV03-ice-before"
+   ],
+   "BV03 runner: ice dispenser jams mid-dispense: the partial amount is measured and kept, the job is held, no second ice command": [
+    "BV03-ice-mid"
+   ],
+   "BV03 runner: two orders contend for one machine and arm: brews never overlap, the robot gets the cup only once docked": [
+    "BV03-contention"
+   ],
+   "BV04 runner: dose-low: the drink is not ready; requested, observed and accepted stay separate (QUALITY_REJECTED)": [
+    "BV04-dose-low"
+   ],
+   "BV04 runner: measure-unknown: the drink is not ready; requested, observed and accepted stay separate (QUALITY_REJECTED)": [
+    "BV04-measure-unknown"
+   ],
+   "BV04 runner: measure-missing: the drink is not ready; requested, observed and accepted stay separate (MEASUREMENT_MISSING)": [
+    "BV04-measure-missing"
+   ],
+   "BV05 runner: lost ACK, duplicate completion and a reboot mid-brew: one effect each, unknown is held, no second brew, cup kept": [
+    "BV05-ack-dup",
+    "BV05-reboot"
+   ],
+   "BV07 runner: arm drops the cup during pick: transfer fails, the cup is never on the robot, the robot is not released from the load stop": [
+    "BV07-drop"
+   ],
+   "BV07 runner: robot docked out of tolerance: no tray transfer, the cup stays with the arm, the robot is held at the load stop": [
+    "BV07-dock"
+   ],
+   "BV07 runner: cancel mid-cycle: the job is cancelled or held with a reason and disposition, nothing is delivered": [
+    "BV07-cancel"
+   ],
+   "ARM06 runner: arm reboot after an accepted pick: transfer outcome unknown, cup keeps its last owner, the program is not resent": [
+    "ARM06"
+   ],
+   "BV08 runner: machine not ready between StartJob and the brew step: the step waits visibly with MACHINE_NOT_READY (no latch) and opens only once readiness returns": [
+    "BV08"
+   ],
+   "SYS01 runner: step granularity, pauses and interleaved reads never change the canonical outcome": [
+    "SYS01"
+   ],
+   "SYS02 runner: executor crash after a committed accept: reopen holds unknown, keeps cargo/owner, never resends": [
+    "SYS02"
+   ],
+   "SYS03 runner: duplicate and stale retained completions are absorbed or rejected; no terminal state revived, served once": [
+    "SYS03"
+   ],
+   "SYS05 runner: reading the report and journal repeatedly is read-only (journal, effects and revision unchanged)": [
+    "SYS05"
+   ],
+   "SYS06 gateway: missing/wrong backend or identity is blocked with a reason, never a fallback; a run cannot change mode": [
+    "SYS06-created"
+   ],
+   "QA-06 transport deny: a full coffee run through the gateway opens no robot/cell socket, process or datagram; hardware sets stay denied": [
+    "QA-06"
+   ],
+   "QA-03 stochastic: FD01 and FD02 over 20 fixed seeds hold every invariant; each seed repeats to the same digest 3 times": [
+    "FD01-seed-1000",
+    "FD02-seed-1000"
+   ],
+   "QA-03 deterministic scenarios: FD07, BV01, FD03, FD04-reopen repeat 3 times to one digest (seed is provenance only)": [
+    "FD07@77",
+    "BV01@77",
+    "FD03@77",
+    "FD04-reopen@77"
+   ],
+   "Timing: two runs compare wait/travel/brew/transfer and interventions against thresholds fixed before the run": [
+    "Timing-BV01@11",
+    "Timing-FD01@11"
+   ]
+  },
+  "gateway": [
+   {
+    "request": {
+     "mode": "simulation",
+     "backendSetId": "simulation-default"
+    },
+    "expected": {
+     "status": 422,
+     "code": "BACKEND_NOT_INSTALLED"
+    },
+    "actual": {
+     "status": 422,
+     "body": {
+      "error": "BACKEND_UNAVAILABLE",
+      "reasonCodes": [
+       "BACKEND_NOT_INSTALLED",
+       "BACKEND_INCOMPATIBLE",
+       "BACKEND_UNREACHABLE"
+      ]
+     }
+    }
+   },
+   {
+    "request": {
+     "mode": "hardware",
+     "access": "live",
+     "backendSetId": "hardware-live"
+    },
+    "expected": {
+     "status": 403,
+     "code": "ACCESS_NOT_GRANTED"
+    },
+    "actual": {
+     "status": 403,
+     "body": {
+      "error": "CAPABILITY_DENIED",
+      "reasonCodes": [
+       "ACCESS_NOT_GRANTED"
+      ]
+     }
+    }
+   },
+   {
+    "request": {
+     "mode": "hardware",
+     "access": "hil",
+     "backendSetId": "hardware-hil"
+    },
+    "expected": {
+     "status": 403,
+     "code": "ACCESS_NOT_GRANTED"
+    },
+    "actual": {
+     "status": 403,
+     "body": {
+      "error": "CAPABILITY_DENIED",
+      "reasonCodes": [
+       "ACCESS_NOT_GRANTED"
+      ]
+     }
+    }
+   },
+   {
+    "request": {
+     "mode": "hardware",
+     "access": "shadow",
+     "backendSetId": "hardware-shadow"
+    },
+    "expected": {
+     "status": 422,
+     "code": "BACKEND"
+    },
+    "actual": {
+     "status": 422,
+     "body": {
+      "error": "BACKEND_UNAVAILABLE",
+      "reasonCodes": [
+       "BACKEND_NOT_INSTALLED",
+       "BACKEND_INCOMPATIBLE",
+       "BACKEND_UNREACHABLE",
+       "BACKEND_NOT_COMMISSIONED"
+      ]
+     }
+    }
+   },
+   {
+    "request": {
+     "runtimeIdentity": {
+      "sourceCommit": "other",
+      "schemaHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+     }
+    },
+    "expected": {
+     "status": 409,
+     "code": "CONTRACT_MISMATCH"
+    },
+    "actual": {
+     "status": 409,
+     "body": {
+      "error": "CONTRACT_MISMATCH",
+      "reasonCodes": [
+       "CONTRACT_MISMATCH"
+      ]
+     }
+    }
+   },
+   {
+    "request": {
+     "backendSetId": "mock-amr"
+    },
+    "expected": {
+     "status": 422,
+     "code": "SCENARIO_BACKEND_MISSING"
+    },
+    "actual": {
+     "status": 422,
+     "body": {
+      "error": "SCENARIO_BACKEND_MISSING",
+      "reasonCodes": []
+     }
+    }
+   }
+  ],
   "timing": {
    "thresholds": {
     "sameInputDeltaMs": 0,
@@ -3441,7 +6742,7 @@
    },
    "runs": {
     "BV01@11#1": {
-     "wallMs": 1446,
+     "wallMs": 1404,
      "travelMs": [
       4560,
       5660,
@@ -3475,7 +6776,7 @@
      }
     },
     "BV01@11#2": {
-     "wallMs": 1459,
+     "wallMs": 1405,
      "travelMs": [
       4560,
       5660,
@@ -3509,7 +6810,7 @@
      }
     },
     "FD01@11": {
-     "wallMs": 65,
+     "wallMs": 68,
      "travelMs": [
       11640,
       14000,
@@ -3530,7 +6831,7 @@
      }
     },
     "FD01@12": {
-     "wallMs": 60,
+     "wallMs": 57,
      "travelMs": [
       11640,
       14000,

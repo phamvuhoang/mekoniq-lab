@@ -34,12 +34,12 @@ Chỉ ghi bằng chứng đã chạy thật. Ba trạng thái tách riêng: **im
 | Hạng mục | Implemented | Tested | Accepted |
 |---|---|---|---|
 | F01–F07: contracts v2, models asset/frame/arm, scenario runtime, coffee domain + mock cell/arm, twin UI, SSE/replay/compare, launcher + pin | có (source `feat/lab-digital-twin-v2`, lab `feat/robot-lab`) | có. Từng task có report, review đạt | không |
-| F08: R-MOCK acceptance | có. Source `79d801e` thêm scenarios FD02–FD05, faults và coffee cancel; `76960de` thêm acceptance test. Lab pin `519f893` (artifact `70197e40…cbe4`, protocol 1/2) | có. Acceptance 40/40; 102 dòng coverage gồm 77 pass, 16 NOT_IMPLEMENTED, 4 UNSUPPORTED_FIDELITY, 4 NEEDS_HUMAN, 1 BLOCKED_EXTERNAL. Regression source/Lab và cả bốn bộ browser đều xanh | **không** |
-| R-MOCK | đủ phần software trong phạm vi mock | trên host này (M2 Pro, macOS 26.5, Node 24.22.2) | **không**: cần owner review bằng chứng, và các mục NEEDS_HUMAN còn mở (usability với ≥5 người mới, fresh macOS profile, network-off, cold boot) |
+| F08: R-MOCK acceptance | **một phần**. Source `79d801e` và `76960de`, rồi fix round 1 `6477409` và `a741e01`. Lab pin `993758c` (artifact `010f5c65…2606`, protocol 1/2) | có. Acceptance 41/41; 105 dòng coverage gồm 78 pass, 18 NOT_IMPLEMENTED, 4 UNSUPPORTED_FIDELITY, 4 NEEDS_HUMAN, 1 BLOCKED_EXTERNAL. Regression source/Lab và cả bốn bộ browser đều xanh, kết quả máy đọc nằm trong `regression/manifest.json` (có sha256) | **không** |
+| R-MOCK | **một phần (partial)**: còn các dòng mock-capable chưa hiện thực, là blocker của G-MOCK nếu owner không miễn. Gồm BV02/BV06 capacity, BV04 outlier, BV07 pickup timeout, BV08 milk policy, FD02 cups, campaign food+coffee, SYS01 render, SYS02 reclaim, SYS03 reorder, QA-02b, QA-09b, UX-05 reset/speed, UX-18 speed, ARM05, offline bundle, UI perf p95 | trên host này (M2 Pro, macOS 26.5, Node 24.22.2) | **không**: cần hiện thực hoặc owner miễn các blocker trên, owner review bằng chứng, và đóng các mục NEEDS_HUMAN (usability với ≥5 người mới, fresh macOS profile, network-off, cold boot) |
 | R-SIM, G-SIM-* | chưa bắt đầu (plan 02/03) | không | `blocked_external`: cần Linux, Gazebo/Nav2 và LinuxCNC |
 | G-HW-READY / G-HW-ACCEPT / G-VENUE | chưa bắt đầu | không | `blocked_external`: chưa có thiết bị |
 
-- Bằng chứng: [mock-report](evidence/digital-twin-v2/mock-report.md) và [F08-mock-acceptance.json](evidence/digital-twin-v2/F08-mock-acceptance.json). Bản freeze cho plan 02/03: [simulation-compatibility.json](../../config/simulation-compatibility.json).
+- Bằng chứng: [mock-report](evidence/digital-twin-v2/mock-report.md), [F08-mock-acceptance.json](evidence/digital-twin-v2/F08-mock-acceptance.json) và [regression/manifest.json](evidence/digital-twin-v2/regression/manifest.json). Bản freeze cho plan 02/03: [simulation-compatibility.json](../../config/simulation-compatibility.json).
 - Chưa đo: p95 frame-time của UI; mục tiêu usability 3/5/2 phút; fresh macOS/Linux profile; network-off; offline bundle; cold boot.
 - Giới hạn chính:
   - Mock không chứng minh motion control, physics, sensing hay hardware.
@@ -66,7 +66,7 @@ Chỉ ghi bằng chứng đã chạy thật. Ba trạng thái tách riêng: **im
 ## Vị trí bàn giao
 
 - App: thư mục `lab/`, branch `feat/robot-lab`.
-- Runtime source: `source/packages/lab-runtime/`, branch `feat/lab-digital-twin-v2`; artifact pin commit `76960de6f34a8aed544e283edfc65404193a77cd` (pin cũ `2be6d15` giữ trong `.runtime/rollback.lock.json`). Giá trị máy đọc nằm trong [runtime lock](../../config/source-runtime.lock.json).
+- Runtime source: `source/packages/lab-runtime/`, branch `feat/lab-digital-twin-v2`; artifact pin commit `a741e019fd2b3a909b6241f88d3d306d5b892312` (pin trước `76960de` giữ trong `.runtime/rollback.lock.json`). Giá trị máy đọc nằm trong [runtime lock](../../config/source-runtime.lock.json).
 - Worktree source riêng và worktree Lab tạm đã xóa; mỗi repository chỉ còn checkout chính. Journal/ghi chú local cũ được giữ trong `lab/runs/worktree-archive-2026-11-02/` (ignored).
 - Fixture map binding và danh tính observer W06 vẫn tương thích W11; lần cập nhật này không cần sửa logic runtime hoặc nới kiểm tra production.
 - Lab đã cài artifact local trong `.runtime/`; chạy `pnpm check:source` để kiểm. Không cần đọc worktree source để chạy artifact đã cài.

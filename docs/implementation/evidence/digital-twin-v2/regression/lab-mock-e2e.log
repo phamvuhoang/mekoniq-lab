@@ -1,0 +1,30 @@
+Mekoniq Robot Lab — mock twin (simulated; no robot hardware)
+Source a741e019fd2b3a909b6241f88d3d306d5b892312 · artifact 010f5c659b18 · protocol 1/2
+Backends: mock_amr, mock_coffee, mock_arm · journal <tmp>
+Owned processes: runtime pid 23902, UI pid 23903
+Open http://127.0.0.1:4175 and enter this one-use pairing code (expires in 5 minutes): <redacted>
+Ready in 451 ms. Press Ctrl-C to stop.
+Running twin-recovery.spec.ts through pnpm lab:mock with a fresh journal.
+
+Running 1 test using 1 worker
+
+  ✓  1 tests/e2e/twin-recovery.spec.ts:16:1 › telemetry stream, stale/frozen states, reconnect, read-only replay, compare, export and a lost session (10.4s)
+
+  1 passed (11.2s)
+
+Stopping the runtime and UI this launcher started…
+Mekoniq Robot Lab — mock twin (simulated; no robot hardware)
+Source a741e019fd2b3a909b6241f88d3d306d5b892312 · artifact 010f5c659b18 · protocol 1/2
+Backends: mock_amr, mock_coffee, mock_arm · journal <tmp>
+Owned processes: runtime pid 23937, UI pid 23944
+Open http://127.0.0.1:4175 and enter this one-use pairing code (expires in 5 minutes): <redacted>
+Ready in 453 ms. Press Ctrl-C to stop.
+Running coffee-journey.spec.ts through pnpm lab:mock with a fresh journal.
+
+Running 1 test using 1 worker
+
+  ✓  1 tests/e2e/coffee-journey.spec.ts:6:1 › missing cup: visible reason and entity, confirmed reconcile, corrected run completes (4.3s)
+
+  1 passed (5.8s)
+
+Stopping the runtime and UI this launcher started…
