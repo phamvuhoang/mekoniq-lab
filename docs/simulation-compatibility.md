@@ -50,6 +50,15 @@ Updated 2026-11-05 for Plan 02. Source `0101d6cfd0fa876eee235077bd591b313c05be37
 - **Evidence.** `LabEvidenceV2` records separate a business record (journal-backed invariants, evaluated in every mode) from a physics record that stays `not_run` without a real SIL worker and an arm-closed-loop record that stays `not_run` while the coupling is open-loop. Modelled quantities never carry `measured` provenance; cup movements must trace to a command or evidence id.
 - **This host.** Every `lab-sil.mjs` command on the recorded macOS host is `not_run` (see [plan02-simulation.md](implementation/evidence/digital-twin-v2/plan02-simulation.md)); physics contacts, separation, physical stop, sensor evidence and plant telemetry remain unverified.
 
+## Plan 03 arm controller
+
+Source `14d62c4` adds `integrations/arm-controller` (model pin, LinuxCNC simulation profile, bridge/arbiter, QtVCP HMI, export/trust chain) and
+the LinuxCNC adapter + arm session in `lab-runtime`. The Lab pins the new artifact (schema hash `8b398544…`, 29 schemas: `arm-command`,
+`arm-observation` added; v1/v2 schemas unchanged) and reads the arm as `controller_sim` samples when the backend exists. On this host the
+`linuxcnc_sim` backend stays `installed:false`; `lab-sil.mjs doctor --backend linuxcnc_sim` records what is missing. The arm controller
+artifact is exported unsigned for the record only and is refused by its own installer; the trust policy ships no key. Evidence:
+`docs/implementation/evidence/digital-twin-v2/plan03-arm-hardware.md`; hashes in `config/simulation-compatibility.json` (`armController`).
+
 ## Distribution and external gates
 
 The [offline build instructions](../README.md) are in the README section **Gói offline có sẵn Node**. `node scripts/build-offline.mjs --out <new-directory>` packages compiled UI dependencies, pinned runtime/schemas, the build host's Node, licenses and an integrity manifest. Run `./start` using its vendored Node. Build separately for each target OS/architecture; the runtime's allowed UI origin stays `http://127.0.0.1:4175`.

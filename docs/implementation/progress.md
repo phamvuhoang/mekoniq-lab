@@ -1,8 +1,24 @@
 # Robot Lab — tiến độ thực hiện
 
-Cập nhật: **2026-11-05, sau Plan 02 (phần mềm mô phỏng, chưa có SIL run)**; đoạn dưới giữ nguyên trạng thái sau remediation Plan 01. Phần mềm mock của F01–F08, R01–R12 và 18 khoảng trống phần mềm trước đây đã được hiện thực và kiểm thử trên các revision dưới đây. Recorder hoàn tất 21 lệnh, tất cả exit 0, không thiếu kết quả; acceptance suite đạt 41/41. **R-MOCK chưa accepted**: Plans 02/03 và các gate con người, Linux, thiết bị vẫn mở.
+Cập nhật: **2026-11-06, sau Plan 03 (arm controller, chưa có controller run)** và 2026-11-05 sau Plan 02 (phần mềm mô phỏng, chưa có SIL run); đoạn dưới giữ nguyên trạng thái sau remediation Plan 01. Phần mềm mock của F01–F08, R01–R12 và 18 khoảng trống phần mềm trước đây đã được hiện thực và kiểm thử trên các revision dưới đây. Recorder hoàn tất 21 lệnh, tất cả exit 0, không thiếu kết quả; acceptance suite đạt 41/41. **R-MOCK chưa accepted**: Plans 02/03 và các gate con người, Linux, thiết bị vẫn mở.
 
 `Implemented` nghĩa là có code; `tested` cần kết quả chạy gắn đúng revision; `accepted` cần owner duyệt bằng chứng. Không dùng một trạng thái thay cho trạng thái khác.
+
+## Plan 03 — arm controller và hardware gates (2026-11-05/06)
+
+Phần mềm của Plan 03 đã hiện thực và kiểm thử trong source `14d62c471fed0560d6a84921371240e6f4470e6f` (6 commit task + CI + test + review fix pass, từ pin Plan 02 `0101d6c`): gói `source/integrations/arm-controller` (model PUMA 560 pin từ sample LinuxCNC 2.9 với oracle FK độc lập, profile LinuxCNC simulation INI/HAL/tool/program/lock, bridge + arbiter một chủ điều khiển ràng buộc token/kênh, HMI QtVCP đi qua arbiter, chuỗi export/ký/verify/install/rollback), adapter LinuxCNC + arm session trong lab-runtime với bằng chứng ARM03 chỉ từ checker hình học của Plan 02, hàng ARM01–ARM06 trong scenario matrix, fixture message và fixture handoff cà phê dùng chung hai runtime. Lab thêm hàng telemetry/ARM03 cho arm trong inspector, test evidence, spec e2e và re-pin. **Không có controller run nào**: host macOS không có LinuxCNC/Qt/Linux nên smoke LinuxCNC, GUI smoke, install trên máy Linux sạch, ký release đều `blocked_external`; không có chuyển cốc nào qua `linuxcnc_sim` được xác nhận (profile mô phỏng chưa có cảm biến kẹp/cốc). Chi tiết tại [plan03-arm-hardware.md](evidence/digital-twin-v2/plan03-arm-hardware.md); hash tại [simulation-compatibility.json](../../config/simulation-compatibility.json).
+
+| Thành phần Plan 03 | Trạng thái |
+|---|---|
+| A01 model/units | pin sample `135b0ce` (inch/rad/deg → SI), oracle ma trận độc lập khớp FK quaternion ≤1e-9, trường cơ khí MEKONIQ `unknown` |
+| A02 LinuxCNC sim | INI/HAL loopback + fault fixture, lock `candidate`; smoke script → `not_run` trên host này |
+| A03 bridge/arbiter | token + kênh socket (lab/local), journal trước gửi, unknown không gửi lại, epoch theo boot id, event lifecycle trên dây |
+| A04 HMI | policy thuần, không E-stop phần mềm, jog/home/revoke chỉ kênh local; GUI smoke chưa chạy |
+| A05 adapter/session | controller_sim samples, attachment/phase, ARM03 chỉ từ checker (not_run khi thiếu); bridge Python thật + parity checker Python/TS đã chạy trong test |
+| A06 export/trust | manifest ký Ed25519 (khóa thật chưa có → fail closed), verifier Python thuần, installer/rollback trên prefix tạm; máy Linux sạch chưa chạy |
+| Gates | CONTROLLER-POC `software_complete_tested_not_run_on_linux`; G-SIM-ARM, R-SIM, hardware: `blocked_external` |
+
+Minor hoãn lại sau review (ghi trong thông điệp bàn giao): verifier chấp nhận point encoding không chuẩn; verifier chưa validate manifest theo schema; Python chưa tính lại payloadHash; journal không giới hạn/O(n); `freshness.quality` luôn valid; `admitPickup` thiếu input lỗi máy pha và chưa nối runtime; hook plant-session không gọi `plant.takeCup`; cốc đã đặt không được thêm lại vào world; kiểm scene revision chỉ khi hai phía đặt; record ARM03 của Plan 03 chưa vào `RunReport`; `BridgeClient.send` chặn Qt main thread; `lab-sil.mjs` liệt kê `linuxcnc_sim` cho `run` mà chưa có runner.
 
 ## Plan 02 — lớp mô phỏng (2026-11-05)
 
