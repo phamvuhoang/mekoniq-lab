@@ -2,9 +2,10 @@
 // is a request the runtime accepts or refuses, and a ViewState (selection, layers, view) is never an execution permission.
 // TODO(interim-copy): RunView/RunReport mirror source packages/lab-runtime/src/v2/{scenario-runner,report}.ts; replace with the pinned artifact types (F07).
 import type {LabProjectV2} from '../shared/types';
+import type {TwinSample} from '../twin/store';
 export interface TwinHealth {protocolMajors:number[];sourceCommit:string;schemaHash:string;scenarioIds:string[];
  backends:{id:string;modes:string[];installed:boolean;compatible:boolean;reachable:boolean;commissioned:boolean;enabled:boolean;reason?:string}[];
- backendSets:{id:string;mode:string;access:string;backends:string[]}[];}
+ backendSets:{id:string;mode:string;access:string;backends:string[]}[];features?:{polling?:boolean;sse?:boolean};}
 export interface RunSnapshotV2 {schemaVersion:2;id:string;mode:'mock'|'simulation'|'hardware';access:string;backendSetId:string;backends:string[];
  status:'ready'|'running'|'paused'|'awaiting_confirmation'|'needs_attention'|'completed'|'cancelled'|'failed';runRevision:number;eventCursor:string|null;telemetryCursor:string|null;
  fidelity:string;ageMs:number;sourceCommit:string;scenarioId:string;scenarioRevision:number;seed:number;}
@@ -17,10 +18,15 @@ export interface RunView {run:RunSnapshotV2;tick:number;simTimeNs:string;model:s
  attention:Attention[];served:string;coffee:{jobs:CoffeeJobView[];cups:CupView[]}|null;}
 export interface Quantity {amount:string;unit:string;provenance:string;tolerance?:string}
 export interface JobStep {id:string;kind:string;status:string;deviceId:string;commandId:string|null;target:Quantity|null;measured:Quantity|null;observedBy:string|null}
-export interface RunReport {manifest:{runId:string;sourceCommit:string;mode:string;backendSetId:string;backends:{id:string;version:string;model:string;dynamics:boolean}[];clock:{tickMs:number};seed:number;
+export interface RunReport {manifest:{runId:string;sourceCommit:string;mode:string;access:string;backendSetId:string;backends:{id:string;version:string;model:string;dynamics:boolean}[];clock:{tickMs:number};seed:number;
   scenario:{id:string;revision:number;hash:string};project:{id:string;revision:number;hash:string};world:{id:string;revision:number;hash:string};assets:{id:string;revision:number;contentHash:string;resolved:boolean}[]};
- metrics:{collision:{available:boolean;reason?:string;contacts:number|null;minSeparationM:number|null}};
- businessEvents:{sequence:string;at:string;type:string;kind:string;id:string}[];faults:{tick:number;faultId:string;entityId:string|null}[];
+ outcome:{status:string;served:string;tick:number;simTimeNs:string};
+ metrics:{maxConcurrentMovers?:number;distanceM:Record<string,number>;collision:{available:boolean;reason?:string;contacts:number|null;minSeparationM:number|null}};
+ /** Durable: read back from the source journal, each with its journal sequence. */
+ businessEvents:{sequence:string;at:string;type:string;kind:string;id:string;state?:Record<string,unknown>}[];faults:{tick:number;faultId:string;entityId:string|null}[];
+ effects:{id:string;type:string;status:string;attempts:number;payload:Record<string,unknown>}[];attention?:Attention[];
+ /** Lossy, coalesced: never an audit ledger (F06). Absent in reports from runtimes before F06. */
+ telemetry?:{lossy:true;coalesced:true;rateHz:number;source:string;samples:TwinSample[];sampleCounts:Record<string,number>;dropped:number;gaps:{reason:string;fromTick:number|null;toTick:number}[]};
  reconciliations:{subjectId:string;commandId:string|null;nativeState:string;tick:number}[];coverage:Record<string,boolean>;limitations:string[];
  coffee?:{jobs:{jobId:string;recipeId:string;recipeRevision:number;status:string;steps:JobStep[]}[];cups:{cupId:string;ownerKind:string;ownerId:string;movements:{transferId:string;provenance:string;observedBy:string;at:string}[]}[];
   armTrace:{tag:string;interpolation:string;modelRevision:string;limitsOk:boolean;samples:{tick:number;q:number[];tcp:[number,number,number]}[]}};}
@@ -28,6 +34,8 @@ export interface CreateRun {project:LabProjectV2;scenarioId:string;scenarioRevis
 export type ActionKind='start'|'pause'|'resume'|'cancel'|'step'|'confirm'|'injectFault'|'reconcile';
 export interface TwinRuntime {
  health():Promise<TwinHealth>;pair(token:string):Promise<void>;readonly paired:boolean;
+ /** Drop the in-memory CSRF token after the runtime lost the session (restart): the pair form shows again. */
+ forget():void;
  create(request:CreateRun,identity:{sourceCommit:string;schemaHash:string}):Promise<RunView>;
  action(view:RunView,kind:ActionKind,payload?:Record<string,unknown>):Promise<RunView>;
  get(runId:string):Promise<RunView>;report(runId:string):Promise<RunReport>;
@@ -45,7 +53,7 @@ export function httpTwinRuntime(base='/lab/v2'):TwinRuntime {
  };
  const run=(id:string)=>`/runs/${encodeURIComponent(id)}`;
  return {
-  get paired(){return !!csrf;},
+  get paired(){return !!csrf;},forget(){csrf='';},
   health:()=>request<TwinHealth>('/health'),
   async pair(token){const r=await request<{csrfToken?:string}>('/sessions',{token});if(!r.csrfToken)throw new TwinRuntimeError('INVALID_PAIRING_RESPONSE',[],502);csrf=r.csrfToken;},
   create:(r,identity)=>request<RunView>('/runs',{...r,runtimeIdentity:identity}),

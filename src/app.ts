@@ -1137,6 +1137,7 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
     });
     this.host.addEventListener("input", (e) => {
       const i = e.target as HTMLInputElement;
+      if (i.id.startsWith("twin-")) return this.twin.input(i.id, i.value);
       if (i.id === "explode") {
         this.exploded = Number(i.value);
         this.viewer?.explode(this.exploded);

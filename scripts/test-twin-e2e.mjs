@@ -28,7 +28,7 @@ try{
  console.log(`Source runtime ${manifest.sourceCommit} (protocol ${manifest.protocolMajors?.join('/')}) artifact ${manifest.artifactSha256.slice(0,12)}`);
  const env={...process.env};
  if(evidence){env.LAB_EVIDENCE_DIR=join(root,'docs/implementation/evidence/digital-twin-v2');await mkdir(env.LAB_EVIDENCE_DIR,{recursive:true});}
- for(const spec of specs.length?specs:['twin-workspace.spec.ts','coffee-journey.spec.ts']){
+ for(const spec of specs.length?specs:['twin-workspace.spec.ts','coffee-journey.spec.ts','twin-recovery.spec.ts']){
   const data=join(work,`data-${spec}`);
   runtime=spawn(process.execPath,[file,'--port','4176','--data-dir',data],{cwd:work,stdio:['ignore','pipe','inherit']});
   const closed=new Promise(r=>runtime.once('close',r));

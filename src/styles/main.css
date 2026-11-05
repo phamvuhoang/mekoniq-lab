@@ -2193,6 +2193,8 @@ main > .panel {
 }
 .visually-hidden {
   position: absolute;
+  /* pinned to the start edge: an unpositioned hidden file input could sit past the viewport and cause horizontal overflow on mobile */
+  inset-inline-start: 0;
   width: 1px;
   height: 1px;
   padding: 0;
@@ -2391,3 +2393,14 @@ label.button:has(+ input:focus-visible) {
 @media (max-width:1100px){.twin-grid,.twin-top{grid-template-columns:1fr}}
 @media (max-width:600px){.twin-bar{position:static}.twin-stage{aspect-ratio:auto;min-height:280px}.attention-chain dl div{grid-template-columns:1fr}.eng-table{font-size:11px}}
 .twin-scene-panel{align-self:start}
+/* F06: telemetry chip, replay, compare, export */
+#twin-telemetry[data-state="stale"],#twin-telemetry[data-state="disconnected"]{color:#9a3412}
+#twin-telemetry[data-state="frozen_sim"]{color:#1d4ed8}
+.report-panel .replay-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.report-panel input[type="range"]{flex:1 1 160px;min-height:44px}
+.report-panel h4{margin:12px 0 4px;font-size:13px}
+.replay-events,.replay-entities,.trace-rows{margin:0;padding-left:18px;font-size:13px;display:grid;gap:2px}
+.replay-events code{font-size:12px}
+.compare table{margin-top:6px}
+.report-panel{padding-bottom:14px}
+.report-panel>*:not(.panel-heading){margin-left:16px;margin-right:16px}
