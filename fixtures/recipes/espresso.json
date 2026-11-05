@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 2,
+  "id": "espresso",
+  "revision": 1,
+  "hash": "2fdaac68e5c91164a466ced01560600da2c8bd6a6a44071d9bba1297ff92aa82",
+  "outputType": "espresso",
+  "cupType": "cup-paper-illustrative",
+  "steps": [
+    {
+      "id": "brew",
+      "kind": "brew",
+      "target": {
+        "amount": "0.00003",
+        "tolerance": "0.000003",
+        "unit": "m3",
+        "provenance": "illustrative"
+      },
+      "requires": [
+        "machine"
+      ],
+      "timeoutMs": 40000
+    }
+  ],
+  "resources": [
+    {
+      "resourceId": "coffee-beans",
+      "kind": "coffee_beans",
+      "requiredAmount": {
+        "amount": "0.018",
+        "tolerance": "0.001",
+        "unit": "kg",
+        "provenance": "illustrative"
+      }
+    },
+    {
+      "resourceId": "cup-paper",
+      "kind": "cup",
+      "requiredAmount": null
+    },
+    {
+      "resourceId": "machine",
+      "kind": "machine",
+      "requiredAmount": null
+    }
+  ],
+  "recovery": {
+    "onTimeout": "hold_and_reconcile",
+    "autoRetry": false
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 2,
+  "id": "iced-milk-coffee",
+  "revision": 1,
+  "hash": "ce3445ef75dc12e099ea505cc3b50a701ce41c9cda14bba4c6449f6a7856b905",
+  "outputType": "iced-milk-coffee",
+  "cupType": "cup-paper-illustrative",
+  "steps": [
+    {
+      "id": "brew",
+      "kind": "brew",
+      "target": {
+        "amount": "0.00003",
+        "tolerance": "0.000003",
+        "unit": "m3",
+        "provenance": "illustrative"
+      },
+      "requires": [
+        "machine"
+      ],
+      "timeoutMs": 40000
+    },
+    {
+      "id": "add_ice",
+      "kind": "add_ice",
+      "target": {
+        "amount": "0.12",
+        "tolerance": "0.01",
+        "unit": "kg",
+        "provenance": "illustrative"
+      },
+      "requires": [
+        "ice"
+      ],
+      "timeoutMs": 15000
+    },
+    {
+      "id": "add_milk",
+      "kind": "add_milk",
+      "target": {
+        "amount": "0.00008",
+        "tolerance": "0.000008",
+        "unit": "m3",
+        "provenance": "illustrative"
+      },
+      "requires": [
+        "milk"
+      ],
+      "timeoutMs": 15000
+    }
+  ],
+  "resources": [
+    {
+      "resourceId": "coffee-beans",
+      "kind": "coffee_beans",
+      "requiredAmount": {
+        "amount": "0.018",
+        "tolerance": "0.001",
+        "unit": "kg",
+        "provenance": "illustrative"
+      }
+    },
+    {
+      "resourceId": "ice",
+      "kind": "ice",
+      "requiredAmount": {
+        "amount": "0.12",
+        "tolerance": "0.01",
+        "unit": "kg",
+        "provenance": "illustrative"
+      }
+    },
+    {
+      "resourceId": "milk",
+      "kind": "milk",
+      "requiredAmount": {
+        "amount": "0.00008",
+        "tolerance": "0.000008",
+        "unit": "m3",
+        "provenance": "illustrative"
+      }
+    },
+    {
+      "resourceId": "cup-paper",
+      "kind": "cup",
+      "requiredAmount": null
+    },
+    {
+      "resourceId": "machine",
+      "kind": "machine",
+      "requiredAmount": null
+    }
+  ],
+  "recovery": {
+    "onTimeout": "hold_and_reconcile",
+    "autoRetry": false
+  }
+}
