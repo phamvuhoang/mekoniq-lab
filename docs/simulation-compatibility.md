@@ -1,6 +1,6 @@
 # Simulation compatibility and evidence scope
 
-Updated 2026-11-05 for the Plan 01 software remediation. This page describes implemented interfaces and their limits. The clean runtime pin and full regression/acceptance record are complete for source `c1d1ea70e42937d421070674f07d00edc7c41245`. Owner acceptance and external gates remain open in the [remediation record](reviews/2026-11-05-plan-01-remediation.md).
+Updated 2026-11-05 for the Plan 01 software remediation and the Plan 02 simulation layer (section below). This page describes implemented interfaces and their limits. The Plan 01 regression/acceptance record is complete for source `c1d1ea70e42937d421070674f07d00edc7c41245`; the current Lab pin is `ff6c2eb7aaee4e4214cdfcb9887156301ffb22fa`. Owner acceptance and external gates remain open in the [remediation record](reviews/2026-11-05-plan-01-remediation.md).
 
 ## Authoritative records
 
@@ -40,6 +40,15 @@ Legacy projects without a profile report `self_injected_only`. Missing geometry 
 Replay reconstructs time-specific job, cup owner, measurements, served quantity and arm state from recorded events/samples. It filters plant process logs and collision evidence by time. Cumulative values unavailable at an earlier cursor remain unavailable. Saved evidence is immutable, and edits mark affected model/world/recipe/profile scopes stale.
 
 Human wait is correlated by mission/stop and ends on the final allocation confirmation; incomplete/cancelled stops are excluded. Coffee queue wait, completed travel and cell-process busy time have separate definitions and populations. Cell busy time unions completed accepted-to-completed intervals; an active incomplete cycle is unavailable. Inter-robot separation needs at least two robots and excludes wall clearance. One run per side provides no p50/p95 population claim.
+
+## Plan 02 simulation layer
+
+Updated 2026-11-05 for Plan 02. Source `ff6c2eb7aaee4e4214cdfcb9887156301ffb22fa` adds the simulation layer; the Lab pin moved to artifact `274912d1a002a78fe4e2836659022b6b66713e29212d7f4a123fcb36945f88b9` (schema hash `f112425e636254a6c3d20d75d615b696c426c7d2a5fb185c01a1943095fe0ffd`). The export manifest now records the digest of the separately distributed Linux SIL tools; they are not part of `runtime.mjs`, and importing or starting the mock never needs Gazebo.
+
+- **Backends.** `gazebo_nav2` has an orchestrator and worker bridge; its evidence is `sil` only with a real worker on a Linux host, protocol doubles are business evidence. `coffee_io_sim` is the F04 process model behind the simulation backend id with modelled measurements and no fluid or thermal model. `linuxcnc_sim` is not implemented (plan 03); the beverage plant session couples the mock arm as `open_loop_visualization`, never closed-loop. The backend set `coffee-simulation` names all three; a missing one is `BACKEND_MISSING`, never a fallback.
+- **Admission and support.** The scenario matrix (`source/packages/lab-runtime/src/v2/scenario-matrix.ts`) binds every verification id to requirement refs, fixtures, tests, backend support, an oracle, invariants and measurements; hardware support is false for every row in this runtime. The Lab reads what a campaign can run from the runtime's health answer (`src/scenarios/support.ts`, `fixtures/scenarios/food-beverage-campaign.json`); it never hardcodes availability.
+- **Evidence.** `LabEvidenceV2` records separate a business record (journal-backed invariants, evaluated in every mode) from a physics record that stays `not_run` without a real SIL worker and an arm-closed-loop record that stays `not_run` while the coupling is open-loop. Modelled quantities never carry `measured` provenance; cup movements must trace to a command or evidence id.
+- **This host.** Every `lab-sil.mjs` command on the recorded macOS host is `not_run` (see [plan02-simulation.md](implementation/evidence/digital-twin-v2/plan02-simulation.md)); physics contacts, separation, physical stop, sensor evidence and plant telemetry remain unverified.
 
 ## Distribution and external gates
 
