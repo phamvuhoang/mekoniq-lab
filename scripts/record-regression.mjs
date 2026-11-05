@@ -54,13 +54,14 @@ const referenced=['lab-v2-mock','lab-v2-recovery','lab-v2-contracts','lab-v2-mod
 run('source-typecheck','source','pnpm',['-s','typecheck']);
 run('source-lint','source','pnpm',['-s','lint']);
 run('source-contracts-check','source','pnpm',['-s','contracts:check']);
-run('source-referenced','source',process.execPath,[V,'run',...referenced,'--reporter=json',out('source-referenced.json')],{kind:'vitest',files:['source-referenced.json'],extraEnv:{LAB_V2_CLEAN_EXPORT:'1'}});
+// The full integration run is a superset of these references; do not execute the same scenarios twice in --ci mode.
+if(!ci)run('source-referenced','source',process.execPath,[V,'run',...referenced,'--reporter=json',out('source-referenced.json')],{kind:'vitest',files:['source-referenced.json'],extraEnv:{LAB_V2_CLEAN_EXPORT:'1'}});
 run('source-unit','source',process.execPath,[V,'run','tests/unit','--reporter=json',out('source-unit.json')],{kind:'vitest',files:['source-unit.json']});
 run('source-contracts','source',process.execPath,[V,'run','tests/contracts','--reporter=json',out('source-contracts.json')],{kind:'vitest',files:['source-contracts.json']});
 if(ci){
  run('source-build','source','pnpm',['-s','build']);
  run('source-adapters','source',process.execPath,[V,'run','tests/adapters','--reporter=json',out('source-adapters.json')],{kind:'vitest',files:['source-adapters.json']});
- run('source-integration','source',process.execPath,[V,'run','tests/integration','--reporter=json',out('source-integration.json')],{kind:'vitest',files:['source-integration.json']});
+ run('source-integration','source',process.execPath,[V,'run','tests/integration','--reporter=json',out('source-integration.json')],{kind:'vitest',files:['source-integration.json'],extraEnv:{LAB_V2_CLEAN_EXPORT:'1'}});
  if(existsSync(python))run('source-pytest','source',python,['-m','pytest','robotics/agent/tests','tests/hardware','tests/contracts/test_schema_python.py','-q',`--junitxml=${OUT}/source-pytest.xml`],{kind:'junit',files:['source-pytest.xml']});
  else notRun.push({id:'source-pytest',reason:scrub(`Python executable missing: ${python}; provide LAB_PYTHON or create source/.venv with requirements-dev.txt`)});
 }
