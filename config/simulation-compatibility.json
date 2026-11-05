@@ -1,7 +1,7 @@
 {
  "schemaVersion": 1,
- "purpose": "Plan 01 software completion, tested on the recorded mock host; owner acceptance and external gates remain open. Provider interface revision 2 binds the updated cell observation, project and recipe contracts; a simulation/hardware provider must verify these hashes and supply its own evidence. Plan 02 (2026-11-05) adds the simulation layer in source: world compiler, Gazebo/Nav2 worker bridge, clock barrier, telemetry ingest, fault schedule, actors/metrics, coffee_io_sim process coupling, cup transfer evidence, the ARM03 swept-path checker, the scenario matrix, LabEvidenceV2 records and SIL campaign tooling. Every SIL run on the recorded macOS host is not_run (no Linux/ROS 2/Gazebo); physics rows carry no pass. Plan 03 (2026-11-05/06) adds the arm controller package in source (pinned PUMA 560 reference model, LinuxCNC simulation profile, token-bound one-owner bridge/arbiter, QtVCP HMI through the arbiter, LinuxCNC adapter + arm session with ARM03 evidence from the plan 02 checker, signed-artifact export/verify/install chain). Every Linux-only check (LinuxCNC smoke, GUI smoke, clean-host install/rollback, systemd) stays blocked_external on the recorded macOS host; no controller run, no R-SIM, no hardware claim.",
- "frozenAt": "2026-11-05T19:36:57.282399+00:00",
+ "purpose": "Plan 01 software completion, tested on the recorded mock host; owner acceptance and external gates remain open. Provider interface revision 2 binds the updated cell observation, project and recipe contracts; a simulation/hardware provider must verify these hashes and supply its own evidence. Plan 02 (2026-11-05) adds the simulation layer in source: world compiler, Gazebo/Nav2 worker bridge, clock barrier, telemetry ingest, fault schedule, actors/metrics, coffee_io_sim process coupling, cup transfer evidence, the ARM03 swept-path checker, the scenario matrix, LabEvidenceV2 records and SIL campaign tooling. Every SIL run on the recorded macOS host is not_run (no Linux/ROS 2/Gazebo); physics rows carry no pass. Plan 03 (2026-11-05/06) adds the arm controller package in source (pinned PUMA 560 reference model, LinuxCNC simulation profile, token-bound one-owner bridge/arbiter, QtVCP HMI through the arbiter, LinuxCNC adapter + arm session with ARM03 evidence from the plan 02 checker, signed-artifact export/verify/install chain). Every Linux-only check (LinuxCNC smoke, GUI smoke, clean-host install/rollback, systemd) stays blocked_external on the recorded macOS host; no controller run, no R-SIM, no hardware claim. Remediation 2026-11-06 closes independent review findings R01–R12 with regression tests and a clean runtime re-pin; external gates are unchanged.",
+ "frozenAt": "2026-11-05T22:03:35.743993+00:00",
  "gates": {
   "R-MOCK": "software_complete_tested_not_accepted",
   "R-SIM": "blocked_external",
@@ -15,10 +15,10 @@
  "codeRevisions": {
   "source": {
    "branch": "feat/lab-digital-twin-v2",
-   "artifactCommit": "14d62c471fed0560d6a84921371240e6f4470e6f",
-   "finalHead": "14d62c471fed0560d6a84921371240e6f4470e6f",
+   "artifactCommit": "a89a077ed12648931a857333f899e3d6c1ea9719",
+   "finalHead": "a89a077ed12648931a857333f899e3d6c1ea9719",
    "dirty": false,
-   "pinNote": "Plan 03 artifact and regression use this exact committed source HEAD (branch feat/lab-digital-twin-v2) after the plan 03 review fix pass; 0101d6c (plan 02) and c1d1ea7 (plan 01) remain historical.",
+   "pinNote": "Remediation checks/export use this exact clean source HEAD; Plan 02/03 pins and evidence below remain historical.",
    "packagesDiffAfterPin": "empty",
    "plan02Commits": [
     "02c416a",
@@ -43,14 +43,16 @@
     "1495188",
     "14d62c4"
    ],
-   "plan03ReviewFixCommit": "14d62c4"
+   "plan03ReviewFixCommit": "14d62c4",
+   "plan0203RemediationCommit": "a89a077ed12648931a857333f899e3d6c1ea9719"
   },
   "lab": {
    "branch": "feat/robot-lab",
    "baseCommit": "aa70d65fdb72f16b64ee7002fbb05c15ee1e690f",
-   "note": "Regression code baseline aa70d65; plan 02 Lab changes (campaign fixture, support matrix helper, capability test, docs) start after 730bd1c and are allowed only by the explicit Lab code identity guard. Plan 03 Lab changes (arm telemetry/view, inspector ARM03 row, arm evidence test, arm e2e spec, re-pin, docs) start after the plan 02 re-pin 2d5fed3.",
+   "note": "Regression code baseline aa70d65; plan 02 Lab changes (campaign fixture, support matrix helper, capability test, docs) start after 730bd1c and are allowed only by the explicit Lab code identity guard. Plan 03 Lab changes (arm telemetry/view, inspector ARM03 row, arm evidence test, arm e2e spec, re-pin, docs) start after the plan 02 re-pin 2d5fed3. Remediation changes only runtime pin, compatibility metadata and review/evidence docs; UI/source/tests unchanged.",
    "plan02BaseCommit": "730bd1ce5b44848b9becae93f6ab78e7b32329da",
-   "plan03BaseCommit": "2d5fed3"
+   "plan03BaseCommit": "2d5fed3",
+   "remediationBaseCommit": "a0a02d205a0996fdc160269b8c742cb6c1f70dcb"
   },
   "artifact": {
    "entrypoint": "runtime.mjs",
@@ -60,11 +62,11 @@
     2
    ],
    "nodeMajor": 24,
-   "sha256": "9b5b72ee3428df18348ccb81929c66d7a0c3c32d51ca08e423728583e681b3a7",
+   "sha256": "fe49fcea31da67630fa50e6fe75418967092cee57ab9144959413a529129ce15",
    "simulationTools": {
     "distribution": "separate",
     "path": "source/robotics/simulation",
-    "digest": "8e746cbac3175f520dc7785a633218ebcdb242bd24e77ead3db65fae92264af4",
+    "digest": "2102ba087776b9935f54b43c9eaeff760dbe306d55c5b17ed95b14e68026b78d",
     "files": 33,
     "note": "Linux SIL tools are not in runtime.mjs; the export manifest records their digest and the pinned ROS image so a Linux host proves the same revision (scripts/lab-sil.mjs doctor). Plan 03 adds collision/__main__.py (JSON entry of the ARM03 checker for the arm session)."
    }
@@ -230,7 +232,7 @@
    },
    {
     "id": "linuxcnc_sim",
-    "implemented": "not implemented (plan 03); the plant session couples the mock arm as open_loop_visualization"
+    "implemented": "Plan 03 adapter/session and bridge/arbiter implemented; controller-backed BV01 campaign remains unavailable and no LinuxCNC run has been recorded."
    }
   ]
  },
@@ -381,6 +383,12 @@
     "file": "docs/implementation/evidence/digital-twin-v2/plan03-arm-trust-refusals.json",
     "sha256": "070f0c4ffddaabdeeaf24453795e4e69daf806bb9190bd4ab1964b0c02c50d83"
    }
+  },
+  "plan0203Remediation": {
+   "report": "docs/reviews/2026-11-06-plan-02-03-remediation.md",
+   "file": "docs/implementation/evidence/digital-twin-v2/plan02-03-remediation/manifest.json",
+   "sha256": "730c23cdd3b1e066f4c912126c7c34042c5e4c2dd018afb616d7f250cf7a2c77",
+   "result": "R01–R12 addressed; software checks pass; external gates unchanged"
   }
  },
  "handoff": [
@@ -447,8 +455,8 @@
  },
  "armController": {
   "package": "source/integrations/arm-controller",
-  "version": "0.1.0+14d62c4",
-  "exportedFrom": "14d62c471fed0560d6a84921371240e6f4470e6f",
+  "version": "0.1.0+a89a077",
+  "exportedFrom": "a89a077ed12648931a857333f899e3d6c1ea9719",
   "signed": false,
   "note": "Exported with --allow-unsigned for this record only: no release signing key exists; the installer refuses it (fail closed). Signed install, downgrade and rollback paths are proven by tests with ephemeral keys.",
   "model": {
@@ -468,7 +476,7 @@
    "sha256": "6bf53b3e448d113d340cae5cc80120621e27c9d8cd70e768900d4097b2f7ee55",
    "note": "candidate pins (LinuxCNC v2.9.10 / bookworm 2.9.0~pre1, PyQt5 5.15.9, QScintilla 2.13.3, Debian 12 amd64); verified:false until a clean host records a run"
   },
-  "files": 43,
+  "files": 44,
   "schemasShipped": [
    "arm-command.schema.json",
    "arm-observation.schema.json",
@@ -481,7 +489,7 @@
   },
   "trustPolicy": {
    "keys": 0,
-   "note": "NO_ACTIVE_KEY in the repository copy; provisioning supplies the real public keys; every install fails closed until then"
+   "note": "NO_ACTIVE_KEY in the repository copy; provisioning supplies the real public keys; every install fails closed until then. Template revision 0; provision a signed positive policyRevision and preserve the accepted revision floor."
   },
   "blockedExternal": [
    "LinuxCNC smoke (scripts/smoke-sim.sh)",

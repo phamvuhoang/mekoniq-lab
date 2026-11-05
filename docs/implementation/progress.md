@@ -4,6 +4,10 @@ Cập nhật: **2026-11-06, sau Plan 03 (arm controller, chưa có controller ru
 
 `Implemented` nghĩa là có code; `tested` cần kết quả chạy gắn đúng revision; `accepted` cần owner duyệt bằng chứng. Không dùng một trạng thái thay cho trạng thái khác.
 
+## Remediation review Plan 02/03 (2026-11-06)
+
+Source `a89a077` sửa R01–R12: release integrity/trust replay, bridge outcome/recovery/transport/entry point/socket ACL, compiled navigation bindings, transfer barrier, sensor freshness, ARM03 trace coverage và static scene loop. Review độc lập không còn finding chặn trong diff này. Lab re-pin artifact `fe49fcea…`, schema giữ `8b398544…`; kiểm chứng và giới hạn tại [remediation record](../reviews/2026-11-06-plan-02-03-remediation.md). Các mục Plan 02/03 bên dưới là mốc lịch sử; Linux/SIL/controller/hardware vẫn chưa nghiệm thu.
+
 ## Plan 03 — arm controller và hardware gates (2026-11-05/06)
 
 Phần mềm của Plan 03 đã hiện thực và kiểm thử trong source `14d62c471fed0560d6a84921371240e6f4470e6f` (6 commit task + CI + test + review fix pass, từ pin Plan 02 `0101d6c`): gói `source/integrations/arm-controller` (model PUMA 560 pin từ sample LinuxCNC 2.9 với oracle FK độc lập, profile LinuxCNC simulation INI/HAL/tool/program/lock, bridge + arbiter một chủ điều khiển ràng buộc token/kênh, HMI QtVCP đi qua arbiter, chuỗi export/ký/verify/install/rollback), adapter LinuxCNC + arm session trong lab-runtime với bằng chứng ARM03 chỉ từ checker hình học của Plan 02, hàng ARM01–ARM06 trong scenario matrix, fixture message và fixture handoff cà phê dùng chung hai runtime. Lab thêm hàng telemetry/ARM03 cho arm trong inspector, test evidence, spec e2e và re-pin. **Không có controller run nào**: host macOS không có LinuxCNC/Qt/Linux nên smoke LinuxCNC, GUI smoke, install trên máy Linux sạch, ký release đều `blocked_external`; không có chuyển cốc nào qua `linuxcnc_sim` được xác nhận (profile mô phỏng chưa có cảm biến kẹp/cốc). Chi tiết tại [plan03-arm-hardware.md](evidence/digital-twin-v2/plan03-arm-hardware.md); hash tại [simulation-compatibility.json](../../config/simulation-compatibility.json).
