@@ -91,3 +91,11 @@ test('exports: JSON and CSV keep ids; HTML is self-contained and escapes every r
  expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
  for(const s of ['Source manifest','d'.repeat(40),'Seeds','42','43','Sample counts','amr-1','Missing evidence','dynamics','RUNTIME_RESTART','Business events (durable)','Telemetry (lossy, coalesced)'])expect(html).toContain(s);
 });
+
+test('CSV neutralises spreadsheet formulas but keeps numbers and ids; redact also removes paths inside longer strings',()=>{
+ const r=report() as unknown as {businessEvents:{type:string;id:string}[]};
+ r.businessEvents[0]!.type='=HYPERLINK("http://x")';r.businessEvents[1]!.type='+cmd';r.businessEvents[2]!.type='@SUM(A1)';r.businessEvents[3]!.id='-12.5';
+ const csv=reportCsv(r as unknown as RunReport);
+ expect(csv).toContain(`"'=HYPERLINK(""http://x"")"`);expect(csv).toContain(",'+cmd");expect(csv).toContain(",'@SUM(A1)");expect(csv).toContain(',-12.5,');expect(csv).not.toMatch(/,=|,\+cmd|,@SUM/);
+ expect(redact({note:'failed to open /Users/someone/runs/abc/journal.db and C:\\Users\\x\\a.txt'})).toEqual({note:'failed to open [redacted path] and [redacted path]'});
+});

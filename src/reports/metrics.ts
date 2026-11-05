@@ -34,15 +34,18 @@ export function summarizeReportV2(r:RunReportV2){
  return {evidence:r.manifest.mode,backends:r.manifest.backends.map(b=>`${b.id}@${b.version} (${b.model})`),outcome:r.outcome.status,served:r.outcome.served,seed:r.manifest.seed,businessEvents:r.businessEvents.length,
   telemetry:t?{lossy:true as const,samples:t.samples.length,sampleCounts:{...t.sampleCounts},dropped:t.dropped,gaps:t.gaps.length}:null,kpis:reportKpis(r)};
 }
-const SECRET=/token|csrf|secret|password|passphrase|private|cookie|credential|^(d|directory|dir|path|dataDir)$/i,PATH=/^(\/(Users|home|tmp|var|private|root)\/|[A-Za-z]:\\)/;
+const SECRET=/token|csrf|secret|password|passphrase|private|cookie|credential|^(d|directory|dir|path|dataDir)$/i,PATH=/^(\/(Users|home|tmp|var|private|root)\/|[A-Za-z]:\\)/,
+ /** Absolute paths anywhere inside a string (error messages, notes): POSIX home/tmp roots or a Windows drive. */
+ PATH_IN=/(?:\/(?:Users|home|tmp|var|private|root)\/|[A-Za-z]:\\)[^\s"'<>]*/g;
 /** Exports never carry keys, tokens, cookies or local filesystem paths, whatever a report happens to contain. */
 export function redact(v:unknown):unknown{
  if(Array.isArray(v))return v.map(redact);
  if(v&&typeof v==='object')return Object.fromEntries(Object.entries(v).filter(([k])=>!SECRET.test(k)).map(([k,x])=>[k,redact(x)]));
- return typeof v==='string'&&PATH.test(v)?'[redacted path]':v;
+ return typeof v==='string'?(PATH.test(v)?'[redacted path]':v.replace(PATH_IN,'[redacted path]')):v;
 }
 export const reportJson=(r:RunReportV2)=>JSON.stringify(redact(r),null,2);
-const cell=(v:unknown)=>{const s=v===null||v===undefined?'':typeof v==='string'?v:JSON.stringify(v);return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;};
+// a text cell starting with = + - @ tab or CR would run as a spreadsheet formula: prefix ' (a finite number such as -12.5 stays as is)
+const cell=(v:unknown)=>{const raw=v===null||v===undefined?'':typeof v==='string'?v:JSON.stringify(v),s=/^[=+\-@\t\r]/.test(raw)&&!(raw.trim()!==''&&Number.isFinite(Number(raw)))?`'${raw}`:raw;return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;};
 /** One table, both streams, labelled by `stream`; business rows keep their journal sequence, telemetry rows their provider seq. */
 export function reportCsv(report:RunReportV2){
  const r=redact(report) as RunReportV2,tickMs=r.manifest.clock.tickMs,t0=r.businessEvents.length?Date.parse(r.businessEvents[0]!.at):0;
