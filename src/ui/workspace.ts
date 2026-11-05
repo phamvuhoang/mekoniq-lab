@@ -6,7 +6,7 @@ import {preflight,ready} from '../scenarios/preflight';
 import {renderTwin,sceneEntities,kindLabel,type TwinFrame,type ViewState} from '../twin/scene';
 import {defaultLayers,LAYERS,layerLabel,legend,toggleLayer,type Layer} from '../twin/overlays';
 import {selectEntity,selectedEntity,onSelection} from '../twin/selection';
-import {inspect} from '../twin/inspector';
+import {inspect,identityItems} from '../twin/inspector';
 import {currentCup,reconcilable} from '../twin/coffee-cell';
 import {operationsPanel,statusText} from './operations-panel';
 import {engineeringPanel} from './engineering-panel';
@@ -35,7 +35,7 @@ export class TwinWorkspace {
   const item=(label:string,value:string,id='')=>`<span class="twin-bar-item"${id?` data-testid="${id}"`:''}><small>${label}</small><b>${esc(value)}</b></span>`;
   return `<div class="twin-bar" role="region" aria-label="${tr('Chế độ, backend và revision của lần chạy','実行のモード・バックエンド・リビジョン','Run mode, backends and revisions')}">
 <span class="twin-mode ${r?'live':''}" data-testid="mode-badge">${icon(r?'lock':'info',14)}${esc(badge)}${r?` · ${esc(r.access)}`:''}</span>
-<span class="twin-identity" data-testid="run-identity">${r?[`${r.backendSetId}`,(m?.backends??r.backends.map(id=>({id,version:'?'}))).map(b=>`${b.id}@${b.version}`).join(', '),`model ${v!.model}`,`${r.scenarioId} r${r.scenarioRevision}`,`seed ${r.seed}`,`project ${p.project.id} r${m?.project.revision??p.project.revision}`,`world r${m?.world.revision??p.project.world.revision}`,...(p.recipes.length?[`recipe ${p.recipes.join(' / ')}`]:[]),`source ${r.sourceCommit.slice(0,7)}`].map(x=>`<span>${esc(x)}</span>`).join(''):`<span>${esc(p.scenarioId)} · ${esc(p.backendSetId)} · ${tr('chưa khóa','未固定','not locked')}</span>`}</span>
+<span class="twin-identity" data-testid="run-identity">${r?identityItems(v!,this.report).map(x=>`<span>${esc(x)}</span>`).join(''):`<span>${esc(p.scenarioId)} · ${esc(p.backendSetId)} · ${tr('chưa khóa','未固定','not locked')}</span>`}</span>
 ${r?`${item(tr('Trạng thái','状態','Status'),statusText(r.status),'run-status')}${item(tr('Thời gian mô phỏng','シミュレーション時間','Sim time'),`${(Number(v!.simTimeNs)/1e9).toFixed(1)} s`,'run-tick')}${item('Run rev.',String(r.runRevision),'run-revision')}${item(tr('Đã giao','提供数','Served'),v!.served,'run-served')}<span class="twin-bar-item"><small>${tr('Cốc hiện tại','現在のカップ','Current cup')}${cup?` ${esc(cup.cupId)}`:''}</small><b data-testid="cup-owner">${cup?esc(nameOf(p,cup.ownerId)):'—'}</b></span><span class="twin-run-id" data-testid="run-id">${esc(r.id)}</span>`:''}
 </div>`;
  }
@@ -62,7 +62,7 @@ ${this.webglFailed?`<p class="source-note" data-testid="twin-fallback-note" role
 ${legendHtml}<p class="source-note">${icon('info',15)}${tr('Cảnh chỉ đọc: vị trí lấy từ runtime, canvas không quyết định đến đích hay hoàn thành.','表示は読み取り専用。位置はランタイムから取得し、描画は到着や完了を判定しません。','Read-only scene: positions come from the runtime; the canvas never decides arrival or completion.')}</p></section>`;
   const ops=operationsPanel({paired:this.rt.paired,ready:ready(preflight(this.preset,this.health,this.rt.paired)),busy:this.busy,playing:this.playing,view:this.view,preset:p},this.checks());
   const eng=engineeringPanel(insp,{hasRun:!!this.view,busy:this.busy||this.playing,fault:this.fault,coffee:!!this.view?.coffee});
-  const dialog=this.confirming?`<dialog id="twin-confirm" aria-labelledby="twin-confirm-title"><h2 id="twin-confirm-title">${tr('Xác nhận đối soát','照合の確認','Confirm reconciliation')}</h2><p>${tr(`Đối soát ${esc(this.confirming)}: runtime hỏi thiết bị theo command id, ghi kết quả và loại bỏ cốc (quarantine). Không pha lại, không gửi lại lệnh. Chỉ xác nhận sau khi đã kiểm tra tại trạm.`,`${esc(this.confirming)} を照合:コマンドIDで機器に問い合わせ、記録してカップを隔離します。再抽出・再送はしません。現場確認後のみ確認してください。`,`Reconcile ${esc(this.confirming)}: the runtime queries the device by command id, records the answer and quarantines the cup. Nothing is re-poured or resent. Confirm only after checking the station.`)}</p><div class="dialog-actions"><button class="button quiet" data-action="twin-confirm-cancel">${tr('Hủy','キャンセル','Cancel')}</button><button class="button primary" data-action="twin-confirm-ok">${icon('check',16)}${tr('Xác nhận đã kiểm tra','確認済みとして実行','Confirm checked')}</button></div></dialog>`:'';
+  const dialog=this.confirming?`<dialog id="twin-confirm" aria-labelledby="twin-confirm-title"><h2 id="twin-confirm-title">${tr('Xác nhận đối soát','照合の確認','Confirm reconciliation')}</h2><p>${tr(`Đối soát ${esc(this.confirming)}: Lab yêu cầu runtime hỏi thiết bị theo command id và ghi lại câu trả lời. Lab không gửi lại lệnh; kết quả là những gì runtime báo về sau đó. Chỉ xác nhận sau khi đã kiểm tra tại chỗ.`,`${esc(this.confirming)} を照合:LabはランタイムにコマンドIDで機器へ問い合わせ、回答を記録するよう依頼します。Labはコマンドを再送しません。結果はその後ランタイムが報告する内容です。現場確認後のみ確認してください。`,`Reconcile ${esc(this.confirming)}: the Lab asks the runtime to query the device by command id and record the answer. The Lab resends nothing; the outcome is whatever the runtime then reports. Confirm only after checking on site.`)}</p><div class="dialog-actions"><button class="button quiet" data-action="twin-confirm-cancel">${tr('Hủy','キャンセル','Cancel')}</button><button class="button primary" data-action="twin-confirm-ok">${icon('check',16)}${tr('Xác nhận đã kiểm tra','確認済みとして実行','Confirm checked')}</button></div></dialog>`:'';
   return `${this.bar()}${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(this.notice)}</span><button aria-label="${tr('Đóng','閉じる','Dismiss')}" data-action="twin-dismiss">${icon('cross',16)}</button></div>`:''}
 <div class="twin-top">${presetsHtml}${this.pairForm()}</div>
 <div class="twin-grid">${scene}<div class="twin-side">${ops}<section class="panel" aria-labelledby="ent-title"><div class="panel-heading"><h2 id="ent-title">${tr('Đối tượng','対象','Objects')}</h2><span class="pill">${ents.length}</span></div>${list}</section></div>${eng}</div>${dialog}`;
@@ -75,7 +75,7 @@ ${legendHtml}<p class="source-note">${icon('info',15)}${tr('Cảnh chỉ đọc:
   if(this.confirming){const d=document.getElementById('twin-confirm') as HTMLDialogElement|null;if(d&&!d.open)d.showModal();d?.addEventListener('cancel',()=>{this.confirming=null;},{once:true});}
   const stage=document.getElementById('twin-stage');
   if(!stage||this.vs.view!=='3d'||this.webglFailed)return;
-  if(this.viewer){stage.replaceChildren(this.viewer.canvas);this.viewer.update(this.frame(),this.vs);return;}
+  if(this.viewer){this.viewer.attach(stage);this.viewer.update(this.frame(),this.vs);return;}
   if(this.mounting)return;this.mounting=true;
   void import('../viewer/twin3d').then(({mountTwin3d})=>{
    this.mounting=false;

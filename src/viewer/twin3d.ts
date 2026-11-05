@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {sceneEntities,type TwinFrame,type ViewState} from '../twin/scene';
 import {amrFootprint,assetOf} from '../twin/amr';
-export interface Twin3d {canvas:HTMLCanvasElement;update(f:TwinFrame,vs:ViewState):void;dispose():void}
+export interface Twin3d {canvas:HTMLCanvasElement;/** Move into a re-rendered stage and size from it. */attach(host:HTMLElement):void;update(f:TwinFrame,vs:ViewState):void;dispose():void}
 const LIME=0xb4f375,NAVY=0x182a33;
 export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:()=>void):Twin3d|null {
  let renderer:THREE.WebGLRenderer;
@@ -19,7 +19,8 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  const dynamic=new THREE.Group();scene.add(dynamic);
  const mat=(color:number,o:{wire?:boolean;emissive?:boolean}={})=>new THREE.MeshStandardMaterial({color,wireframe:!!o.wire,emissive:o.emissive?LIME:0x000000,emissiveIntensity:o.emissive?0.6:0,roughness:0.7});
  const render=()=>renderer.render(scene,camera);
- const resize=()=>{const w=host.clientWidth||640,h=host.clientHeight||420;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();render();};
+ // size from wherever the canvas lives now: the stage element is replaced on every workspace render
+ const resize=()=>{const p=canvas.parentElement,w=p?.clientWidth||640,h=p?.clientHeight||420;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();render();};
  const ro=new ResizeObserver(resize);ro.observe(host);controls.addEventListener('change',render);
  let last:{w:number;h:number}|null=null;
  const pick=(e:PointerEvent)=>{const r=canvas.getBoundingClientRect(),ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1),camera);
@@ -28,6 +29,7 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  canvas.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];});
  canvas.addEventListener('pointerup',e=>{if(Math.hypot(e.clientX-down[0],e.clientY-down[1])<5)pick(e);});
  return {canvas,
+  attach(next){if(canvas.parentElement!==next)next.replaceChildren(canvas);ro.disconnect();ro.observe(next);resize();},
   update(f,vs){
    const w=f.preset.project.world,at=(x:number,y:number,z=0)=>new THREE.Vector3(x,z,-y);
    if(!last||last.w!==w.width||last.h!==w.height){last={w:w.width,h:w.height};camera.position.set(w.width/2,Math.max(w.width,w.height)*0.9,w.height*0.4+Math.max(w.width,w.height)*0.6);controls.target.set(w.width/2,0,-w.height/2);controls.update();}

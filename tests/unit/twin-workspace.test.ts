@@ -4,7 +4,7 @@ const {presets,presetById}=await import('../../src/scenarios/catalog');
 const {renderTwin,sceneEntities}=await import('../../src/twin/scene');
 const {defaultLayers,toggleLayer,legend}=await import('../../src/twin/overlays');
 const {selectEntity,selectedEntity,onSelection}=await import('../../src/twin/selection');
-const {inspect}=await import('../../src/twin/inspector');
+const {inspect,identityItems}=await import('../../src/twin/inspector');
 const {preflight,ready}=await import('../../src/scenarios/preflight');
 const {explain,qty,currentCup,reconcilable}=await import('../../src/twin/coffee-cell');
 const {nextAction}=await import('../../src/ui/operations-panel');
@@ -85,4 +85,16 @@ test('current cup follows the first unfinished job, then the last cup',()=>{
  const done=view({coffee:{jobs:[{jobId:'coffee-job-1',status:'delivered',recipeId:'espresso',cupId:'cup-1',attentionReason:null},{jobId:'coffee-job-2',status:'delivered',recipeId:'iced-milk-coffee',cupId:'cup-2',attentionReason:null}],cups:[{cupId:'cup-1',ownerKind:'customer',ownerId:'table-1'},{cupId:'cup-2',ownerKind:'customer',ownerId:'table-1'}]}});
  expect(currentCup(done)!.cupId).toBe('cup-2');
  expect(presets.map(p=>p.backendSetId)).toEqual(['mock-default','mock-amr']);
+});
+test('locked identity shows recipe and project revisions as the runtime reported them, never preset constants',()=>{
+ const report={manifest:{clock:{tickMs:20},assets:[],backends:[{id:'mock_amr',version:'1',model:'m',dynamics:false}],project:{id:'runtime-project',revision:7,hash:'h'},world:{id:'w',revision:4,hash:'h'}},
+  coffee:{jobs:[{jobId:'coffee-job-1',recipeId:'espresso',recipeRevision:3,status:'dispensing',steps:[]},{jobId:'coffee-job-2',recipeId:'espresso',recipeRevision:3,status:'reserved',steps:[]}],cups:[],armTrace:{samples:[]}}} as unknown as RunReport;
+ const items=identityItems(view(),report);
+ expect(items).toContain('recipe espresso r3');
+ expect(items).toContain('project runtime-project r7');
+ expect(items).toContain('world r4');
+ expect(items.join(' ')).not.toContain('iced-milk-coffee r1');
+ // no report yet: unknown, not the preset's values
+ expect(identityItems(view(),null)).toEqual(expect.arrayContaining(['recipe ?','project ?','world ?']));
+ expect(identityItems(view({coffee:null}),null).some(x=>x.startsWith('recipe'))).toBe(false);
 });

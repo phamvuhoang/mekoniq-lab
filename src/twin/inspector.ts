@@ -4,6 +4,14 @@ import {armRows,cupRows,cupSensorRow,jobsOf,stepRows} from './coffee-cell';
 import {sceneEntities,kindLabel,type TwinFrame} from './scene';
 import {nameOf} from '../scenarios/catalog';
 import {tr} from '../i18n';
+import type {RunReport,RunView} from '../scenarios/controls';
+/** Locked-run identity, only from what the runtime reported (snapshot + report manifest/jobs); a value it has not reported shows '?'. */
+export function identityItems(v:RunView,report:RunReport|null):string[] {
+ const r=v.run,m=report?.manifest;
+ const recipes=[...new Set((report?.coffee?.jobs??[]).map(j=>`${j.recipeId} r${j.recipeRevision}`))];
+ return [r.backendSetId,(m?.backends??r.backends.map(id=>({id,version:'?'}))).map(b=>`${b.id}@${b.version}`).join(', '),`model ${v.model}`,`${r.scenarioId} r${r.scenarioRevision}`,`seed ${r.seed}`,
+  `project ${m?`${m.project.id} r${m.project.revision}`:'?'}`,`world ${m?`r${m.world.revision}`:'?'}`,...(v.coffee?[`recipe ${recipes.length?recipes.join(' / '):'?'}`]:[]),`source ${r.sourceCommit.slice(0,7)}`];
+}
 export interface Inspection {id:string;title:string;kind:string;source:string;rows:Row[];note:string}
 /** `seen`: tick at which the Lab first saw an entity's current value (owner etc.), for an age that is honest about polling. */
 export function inspect(f:TwinFrame,entityId:string|null,seen:Record<string,number>={}):Inspection|null {

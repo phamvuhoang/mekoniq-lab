@@ -66,6 +66,9 @@ test.describe.serial("paired source runtime", () => {
     await page.getByRole("button", { name: "3D", exact: true }).click();
     await page.getByTestId("entity-list").getByRole("button", { name: /cup-1/ }).click();
     await expect(page.getByTestId("inspector-title")).toContainText("cup-1");
+    // the selection re-rendered the stage: the 3D buffer must follow the new stage size, not a stale/default 640x420
+    await page.getByRole("button", { name: "+5 s" }).click();
+    await expect.poll(() => page.evaluate(() => { const s = document.getElementById("twin-stage")!, c = s.querySelector("canvas"), r = Math.min(devicePixelRatio, 2); return c ? Math.abs(c.width - Math.round(s.clientWidth * r)) <= 2 && Math.abs(c.height - Math.round(s.clientHeight * r)) <= 2 && s.clientWidth !== 640 : false; })).toBe(true);
     const status = await page.getByTestId("run-status").textContent();
     const tick = await page.getByTestId("run-tick").textContent();
     await page.getByRole("button", { name: "2D", exact: true }).click();
@@ -81,7 +84,7 @@ test.describe.serial("paired source runtime", () => {
 
   test("engineering panel shows units, observed versus commanded and data age", async () => {
     await page.getByRole("button", { name: "+5 s" }).click();
-    await expect(page.getByTestId("run-tick")).toContainText("10.0 s");
+    await expect(page.getByTestId("run-tick")).toContainText("15.0 s");
     const eng = page.getByTestId("engineering-panel");
     await page.getByTestId("entity-list").getByRole("button", { name: /AMR-1/ }).click();
     for (const h of ["Quan sát", "Lệnh", "Tuổi dữ liệu"]) await expect(eng).toContainText(h);
@@ -91,7 +94,7 @@ test.describe.serial("paired source runtime", () => {
     // before the arm moves there is no trace sample: shown as unknown, not as zero
     await expect(eng.getByTestId("eng-joint-1")).toContainText("chưa có mẫu");
     for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "+5 s" }).click();
-    await expect(page.getByTestId("run-tick")).toContainText("30.0 s");
+    await expect(page.getByTestId("run-tick")).toContainText("35.0 s");
     await expect(eng.getByTestId("eng-joint-1")).toContainText("rad");
     await expect(eng.getByTestId("eng-joint-1")).toContainText("ms");
     await page.getByTestId("entity-list").getByRole("button", { name: /Coffee cell/ }).click();
