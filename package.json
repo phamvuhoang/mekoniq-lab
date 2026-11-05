@@ -17,7 +17,8 @@
     "test": "vitest run",
     "check:source": "node scripts/check-source.mjs",
     "runtime": "node scripts/start-runtime.mjs",
-    "test:runtime-e2e": "node scripts/test-runtime-e2e.mjs"
+    "test:runtime-e2e": "node scripts/test-runtime-e2e.mjs",
+    "test:twin-e2e": "node scripts/test-twin-e2e.mjs"
   },
   "dependencies": {
     "three": "0.180.0"
