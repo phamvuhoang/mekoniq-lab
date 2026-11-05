@@ -8,7 +8,8 @@ import {cellLayout,cupLocation,jobsOf} from './coffee-cell';
 import {esc} from '../ui/icons';
 import {tr} from '../i18n';
 import {stateLabel} from '../ui/labels';
-export interface TwinFrame {preset:TwinPreset;view:RunView|null;report:RunReport|null;seen?:Record<string,number>}
+import type {Held} from './store';
+export interface TwinFrame {preset:TwinPreset;view:RunView|null;report:RunReport|null;seen?:Record<string,number>;/** latest telemetry per entity from the browser store (plan 03: arm joints) */samples?:Record<string,Held>;nowMs?:number}
 export interface ViewState {view:'2d'|'3d';layers:Layers;selected:string|null}
 export interface SceneEntity {id:string;kind:string;name:string;x:number;y:number;source:'observed'|'modeled'|'derived'|'unknown';status?:string}
 const S=100;

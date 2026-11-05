@@ -1,0 +1,38 @@
+// Arm inspector rows from telemetry and run evidence (plan 03 A05). Pure, read-only: joints actual/commanded with provenance and age,
+// and the ARM03 status derived from the report's recorded checker evidence (engine, intervals, failure) — never from a viewer overlap.
+// No checker evidence in the report means ARM03 is not run for that cursor, whatever the picture shows.
+import type {RunReport} from '../../scenarios/controls';
+import type {Row} from '../amr';
+import {fmt} from '../amr';
+import {tr} from '../../i18n';
+import type {ArmJointsView} from './arm-telemetry';
+export function armTelemetryRows(v:ArmJointsView|null):Row[] {
+ if(!v)return [];
+ const src=v.provenance==='controller_sim'?tr('controller mô phỏng','コントローラ模擬','controller sim'):v.provenance==='mock'?tr('mock','モック','mock'):v.provenance;
+ const rows:Row[]=Array.from({length:6},(_,i)=>({key:`joint-${i+1}`,label:`q${i+1}`,observed:v.jointsActualRad?`${fmt(v.jointsActualRad[i]!,4)} (${fmt(v.jointsActualRad[i]!*180/Math.PI,2)}°)`:tr('không có','なし','none'),
+  commanded:v.jointsCommandedRad?`${fmt(v.jointsCommandedRad[i]!,4)} (${fmt(v.jointsCommandedRad[i]!*180/Math.PI,2)}°)`:'—',unit:'rad',source:v.jointsActualRad?(v.stale?'unknown':'observed'):v.jointsCommandedRad?'commanded':'unknown',ageMs:v.ageMs}));
+ if(v.tcpM)rows.push({key:'tcp',label:'TCP x, y, z',observed:v.tcpM.map(x=>fmt(x,3)).join(', '),commanded:'—',unit:'m',source:v.stale?'unknown':'observed',ageMs:v.ageMs});
+ rows.push({key:'homed',label:tr('Đã home','ホーム済み','Homed'),observed:v.homed===null?tr('chưa rõ','不明','unknown'):v.homed?tr('có','はい','yes'):tr('không','いいえ','no'),commanded:'—',unit:'',source:v.homed===null?'unknown':'observed',ageMs:v.ageMs});
+ rows.push({key:'arm-source',label:tr('Nguồn / độ mới','ソース / 鮮度','Source / freshness'),observed:`${src} · ${v.providerId} · ${v.stale?tr('CŨ','古い','STALE'):tr('mới','新鮮','fresh')} ${Math.round(v.ageMs)} ms · boot ${v.bootId.slice(-6)} seq ${v.seq}`,commanded:v.observedAt??'—',unit:'',source:v.stale?'unknown':'observed',ageMs:v.ageMs});
+ if(v.reasonCodes.length)rows.push({key:'arm-reasons',label:tr('Lý do','理由','Reasons'),observed:v.reasonCodes.join(', '),commanded:'—',unit:'',source:'unknown',ageMs:v.ageMs});
+ return rows;
+}
+export interface Arm03Status {result:'pass'|'fail'|'not_run';reason:string;engine:string|null;intervals:number;geometryRevision:string|null}
+/** ARM03 from the recorded evidence up to `tick`: the checker must have run (intervals retained, geometry named); a picture is never a pass. */
+export function arm03Status(report:RunReport|null,tick:number):Arm03Status {
+ const c=report?.coffee?.armTrace.collision;
+ if(!report||!c)return {result:'not_run',reason:'CHECKER_EVIDENCE_MISSING',engine:null,intervals:0,geometryRevision:null};
+ const intervals=(c.evidence?.intervals??[]).filter(i=>i.firstTick<=tick);
+ if(!intervals.length)return {result:'not_run',reason:'NO_CHECKED_INTERVAL_AT_CURSOR',engine:c.last?.engine??null,intervals:0,geometryRevision:null};
+ const scene=c.scene,scope=scene&&scene.tick<=tick?scene:null;
+ if(!scope||!scope.available)return {result:'not_run',reason:scope?scope.reason??'SCENE_UNAVAILABLE':'SCENE_NOT_DECLARED_AT_CURSOR',engine:c.last?.engine??null,intervals:intervals.length,geometryRevision:null};
+ const failure=c.evidence?.firstFailure&&c.evidence.firstFailure.tick<=tick?c.evidence.firstFailure:null;
+ if(failure)return {result:'fail',reason:`${failure.result.reason??'COLLISION'}:${(failure.result.pair??[]).join('/')}`,engine:failure.result.engine,intervals:intervals.length,geometryRevision:failure.result.geometryRevision};
+ if(c.evidence?.projection&&!c.evidence.projection.historyComplete)return {result:'not_run',reason:c.evidence.projection.reason??'HISTORY_INCOMPLETE',engine:c.last?.engine??null,intervals:intervals.length,geometryRevision:null};
+ const last=intervals[intervals.length-1]!;
+ return {result:intervals.every(i=>i.result.ok)?'pass':'fail',reason:intervals.every(i=>i.result.ok)?'':'INTERVAL_NOT_OK',engine:last.result.engine,intervals:intervals.length,geometryRevision:last.result.geometryRevision};
+}
+export function arm03Rows(report:RunReport|null,tick:number):Row[] {
+ const s=arm03Status(report,tick),label=s.result==='pass'?tr('đạt','合格','pass'):s.result==='fail'?tr('không đạt','不合格','fail'):tr('chưa chạy','未実行','not run');
+ return [{key:'arm03',label:'ARM03 · '+tr('kiểm va chạm hình học','幾何衝突チェック','geometric collision check'),observed:`${label}${s.reason?` · ${s.reason}`:''}`,commanded:s.engine?`${s.engine} · ${s.intervals} ${tr('khoảng','区間','intervals')}${s.geometryRevision?` · ${s.geometryRevision.slice(0,8)}`:''}`:'—',unit:'',source:s.result==='not_run'?'unknown':'modeled',ageMs:null}];
+}

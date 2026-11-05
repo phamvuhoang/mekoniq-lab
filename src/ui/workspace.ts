@@ -46,7 +46,7 @@ export class TwinWorkspace {
   if(!v)return {...base,view:v};
   if(this.replay){const r=this.replay,projection=r.rp.project(v,r.tick);return {...base,...projection};}
   const now=performance.now();
-  return {...base,view:{...v,entities:v.entities.map(e=>{const s=this.store.entity(e.id),o=s?.observed;if(!s||!o||typeof o.xM!=='number')return e;
+  return {...base,samples:Object.fromEntries(this.store.entities().map(s=>[s.entityId,s])),nowMs:now,view:{...v,entities:v.entities.map(e=>{const s=this.store.entity(e.id),o=s?.observed;if(!s||!o||typeof o.xM!=='number')return e;
    const fresh=freshness(s,this.link,now),newer=s.simTimeNs!==null&&BigInt(s.simTimeNs)>=BigInt(v.simTimeNs)&&(v.run.telemetryCursor===null||BigInt(s.seq)>=BigInt(v.run.telemetryCursor));
    return {...e,...newer?{pose:{x:o.xM as number,y:o.yM as number,yawRad:o.yawRad as number},moving:typeof o.moving==='boolean'?o.moving:e.moving,hold:typeof o.hold==='string'?o.hold:null}:{},sampleAgeMs:fresh.ageMs??undefined,quality:fresh.state==='live'||fresh.state==='frozen_sim'?newer?(s.quality==='valid'?'valid':'stale'):e.quality:'stale'};})}};
  }

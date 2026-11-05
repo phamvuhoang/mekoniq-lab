@@ -1,6 +1,8 @@
 // Inspector model for the selected entity: values with unit, source (observed / commanded / modeled / derived / unknown) and age. Pure.
 import {amrRows,runtimeResolved,type Row} from './amr';
 import {armRows,cupRows,cupSensorRow,jobsOf,stepRows} from './coffee-cell';
+import {armJointsView} from './arm/arm-telemetry';
+import {arm03Rows,armTelemetryRows} from './arm/arm-view';
 import {sceneEntities,kindLabel,type TwinFrame} from './scene';
 import {nameOf} from '../scenarios/catalog';
 import {tr} from '../i18n';
@@ -21,7 +23,11 @@ export function inspect(f:TwinFrame,entityId:string|null,seen:Record<string,numb
  const base={id:e.id,title:`${e.name}`,kind:kindLabel(e.kind),source:e.source};
  const noRun=tr('Chưa có lần chạy: chỉ có dữ liệu mô hình của preset.','未実行:プリセットのモデル値のみ。','No run yet: preset model data only.');
  if(e.kind==='amr'){const a=v?.entities.find(r=>r.id===e.id);return {...base,rows:a?amrRows(a,a.sampleAgeMs??v!.run.ageMs,runtimeResolved(report,f.preset.project,e.id)):[],note:a?tr('Pose quan sát từ backend mock (mô hình động học), không phải cảm biến.','姿勢はモック(運動学モデル)の観測でセンサーではありません。','Pose is observed from the mock backend (kinematic model), not a sensor.'):noRun};}
- if(e.kind==='arm')return {...base,rows:v?armRows(report,tick):[],note:tr('Góc khớp là quỹ đạo lệnh của mock_kinematic; không có encoder hay lực kẹp.','関節角はmock_kinematicの指令軌道。エンコーダ・把持力なし。','Joint angles are the mock_kinematic commanded trace; no encoder or grip force.')};
+ if(e.kind==='arm'){
+  const sample=f.samples?.[e.id],live=sample?armJointsView(sample,f.nowMs??sample.receivedAtMs):null;
+  // telemetry rows first (actual/commanded apart, provenance and age), then the report's commanded trace, then ARM03 from recorded checker evidence
+  return {...base,rows:v?[...armTelemetryRows(live),...armRows(report,tick).filter(r=>!live||!r.key.startsWith('joint-')),...arm03Rows(report,tick)]:[],note:live?.provenance==='controller_sim'?tr('Khớp thực tế từ controller mô phỏng (LinuxCNC sim); không có cảm biến kẹp hay lực.','関節実測は模擬コントローラ(LinuxCNC sim)から。把持センサ・力なし。','Actual joints from the simulated controller (LinuxCNC sim); no gripper sensor or force.'):tr('Góc khớp là quỹ đạo lệnh của mock_kinematic; không có encoder hay lực kẹp.','関節角はmock_kinematicの指令軌道。エンコーダ・把持力なし。','Joint angles are the mock_kinematic commanded trace; no encoder or grip force.')};
+ }
  const job=e.kind==='job'?e.id:jobsOf(v).find(j=>!['delivered','quarantined','cancelled'].includes(j.status))?.jobId??jobsOf(v).at(-1)?.jobId;
  if(e.kind==='coffee_machine'||e.kind==='job'){
   const j=jobsOf(v).find(x=>x.jobId===job);
