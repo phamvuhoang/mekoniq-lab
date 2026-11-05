@@ -3,14 +3,13 @@
   "status": "not_run",
   "result": "blocked_external",
   "scenarioId": "FD04",
-  "seed": 1,
-  "repeat": 1,
+  "seed": 17,
+  "repeat": 3,
   "backendSetId": "simulation-default",
   "requiredBackends": [
     "gazebo_nav2"
   ],
   "reasons": [
-    "PREREQUISITE_MISSING:node24",
     "PREREQUISITE_MISSING:linux",
     "PREREQUISITE_MISSING:python-deps",
     "PREREQUISITE_MISSING:compiler",
@@ -21,7 +20,7 @@
     "backend": "gazebo_nav2",
     "host": {
       "platform": "darwin",
-      "node": "26.3.0",
+      "node": "24.22.2",
       "python": "Python 3.13.3"
     },
     "image": {
@@ -35,8 +34,8 @@
     "checks": [
       {
         "id": "node24",
-        "ok": false,
-        "detail": "node 26.3.0"
+        "ok": true,
+        "detail": "node 24.22.2"
       },
       {
         "id": "linux",
@@ -75,6 +74,6 @@
       }
     ],
     "prerequisitesMet": false,
-    "reportSha256": "a7d302167f4e85f2dd963435f2029cf2ada24d552b88f3b67fc467f16c72115e"
+    "reportSha256": "a4f111198b2a0c3dd8a6bbe2acd83a11b3da0eeac7e2d6656cd3342c9215c1f1"
   }
 }

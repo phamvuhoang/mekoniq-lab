@@ -1,6 +1,6 @@
 # Simulation compatibility and evidence scope
 
-Updated 2026-11-05 for the Plan 01 software remediation and the Plan 02 simulation layer (section below). This page describes implemented interfaces and their limits. The Plan 01 regression/acceptance record is complete for source `c1d1ea70e42937d421070674f07d00edc7c41245`; the current Lab pin is `ff6c2eb7aaee4e4214cdfcb9887156301ffb22fa`. Owner acceptance and external gates remain open in the [remediation record](reviews/2026-11-05-plan-01-remediation.md).
+Updated 2026-11-05 for the Plan 01 software remediation and the Plan 02 simulation layer (section below). This page describes implemented interfaces and their limits. The Plan 01 regression/acceptance record is complete for source `c1d1ea70e42937d421070674f07d00edc7c41245`; the current Lab pin is `0101d6cfd0fa876eee235077bd591b313c05be37`. Owner acceptance and external gates remain open in the [remediation record](reviews/2026-11-05-plan-01-remediation.md).
 
 ## Authoritative records
 
@@ -43,7 +43,7 @@ Human wait is correlated by mission/stop and ends on the final allocation confir
 
 ## Plan 02 simulation layer
 
-Updated 2026-11-05 for Plan 02. Source `ff6c2eb7aaee4e4214cdfcb9887156301ffb22fa` adds the simulation layer; the Lab pin moved to artifact `274912d1a002a78fe4e2836659022b6b66713e29212d7f4a123fcb36945f88b9` (schema hash `f112425e636254a6c3d20d75d615b696c426c7d2a5fb185c01a1943095fe0ffd`). The export manifest now records the digest of the separately distributed Linux SIL tools; they are not part of `runtime.mjs`, and importing or starting the mock never needs Gazebo.
+Updated 2026-11-05 for Plan 02. Source `0101d6cfd0fa876eee235077bd591b313c05be37` (plan 02 plus its review fix pass) adds the simulation layer; the Lab pin moved to artifact `f96a65b36bd3520bb04a4282314bdf55867b1257e591271c28f0bf7d948257ec` (schema hash `f112425e636254a6c3d20d75d615b696c426c7d2a5fb185c01a1943095fe0ffd`). The export manifest now records the digest of the separately distributed Linux SIL tools; they are not part of `runtime.mjs`, and importing or starting the mock never needs Gazebo.
 
 - **Backends.** `gazebo_nav2` has an orchestrator and worker bridge; its evidence is `sil` only with a real worker on a Linux host, protocol doubles are business evidence. `coffee_io_sim` is the F04 process model behind the simulation backend id with modelled measurements and no fluid or thermal model. `linuxcnc_sim` is not implemented (plan 03); the beverage plant session couples the mock arm as `open_loop_visualization`, never closed-loop. The backend set `coffee-simulation` names all three; a missing one is `BACKEND_MISSING`, never a fallback.
 - **Admission and support.** The scenario matrix (`source/packages/lab-runtime/src/v2/scenario-matrix.ts`) binds every verification id to requirement refs, fixtures, tests, backend support, an oracle, invariants and measurements; hardware support is false for every row in this runtime. The Lab reads what a campaign can run from the runtime's health answer (`src/scenarios/support.ts`, `fixtures/scenarios/food-beverage-campaign.json`); it never hardcodes availability.

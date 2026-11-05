@@ -1,7 +1,7 @@
 {
  "schemaVersion": 1,
  "purpose": "Plan 01 software completion, tested on the recorded mock host; owner acceptance and external gates remain open. Provider interface revision 2 binds the updated cell observation, project and recipe contracts; a simulation/hardware provider must verify these hashes and supply its own evidence. Plan 02 (2026-11-05) adds the simulation layer in source: world compiler, Gazebo/Nav2 worker bridge, clock barrier, telemetry ingest, fault schedule, actors/metrics, coffee_io_sim process coupling, cup transfer evidence, the ARM03 swept-path checker, the scenario matrix, LabEvidenceV2 records and SIL campaign tooling. Every SIL run on the recorded macOS host is not_run (no Linux/ROS 2/Gazebo); physics rows carry no pass.",
- "frozenAt": "2026-11-05T13:55:42.745Z",
+ "frozenAt": "2026-11-05T14:37:34.066Z",
  "gates": {
   "R-MOCK": "software_complete_tested_not_accepted",
   "R-SIM": "blocked_external",
@@ -14,10 +14,10 @@
  "codeRevisions": {
   "source": {
    "branch": "feat/lab-digital-twin-v2",
-   "artifactCommit": "ff6c2eb7aaee4e4214cdfcb9887156301ffb22fa",
-   "finalHead": "ff6c2eb7aaee4e4214cdfcb9887156301ffb22fa",
+   "artifactCommit": "0101d6cfd0fa876eee235077bd591b313c05be37",
+   "finalHead": "0101d6cfd0fa876eee235077bd591b313c05be37",
    "dirty": false,
-   "pinNote": "Plan 02 artifact and regression use this exact committed source HEAD (branch feat/lab-digital-twin-v2); the plan 01 pin c1d1ea70e42937d421070674f07d00edc7c41245 remains historical.",
+   "pinNote": "Plan 02 artifact and regression use this exact committed source HEAD (branch feat/lab-digital-twin-v2) after the review fix pass; ff6c2eb (pre-review) and the plan 01 pin c1d1ea7 remain historical.",
    "packagesDiffAfterPin": "empty",
    "plan02Commits": [
     "02c416a",
@@ -26,8 +26,11 @@
     "d9fcde6",
     "9f20184",
     "413c40a",
-    "ff6c2eb"
-   ]
+    "ff6c2eb",
+    "71bc783",
+    "0101d6c"
+   ],
+   "reviewFixCommit": "0101d6c"
   },
   "lab": {
    "branch": "feat/robot-lab",
@@ -43,12 +46,12 @@
     2
    ],
    "nodeMajor": 24,
-   "sha256": "274912d1a002a78fe4e2836659022b6b66713e29212d7f4a123fcb36945f88b9",
+   "sha256": "f96a65b36bd3520bb04a4282314bdf55867b1257e591271c28f0bf7d948257ec",
    "simulationTools": {
     "distribution": "separate",
     "path": "source/robotics/simulation",
-    "digest": "8389988ec02b378a05bb969fc947f9f36d00c74717e82cad89db2b1024a0e6b9",
-    "files": 31,
+    "digest": "2256fe7748b40b170a861ba2b58e8bf4a2cae2c796cf9ed7d47e7a23a81c2ed3",
+    "files": 32,
     "note": "Linux SIL tools are not in runtime.mjs; the export manifest records their digest and the pinned ROS image so a Linux host proves the same revision (scripts/lab-sil.mjs doctor)."
    }
   },
@@ -328,20 +331,21 @@
    "silRuns": {
     "plan02-sil-fd07.json": {
      "file": "docs/implementation/evidence/digital-twin-v2/plan02-sil-fd07.json",
-     "sha256": "3d1832a135d58989aa6461bc8b77918f15c85056e088a8eb3fb74d6987b41fdc",
+     "sha256": "63d6eeca2cedf1aca0b60d2841a5cefed9d3cdfb55e382d5f867e5d8c7d098cf",
      "result": "not_run (exit 2)"
     },
     "plan02-sil-fd03.json": {
      "file": "docs/implementation/evidence/digital-twin-v2/plan02-sil-fd03.json",
-     "sha256": "4e42c6fc013b7762148c8338697babc1cf5f6e7622a233594cfe44a4957e3be2",
+     "sha256": "fee2bec1a8c45095f5904c54d7f93c508aab23b77c88b846a61fc6ee794c9831",
      "result": "not_run (exit 2)"
     },
     "plan02-sil-fd04.json": {
      "file": "docs/implementation/evidence/digital-twin-v2/plan02-sil-fd04.json",
-     "sha256": "ecf005c84b2b950b554a450735ed9dfaa192f00b3d1374a0307c10bf8aa79d4c",
+     "sha256": "24dd27b99916e606efdd44cdc356ddef17f8ffc1fa0367a2c9cbb830773b5353",
      "result": "not_run (exit 2)"
     }
-   }
+   },
+   "reviewFixPass": "source 0101d6c: capability lifecycle health, honest physics rows (liveness + computed separation), worker scene loop (telemetry/contacts/separation/actors/blockers/faults), barriers, journal-before-send, Nav2 overlay params file, stdio guards, per-run ROS/GZ partition, one requiredBackends formula, allowed-contact validation; every SIL run on this host still not_run."
   }
  },
  "handoff": [
@@ -349,7 +353,8 @@
   "Mock durations and S01 completion timing are not physical cycle-time baselines.",
   "ARM03 uses conservative illustrative capsule sweeps with a declared map profile and current/static AMR proxies; native collision planning, calibration, dynamics, physical grip and stopping require separate evidence.",
   "Plan 02: SIL tooling, the scenario matrix, evidence records and coffee process coupling are implemented and tested in software; no SIL run executed on the recorded host (macOS, no ROS 2/Gazebo), so G-SIM-NAV, G-SIM-ARM and G-SIM-E2E stay blocked_external and no physics row passes.",
-  "Plan 02: the arm side of BV01 remains the F04 mock arm as open_loop_visualization; the LinuxCNC controller loop, closed-loop checkbox and BV01 SIL fixture belong to plan 03."
+  "Plan 02: the arm side of BV01 remains the F04 mock arm as open_loop_visualization; the LinuxCNC controller loop, closed-loop checkbox and BV01 SIL fixture belong to plan 03.",
+  "Plan 02 review fix pass (source 0101d6c): the SIL path can no longer pass a physics row without a live worker reporting sensor liveness and separation; the real RosPorts scene node has still never executed (Linux/ROS 2 required)."
  ],
  "gMockBlockers": {
   "note": "All 18 former software gaps have executed evidence. Acceptance still requires owner review and the human/Linux gates below; unsupported physical fidelity remains explicit.",

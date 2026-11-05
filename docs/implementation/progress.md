@@ -6,11 +6,11 @@ Cập nhật: **2026-11-05, sau Plan 02 (phần mềm mô phỏng, chưa có SIL
 
 ## Plan 02 — lớp mô phỏng (2026-11-05)
 
-Phần mềm của Plan 02 đã hiện thực và kiểm thử trong source `ff6c2eb7aaee4e4214cdfcb9887156301ffb22fa` (7 commit từ pin Plan 01): world compiler có hash, bridge Gazebo/Nav2 với bảng lệnh bền, clock barrier, telemetry ingest, fault schedule, actor/blocker và metrics, coffee_io_sim ghép với domain, bằng chứng chuyển cốc hai phía, checker quét quỹ đạo ARM03, scenario matrix FD01–FD08/BV01–BV08/SYS01–SYS06 và LabEvidenceV2. Lab chỉ thêm fixture campaign, helper đọc support matrix từ health, test khả năng mô phỏng và tài liệu này. **Không có SIL run nào đã chạy**: host macOS không có ROS 2/Gazebo/LinuxCNC nên mọi lệnh `lab-sil.mjs` dừng ở prerequisite với `not_run` (exit 2); không hàng physics nào pass; R-SIM, G-SIM-NAV, G-SIM-ARM, G-SIM-E2E vẫn `blocked_external`. Chi tiết lệnh, kết quả và giới hạn tại [plan02-simulation.md](evidence/digital-twin-v2/plan02-simulation.md); hash tại [simulation-compatibility.json](../../config/simulation-compatibility.json).
+Phần mềm của Plan 02 đã hiện thực và kiểm thử trong source `0101d6cfd0fa876eee235077bd591b313c05be37` (7 commit task + lint + review fix pass, từ pin Plan 01): world compiler có hash, bridge Gazebo/Nav2 với bảng lệnh bền, clock barrier, telemetry ingest, fault schedule, actor/blocker và metrics, coffee_io_sim ghép với domain, bằng chứng chuyển cốc hai phía, checker quét quỹ đạo ARM03, scenario matrix FD01–FD08/BV01–BV08/SYS01–SYS06 và LabEvidenceV2. Lab chỉ thêm fixture campaign, helper đọc support matrix từ health, test khả năng mô phỏng và tài liệu này. **Không có SIL run nào đã chạy**: host macOS không có ROS 2/Gazebo/LinuxCNC nên mọi lệnh `lab-sil.mjs` dừng ở prerequisite với `not_run` (exit 2); không hàng physics nào pass; R-SIM, G-SIM-NAV, G-SIM-ARM, G-SIM-E2E vẫn `blocked_external`. Chi tiết lệnh, kết quả và giới hạn tại [plan02-simulation.md](evidence/digital-twin-v2/plan02-simulation.md); hash tại [simulation-compatibility.json](../../config/simulation-compatibility.json).
 
 | Thành phần Plan 02 | Trạng thái |
 |---|---|
-| Runtime pin mới | `ff6c2eb7…` · artifact `274912d1…` · schema `f112425e…` (cell-observation thêm `recipeRevision` tùy chọn) · Node 24 |
+| Runtime pin mới | `0101d6cf…` · artifact `f96a65b3…` · schema `f112425e…` (cell-observation thêm `recipeRevision` tùy chọn) · Node 24 |
 | SIL campaign `food-beverage` | not_run trên host này; BV01 và campaign còn thiếu `linuxcnc_sim` (Plan 03) và fixture SIL cho cell |
 | Beverage coupling | `open_loop_visualization` với mock arm; chưa tick closed-loop |
 | Evidence records | business pass từ journal, physics `not_run`, provenance `modelled`, cup movement truy được command/evidence |
