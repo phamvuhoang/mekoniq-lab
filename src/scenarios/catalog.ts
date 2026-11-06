@@ -3,7 +3,7 @@ import coffeeFixture from '../../fixtures/twins/coffee-cell-v2.json';
 import restaurantFixture from '../../fixtures/twins/restaurant-v2.json';
 import type {AssetRevision,LabProjectV2} from '../shared/types';
 import {tr} from '../i18n';
-export interface TwinPreset {id:string;title:()=>string;summary:()=>string;scenarioId:string;scenarioRevision:number;backendSetId:string;seed:number;
+export interface TwinPreset {mode?:'mock'|'simulation';id:string;title:()=>string;summary:()=>string;scenarioId:string;scenarioRevision:number;backendSetId:string;seed:number;
  project:LabProjectV2;assets:AssetRevision[];names:Record<string,string>;roles:{entities:LabProjectV2['entities'][number]['kind'][];points:string[]};}
 export const presets:TwinPreset[]=[
  {id:'coffee',title:()=>tr('Cà phê sữa đá','アイスミルクコーヒー','Iced milk coffee'),summary:()=>tr('BV01 · espresso + cà phê sữa đá · máy pha → arm → khay robot → bàn','BV01 · エスプレッソ + アイスミルクコーヒー · マシン → アーム → ロボットトレイ → テーブル','BV01 · espresso + iced milk coffee · machine → arm → robot tray → table'),

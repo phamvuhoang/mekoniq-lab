@@ -43,7 +43,8 @@ export interface RunReport {verification?:RunVerification;manifest:{armCollision
  reconciliations:{subjectId:string;commandId:string|null;nativeState:string;tick:number}[];coverage:Record<string,boolean>;limitations:string[];
  coffee?:{plantLog?:Record<string,unknown>[];jobs:{jobId:string;recipeId:string;recipeRevision:number;status:string;steps:JobStep[]}[];cups:{cupId:string;ownerKind:string;ownerId:string;movements:{transferId:string;provenance:string;observedBy:string;at:string}[]}[];
   armTrace:{collision?:ArmCollisionView|null;stop?:ArmStopView|null;tag:string;interpolation:string;modelRevision:string;limitsOk:boolean;samples:{tick:number;q:number[];tcp:[number,number,number]}[]}};}
-export interface CreateRun {project:LabProjectV2;scenarioId:string;scenarioRevision:number;seed:number;mode:'mock';backendSetId:string;access:'simulated'}
+export interface CreateRun {project:LabProjectV2;scenarioId:string;scenarioRevision:number;seed:number;mode:'mock'|'simulation';backendSetId:string;access:'simulated'}
+export function requestForPreset(p:import('./catalog').TwinPreset):CreateRun{return {project:structuredClone(p.project),scenarioId:p.scenarioId,scenarioRevision:p.scenarioRevision,seed:p.seed,mode:p.mode??'mock',backendSetId:p.backendSetId,access:'simulated'};}
 export type ActionKind='start'|'pause'|'resume'|'cancel'|'step'|'confirm'|'injectFault'|'reconcile'|'restoreCup';
 export interface TwinRuntime {
  readiness?(scenarioId:string,backendSetId:string,project?:LabProjectV2):Promise<ReadinessSnapshot>;
