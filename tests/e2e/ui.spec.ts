@@ -5,7 +5,7 @@ test("shell preserves identity, defaults to Vietnamese and offers all screens", 
 }) => {
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("lang", "vi");
-  await expect(page.locator(".brand-mark i")).toHaveCount(3);
+  await expect(page.locator(".brand-horizontal")).toHaveAttribute("src", "/brand/assets/MEKONIQ_Horizontal_White_Transparent_v2.png");
   await expect(page.locator(".mode-badge")).toContainText("PREVIEW");
   await expect(
     page.getByRole("link", { name: "Kế hoạch kinh doanh" }),

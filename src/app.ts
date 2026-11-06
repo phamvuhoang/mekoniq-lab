@@ -167,18 +167,10 @@ export class LabApp {
     const ns = names();
     return `<a class="skip-link" href="#workspace">${tr("Đến vùng làm việc", "ワークスペースへ", "Skip to workspace")}</a>
 <header class="topbar">
-<a class="brand" href="#design" aria-label="Mekoniq Robot Lab">
-<span class="brand-mark" aria-hidden="true">
-<i>
-</i>
-<i>
-</i>
-<i>
-</i>
-</span>
-<span>MEKONIQ<span class="brand-divider">/</span>
+<a class="brand mq-brand" href="#design" aria-label="MEKONIQ Robot Lab">
+<img class="brand-horizontal" src="/brand/assets/MEKONIQ_Horizontal_White_Transparent_v2.png" width="1420" height="300" alt="">
+<img class="brand-compact" src="/brand/assets/MEKONIQ_Icon_Transparent.svg" width="40" height="40" alt="">
 <span class="brand-lab">ROBOT LAB</span>
-</span>
 </a>
 <span class="top-project">${icon("cube", 15)} ${tr("Dự án nhà hàng", "レストランプロジェクト", "Restaurant project")} <span class="revision">R${String(this.project.revision).padStart(2, "0")}</span>
 </span>
@@ -215,7 +207,7 @@ export class LabApp {
 </div>
 </div>
 </aside>
-<main id="workspace" tabindex="-1">
+<main id="workspace" tabindex="-1" aria-busy="${this.busy}">
 <div class="page-heading">
 <div>
 <div class="eyebrow">${tr("THIẾT KẾ. KIỂM CHỨNG. TRIỂN KHAI.", "設計。検証。運用。", "DESIGN. VALIDATE. DEPLOY.")}</div>
