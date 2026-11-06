@@ -441,7 +441,7 @@ export class LabApp {
     const point = run?.robotPosition ?? { x: 1, y: 1 };
     const selected = this.worldSelected;
     const pos = (x: number, y: number) => `${x * 70},${(w.height - y) * 70}`;
-    return `<svg id="world-map" class="world-map" data-world-revision="${w.revision}" viewBox="-22 -22 ${w.width * 70 + 44} ${w.height * 70 + 44}" role="img" aria-label="${tr("Mặt bằng nhà hàng theo mét", "レストラン平面図、単位メートル", "Restaurant layout in metres")}">
+    return `<svg id="world-map" class="world-map" data-world-revision="${w.revision}" viewBox="-22 -22 ${w.width * 70 + 44} ${w.height * 70 + 44}" role="${interactive ? "group" : "img"}" aria-label="${tr("Mặt bằng nhà hàng theo mét", "レストラン平面図、単位メートル", "Restaurant layout in metres")}">
 <defs>
 <pattern id="map-grid" width="70" height="70" patternUnits="userSpaceOnUse">
 <path d="M70 0H0V70" fill="none" stroke="#2c424b" stroke-width="1"/>

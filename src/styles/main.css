@@ -252,7 +252,7 @@ select {
 .nav-number {
   margin-left: auto;
   font: 12px var(--mono);
-  opacity: 0.6;
+  opacity: 1;
 }
 .sidebar-bottom {
   margin-top: auto;
@@ -2444,3 +2444,14 @@ h2 { font-size: 20px; line-height: 1.35; }
 
 input:disabled, select:disabled { opacity: 1; background: var(--raised); color: var(--muted); cursor: not-allowed; }
 .button:disabled { background: var(--raised); color: var(--muted); border-color: var(--mq-control-border); box-shadow: none; }
+
+/* Keep the hit area even when compact toolbar rules hide button text. */
+.heading-actions .button, .heading-actions .quiet { min-width:44px; min-height:44px; }
+@media print {
+  :root {
+    --bg:var(--mekoniq-paper); --panel:var(--mekoniq-paper); --raised:var(--mekoniq-light);
+    --ink:var(--mekoniq-ink); --muted:var(--mekoniq-ink); --line:var(--mekoniq-ink);
+    --accent:var(--mekoniq-ink); --accent-ink:var(--mekoniq-paper);
+    --blue:var(--mekoniq-ink); --amber:var(--mekoniq-ink); --danger:var(--mekoniq-ink);
+  }
+}
