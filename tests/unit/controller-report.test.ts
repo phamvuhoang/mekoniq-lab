@@ -45,3 +45,9 @@ test('import rejects malformed enclosing metadata, events and telemetry before p
   await expect(importControllerBundle([new File([JSON.stringify(report)],'report.json')])).rejects.toThrow('REPORT_INVALID');
  }
 });
+test('import shape rejects nested iterable/coercion hazards and accepts a full recorder buffer',async()=>{
+ const {validReportShape}=await import('../../src/reports/report-shape');
+ for(const mutate of [(r:any)=>{r.businessEvents[0].state.stops=[{id:'s',allocationIds:42}];},(r:any)=>{r.businessEvents[0].state.currentStopId={toString:0,valueOf:0};},(r:any)=>{r.effects=[{id:'x',type:'robot.execute',status:'pending',attempts:0,payload:{commandId:{toString:0}}}];},(r:any)=>{r.telemetry.samples[0].observed.cycleState={toString:0};}]){const r=controllerReportFixture(20);mutate(r);expect(validReportShape(r)).toBe(false);}
+ const r=controllerReportFixture(20);r.telemetry!.samples=Array.from({length:20000},(_,i)=>({...r.telemetry!.samples[0]!,seq:String(i)}));expect(validReportShape(r)).toBe(true);
+ const {stateLabel}=await import('../../src/ui/labels');expect(stateLabel('constructor')).toBe('constructor');expect(stateLabel('__proto__')).toBe('__proto__');
+});

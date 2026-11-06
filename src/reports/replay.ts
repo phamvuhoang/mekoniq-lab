@@ -38,7 +38,7 @@ function collisionAt(report:RunReport,tick:number):ArmCollisionView|null {
  const ticks=intervals.map(i=>i.firstTick);if(firstFailure)ticks.push(firstFailure.tick);
  return {world:structuredClone(world??[]),checks:truncated?(tick>=report.outcome.tick?c.checks:null):retainedChecks,last:structuredClone(result),...scene?{scene}:{},
   evidence:{intervals,worlds,droppedIntervals:truncated?(tick>=report.outcome.tick?e.droppedIntervals:null):0,...firstFailure?{firstFailure}:{},
-   projection:{cursorTick:tick,lastCheckTick:lastTick,retainedRange:{fromTick:ticks.length?Math.min(...ticks):null,toTick:lastTick},historyComplete,worldScope:'checked_geometry',
+   projection:{cursorTick:tick,lastCheckTick:lastTick,retainedRange:{fromTick:ticks.length?ticks.reduce((n,t)=>Math.min(n,t),Infinity):null,toTick:lastTick},historyComplete,worldScope:'checked_geometry',
     ...truncated?{reason:'SOURCE_TRACE_TRUNCATED' as const}:missingWorld?{reason:'MISSING_RECORDED_WORLD' as const}:{}}}};
 }
 function stopAt(report:RunReport,tick:number):ArmStopView|null {
@@ -55,7 +55,7 @@ export function openReplayV2(report:RunReport,o:{maxGapTicks?:number}={}){
  const epoch=s0?Date.parse(s0.observedAt!)-Number(BigInt(s0.simTimeNs!)/1000000n):report.businessEvents.length?Date.parse(report.businessEvents[0]!.at):0;
  const tickOf=(e:Event)=>Math.round((Date.parse(e.at)-epoch)/tickMs);
  const events=report.businessEvents.map(e=>({...structuredClone(e),tick:tickOf(e)}));
- const toTick=Math.max(report.outcome.tick,...events.map(e=>e.tick),...samples.map(tickOfSample));
+ const toTick=samples.reduce((n,s)=>Math.max(n,tickOfSample(s)),events.reduce((n,e)=>Math.max(n,e.tick),report.outcome.tick));
  // ponytail: default max interpolation gap = 2 recording periods (10 ticks at 10 Hz); a profile value belongs in the manifest when one exists
  const maxGap=o.maxGapTicks??10;
  const clamp=(t:number)=>{if(!Number.isFinite(t))throw new Error('INVALID_REPLAY_CURSOR');return Math.max(0,Math.min(Math.round(t),toTick));};
