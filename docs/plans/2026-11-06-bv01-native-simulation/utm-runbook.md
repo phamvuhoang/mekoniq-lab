@@ -215,13 +215,14 @@ Fault schedule dùng chung shape `id/faultId/targetId/trigger/durationMs`, trong
 ```json
 {
   "restartOperator": {"mode": "operator", "timeoutMs": 30000},
+  "faultExpectation": {"faultId": "restart-at-handoff", "outcome": "needs_attention", "attentionReasons": ["CONTROLLER_RESTART_OPERATOR_REQUESTED"]},
   "faultSchedule": [
     {"id": "restart-at-handoff", "faultId": "controller-restart", "targetId": "arm-1", "trigger": {"kind": "phase", "value": "handoff"}, "durationMs": 1000}
   ]
 }
 ```
 
-Ghép hai trường này vào config server đầy đủ; giữ mỗi fault qualification ở output/run riêng. Khi `native-faults.json` ghi `awaiting_operator`, operator thực hiện restart controller SIM qua console/quy trình quản lý của Debian. Kênh Lab không được cấp sudo/operator group và không chạy command SSH tùy ý. Chỉ `observed_transition` với cả bootId và controllerEpoch đổi mới chứng minh restart đã xảy ra; deadline hết ghi `unperformed`. Intent hoặc operator bấm nút không đủ để pass. Để kiểm mất tunnel đúng lúc handoff, dùng `faultId: "tunnel-loss"` với cùng phase/target; không cần `restartOperator` cho fault này. Negative fault run có thể attention/served=0; đánh giá theo required fault assertions, không dùng happy-path served count làm kết luận.
+Ghép hai trường này vào config server đầy đủ; giữ mỗi fault qualification ở output/run riêng. Khi `native-faults.json` ghi `awaiting_operator`, operator thực hiện restart controller SIM qua console/quy trình quản lý của Debian. Kênh Lab không được cấp sudo/operator group và không chạy command SSH tùy ý. Chỉ `observed_transition` với cả bootId và controllerEpoch đổi mới chứng minh restart đã xảy ra; deadline hết ghi `unperformed`. Intent hoặc operator bấm nút không đủ để pass. Để kiểm mất tunnel đúng lúc handoff, dùng `faultId: "tunnel-loss"` với cùng phase/target; không cần `restartOperator` cho fault này. Negative fault run có thể attention/served=0; `faultExpectation.faultId` tham chiếu ID entry (`restart-at-handoff`), không phải tên fault (`controller-restart`). Khai báo đúng attention reason mong đợi trước run; không thêm mọi lỗi gặp phải vào allowlist để đạt pass. Case assessment giữ nguyên business verdict, kiểm fault đã quan sát, custody/no-replay và coverage áp dụng. Coverage trước injection không chứng minh physics sau khi mất kết nối; các gate native/release rộng hơn vẫn cần evidence tương ứng.
 
 Native browser check dùng `playwright.native.config.ts` với `LAB_NATIVE_BASE_URL` và `LAB_NATIVE_PAIRING_TOKEN` từ môi trường thật; đặt `CHROME_PATH` theo máy chạy browser. Hành trình import/replay riêng nhận bundle thật qua `LAB_NATIVE_IMPORT_BUNDLE`; phải copy đủ report và raw artifacts đúng hashes từ run, không thay bằng fixture mock. Không dùng `test:mock-e2e` cho bài này. Khi thiếu môi trường/token, test ghi not_run/skip và không mở native gate. Không đưa token vào evidence hoặc shell log công khai.
 
