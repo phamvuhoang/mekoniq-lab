@@ -1,5 +1,7 @@
 # MEKONIQ Lab — Digital Twin & Simulation v2
 
+> Phần tiếp nối ngày 06/11/2026: [BV01 Integration Completion & Native Simulation](../2026-11-06-bv01-native-simulation/README.md). Các release/hardware gates trong bộ spec này vẫn có hiệu lực.
+
 Ngày 2026-11-05 · Trạng thái **đề xuất kiến trúc và kế hoạch triển khai**, chưa phải tính năng đã chạy hoặc chứng nhận máy thật.
 
 ## 1. Quyết định sản phẩm

@@ -1,5 +1,7 @@
 # MEKONIQ Lab Digital Twin v2 — Implementation Plan
 
+> Tiếp nối sau review Plan 02/03: [BV01 Integration Completion & UTM Native Simulation — 06/11/2026](../2026-11-06-bv01-native-simulation/README.md). Bộ mới xử lý khoảng trống tích hợp và qualification trên baseline `a89a077` / `3a92e65`; không thay đổi lịch sử execution của plan này.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Lab chạy mock food delivery + coffee ngay sau cài đặt, hoàn thiện simulation bằng backend thật, và có đường hardware được kiểm chứng theo từng gate.
