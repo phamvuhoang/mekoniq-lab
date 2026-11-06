@@ -1,0 +1,634 @@
+{
+  "schemaVersion": 1,
+  "purpose": "NR01-NR12 preservation inventory (compatibility.md)",
+  "baseline": {
+    "capturedOn": "2026-11-07",
+    "labCommit": "679a23929f7e100adbe4633123fa74689689e561",
+    "sourceCommit": "d881c6f93d06cdde0d6e10289b65dc7beac6537a",
+    "runtimePin": {
+      "dirty": false,
+      "packageVersion": "0.1.0",
+      "toolchain": {
+        "node": "v24.22.2"
+      },
+      "sourceCommit": "f82b2057cae89b0029968212753df01f86f334ad",
+      "schemaHash": "ebc4b1f05c57f1dbbbca9e376bd815dd20277a9fe8a7d4c8365ab566cc8f63fe",
+      "protocolMajor": 2,
+      "protocolMajors": [
+        1,
+        2
+      ],
+      "nodeMajor": 24,
+      "artifactSha256": "470a404c61714f5ee5b1878f964c1be4bea28628846bdfd800b1df8619a9d236",
+      "entrypoint": "runtime.mjs"
+    },
+    "node": "v24.22.2",
+    "suites": [
+      {
+        "command": "pnpm test (lab)",
+        "result": "188 passed, 1 skipped (30 files)"
+      },
+      {
+        "command": "pnpm exec vitest run tests/contracts tests/integration/lab-v2-contracts.test.ts tests/integration/lab-v2-recovery.test.ts (source)",
+        "result": "67 passed (8 files)"
+      }
+    ]
+  },
+  "candidate": {
+    "commit": null,
+    "pin": null,
+    "status": "pending"
+  },
+  "rows": [
+    {
+      "id": "NR01",
+      "tests": [
+        {
+          "file": "lab/tests/unit/core-calculations.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/unit/core-design-world.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/ui.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NR02",
+      "tests": [
+        {
+          "file": "lab/tests/integration/project-store.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/integration/project-v2-migration.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/ui.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NR03",
+      "tests": [
+        {
+          "file": "lab/tests/unit/core-design-world.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/ui.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "source/robotics/simulation/tests/test_world_compiler.py",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NR04",
+      "tests": [
+        {
+          "file": "source/tests/integration/lab-runtime.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "source/tests/integration/lab-runtime-gateway.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/service-journey.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NR05",
+      "tests": [
+        {
+          "file": "source/tests/integration/lab-v2-mock.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "source/tests/integration/lab-v2-bv01-ports.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/twin-workspace.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/coffee-journey.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NR06",
+      "tests": [
+        {
+          "file": "source/tests/integration/lab-v2-mixed.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "source/tests/integration/lab-v2-scenario-matrix.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "source/tests/acceptance/lab-v2-mock.acceptance.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NR07",
+      "tests": [
+        {
+          "file": "source/tests/integration/lab-v2-arm-stage-start.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "source/tests/integration/lab-v2-native-gateway.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "source/tests/integration/lab-v2-controller-report.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "source/robotics/simulation/tests/test_world_compiler.py",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/controller-report.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/arm-simulation.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NR08",
+      "tests": [
+        {
+          "file": "source/tests/integration/lab-v2-recovery.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm exec vitest run (source)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "source/tests/integration/lab-v2-stream.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "source/tests/integration/lab-v2-reclaim-targets.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/unit/workspace-reclaim.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/twin-inputs.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/twin-recovery.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NR09",
+      "tests": [
+        {
+          "file": "source/tests/integration/lab-v2-fault-schedule.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "source/tests/integration/lab-v2-bv01-recovery.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "source/tests/integration/lab-v2-cup-ledger.test.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/unit/fault-schedule.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/fault-schedule.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NR10",
+      "tests": [
+        {
+          "file": "lab/tests/unit/report-evidence.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/unit/report-replay.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/unit/report-metrics.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/unit/report-human-wait.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/unit/core-deployment.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/ui.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/twin-recovery.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/controller-report.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NR11",
+      "tests": [
+        {
+          "file": "lab/tests/integration/mock-launcher.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/integration/runtime-artifact.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/integration/offline-bundle.test.ts",
+          "baseline": {
+            "status": "pass",
+            "command": "pnpm test (lab vitest run)"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/offline-bv01.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NR12",
+      "tests": [
+        {
+          "file": "lab/tests/e2e/ui.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/brand-ui.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/brand-accessibility.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/tests/e2e/twin-workspace.spec.ts",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        },
+        {
+          "file": "lab/scripts/measure-twin-ui.mjs",
+          "baseline": {
+            "status": "not_run",
+            "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
+          },
+          "candidate": {
+            "status": "pending"
+          }
+        }
+      ]
+    }
+  ]
+}
