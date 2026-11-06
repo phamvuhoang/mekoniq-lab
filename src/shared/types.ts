@@ -19,7 +19,7 @@ export interface AssetRevision {schemaVersion:2;id:string;revision:number;conten
  geometry:({kind:'box';frameId:string;sizeM:number[]}|{kind:'cylinder';frameId:string;radiusM:number;heightM:number}|{kind:'sphere';frameId:string;radiusM:number})[];
  kinematics?:{convention:'modified_dh'|'urdf';jointCount:number};inertial?:{massKg:number};sensorRefs?:string[];toolRefs?:string[];
  provenance:{parameter:string;source:'measured'|'vendor_spec'|'vendor_cad'|'assumed'|'illustrative';reference?:string;license?:string}[];}
-export interface LabProjectV2 {schemaVersion:2;id:string;name:string;revision:number;updatedAt:string;
+export interface LabProjectV2 {faultSchedule?:import('../scenarios/fault-schedule').FaultScheduleEntry[];schemaVersion:2;id:string;name:string;revision:number;updatedAt:string;
  armCollisionProfile?:{schemaVersion:1;id:string;revision:number;units:'SI';provenance:'illustrative';reference:string;modelId:string;modelRevision:string;
   baseInMap:{position:number[];quaternionXyzw:number[]};fixtureHeightM:number;robotHeightM:number};
  entities:{id:string;speedLimitMps?:number;kind:'amr'|'arm'|'coffee_machine'|'cup_station';assetRef:{id:string;revision:number;contentHash:string};recipeRefs?:{id:string;revision:number;hash:string}[]}[];

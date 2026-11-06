@@ -1,3 +1,4 @@
+import {validateSchedule} from '../scenarios/fault-schedule';
 import type {LabProject,LabProjectV2} from '../shared/types';
 export const MAX_PROJECT_BYTES=5*1024*1024;
 export const MAX_TRAYS=10;
@@ -53,8 +54,10 @@ function list(value:unknown,field:string,max=200):unknown[] {if (!Array.isArray(
 function vec(value:unknown,length:number,field:string):void {if (!Array.isArray(value)||value.length!==length||!value.every(Number.isFinite)) invalid(field);}
 /** Structural v2 check on the Lab side; the source runtime stays the authoritative validator (JSON Schema). Rejects unknown members, so a bad migration cannot be stored. */
 export function validateProjectV2(value:unknown):LabProjectV2 {
+  const hasSchedule=!!value&&typeof value==='object'&&'faultSchedule' in value;
   const hasArmProfile=!!value&&typeof value==='object'&&'armCollisionProfile' in value;
-  const project=object(value,['schemaVersion','id','name','revision','updatedAt','entities','world',...hasArmProfile?['armCollisionProfile']:[]],'root');
+  const project=object(value,['schemaVersion','id','name','revision','updatedAt','entities','world',...hasArmProfile?['armCollisionProfile']:[],...hasSchedule?['faultSchedule']:[]],'root');
+  if(hasSchedule)validateSchedule(project.faultSchedule);
   if (project.schemaVersion!==2) invalid('schemaVersion');
   id(project.id,'id');text(project.name,'name');revision(project.revision,'revision');
   if (typeof project.updatedAt!=='string'||!Number.isFinite(Date.parse(project.updatedAt))) invalid('updatedAt');

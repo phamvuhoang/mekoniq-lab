@@ -52,6 +52,12 @@ export class ProjectStore {
       request.onerror=()=>reject(request.error??new Error('PROJECT_LOAD_FAILED'));
     });
   }
+  async saveV2(project:LabProjectV2):Promise<void>{
+    const checked=validateProjectV2(project),db=await this.database();
+    await new Promise<void>((resolve,reject)=>{const tx=db.transaction('projectsV2','readwrite');tx.oncomplete=()=>resolve();tx.onabort=()=>reject(tx.error??new Error('PROJECT_SAVE_ABORTED'));tx.onerror=()=>reject(tx.error??new Error('PROJECT_SAVE_FAILED'));tx.objectStore('projectsV2').put(checked);});
+  }
+  async exportV2(id:string):Promise<string>{const p=await this.loadV2(id);if(!p)throw new Error('PROJECT_NOT_FOUND');return JSON.stringify(p,null,2);}
+  async importV2(json:string):Promise<LabProjectV2>{if(new TextEncoder().encode(json).length>MAX_PROJECT_BYTES)throw new Error('PROJECT_TOO_LARGE');const p=validateProjectV2(JSON.parse(json));await this.saveV2(p);return p;}
   async loadV2(id:string):Promise<LabProjectV2|null> {return this.read('projectsV2',id,r=>validateProjectV2(r));}
   async loadLegacy(id:string):Promise<LegacyBackup|null> {return this.read('legacyProjects',id,r=>r as LegacyBackup);}
   async loadAssets(project:LabProjectV2):Promise<AssetRevision[]> {

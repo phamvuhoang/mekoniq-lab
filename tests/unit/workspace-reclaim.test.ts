@@ -63,7 +63,7 @@ test('multiple known reconciliation targets require an explicit selection and ne
  reclaimed.attention=[{reason:'RECLAIM_RECONCILIATION_REQUIRED',tick:691,robotId:'amr-1',subjectId:'mission-1'},{reason:'STOP_REQUESTED',tick:691,robotId:'amr-1',subjectId:'mission-1'},{reason:'RECLAIM_RECONCILIATION_REQUIRED',tick:691,robotId:'amr-2',subjectId:'mission-2'}];
  w.click('twin-reclaim','run');await vi.waitFor(()=>expect(h.busy).toBe(false));w.click('twin-reconcile');
  expect(w.html()).toContain('id="twin-reconcile-target"');expect(w.html()).toContain('value="amr-2"');
- expect(w.html().match(/<option value="amr-1"/g)).toHaveLength(1);
+ expect(w.html().match(/<select id="twin-reconcile-target"[^]*?<\/select>/)?.[0].match(/<option value="amr-1"/g)).toHaveLength(1);
  w.click('twin-confirm-ok');expect(actions).toEqual([]);
  w.change('twin-reconcile-target','unknown-robot');w.click('twin-confirm-ok');expect(actions).toEqual([]);
  w.change('twin-reconcile-target','amr-2');expect(w.html()).toContain('Reconcile amr-2');expect(actions).toEqual([]);
