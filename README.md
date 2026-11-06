@@ -4,7 +4,7 @@ Lab thiết kế và mô phỏng nghiệp vụ robot giao món, giữ nhận di�
 
 Bản hiện tại có cấu hình robot, mô hình 3D/2D và lắp ráp, sơ đồ kết nối chức năng, BOM, ước tính năng lượng, trình sửa mặt bằng, báo cáo/replay và xuất candidate dự thảo. Digital Twin v2 chạy giao món, cà phê và chiến dịch hai AMR qua **domain, SQLite journal và dispatcher trong source**, với backend mock AMR/arm/coffee. S01 v1 vẫn có luồng xác nhận tải và giao món riêng. Mô hình web không chứng minh robot thật, động lực học hay an toàn vật lý.
 
-Đã hoàn thiện R01–R12 và 18 mục phần mềm còn thiếu của Plan 01. Vòng kiểm chứng cuối trên source/runtime `c1d1ea7` đã qua toàn bộ lệnh CI tương đương, browser, offline và 41 acceptance tests: 96/106 dòng có bằng chứng pass, không còn `NOT_IMPLEMENTED`. Mười dòng còn lại thuộc gate người dùng/Linux hoặc fidelity vật lý. Xem [bản ghi remediation](docs/reviews/2026-11-05-plan-01-remediation.md) và [bằng chứng](docs/implementation/evidence/digital-twin-v2/mock-report.md); **R-MOCK chưa accepted**.
+Bản ghi lịch sử Plan 01: đã hoàn thiện R01–R12 và 18 mục phần mềm còn thiếu. Vòng kiểm chứng của đợt đó trên source/runtime `c1d1ea7` đã qua toàn bộ lệnh CI tương đương, browser, offline và 41 acceptance tests: 96/106 dòng có bằng chứng pass, không còn `NOT_IMPLEMENTED`. Mười dòng còn lại thuộc gate người dùng/Linux hoặc fidelity vật lý. Xem [bản ghi remediation](docs/reviews/2026-11-05-plan-01-remediation.md) và [bằng chứng](docs/implementation/evidence/digital-twin-v2/mock-report.md); **R-MOCK chưa accepted**.
 
 ## Chạy giao diện
 
@@ -74,7 +74,7 @@ cd /path/to/mekoniq-lab-offline
 
 `./start` dùng Node trong gói; không cần Node, pnpm, npm hay tải mạng trên máy nhận. Mở `http://127.0.0.1:4175`, nhập mã ghép nối in trong terminal. Runtime dùng cổng 4176, dữ liệu mặc định ở `runs/` trong gói; có thể chọn `./start --data-dir /path/to/runs`. UI phải giữ cổng 4175 để khớp origin được runtime cho phép. Launcher kiểm manifest/platform, từ chối cổng đang dùng và chỉ dừng tiến trình nó đã tạo.
 
-Gói macOS/Apple Silicon hiện có tại [`releases/mekoniq-lab-plan01-macos-arm64-c1d1ea7.tar.gz`](releases/mekoniq-lab-plan01-macos-arm64-c1d1ea7.tar.gz), kèm [checksum và nguồn runtime](docs/implementation/evidence/digital-twin-v2/plan01-offline-release.json). Giải nén rồi chạy `./start`. Gói này đã qua kiểm khởi động; các hành trình FD01/BV01 đã qua browser với bản offline cùng code/pin. Kiểm không có package manager trong `PATH` đã qua. Cài trên máy mới, ngắt mạng hệ điều hành, cold boot và Linux vẫn cần bằng chứng riêng.
+Gói lịch sử Plan 01 cho macOS/Apple Silicon ở [`releases/mekoniq-lab-plan01-macos-arm64-c1d1ea7.tar.gz`](releases/mekoniq-lab-plan01-macos-arm64-c1d1ea7.tar.gz), kèm [checksum và nguồn runtime](docs/implementation/evidence/digital-twin-v2/plan01-offline-release.json). Giải nén rồi chạy `./start`. Gói này đã qua kiểm khởi động; các hành trình FD01/BV01 đã qua browser với bản offline cùng code/pin. Kiểm không có package manager trong `PATH` đã qua. Cài trên máy mới, ngắt mạng hệ điều hành, cold boot và Linux vẫn cần bằng chứng riêng.
 
 ## Đầu vào, khôi phục và báo cáo Twin
 
@@ -110,7 +110,7 @@ Runtime chỉ bind `127.0.0.1:4176`; Vite proxy cùng origin. Không dùng cổn
 
 ### Cài hoặc cập nhật runtime
 
-Revision runtime thực đang cài nằm trong [`config/source-runtime.lock.json`](config/source-runtime.lock.json): source commit, schema hash, artifact SHA-256 và protocol majors. Lab dùng protocol 1 cho S01 và 2 cho twin. `.runtime/rollback.lock.json` giữ đúng một pin trước đó; muốn quay xa hơn cần export/import revision cũ. Runtime không tự theo source HEAD. Bản remediation hiện ghim đúng source `c1d1ea70e42937d421070674f07d00edc7c41245`, export từ checkout sạch và đã kiểm trên runtime cài thực. Xem [bản ghi remediation](docs/reviews/2026-11-05-plan-01-remediation.md) để đối chiếu hash và kết quả.
+Revision runtime thực đang cài nằm trong [`config/source-runtime.lock.json`](config/source-runtime.lock.json): source commit, schema hash, artifact SHA-256 và protocol majors. Lab dùng protocol 1 cho S01 và 2 cho twin. `.runtime/rollback.lock.json` giữ đúng một pin trước đó; muốn quay xa hơn cần export/import revision cũ. Runtime không tự theo source HEAD. Pin hiện tại lấy từ lock này, không từ revision trong các báo cáo lịch sử. Kết quả đợt BV01 continuation nằm trong [evidence index](docs/implementation/evidence/bv01-native-simulation/README.md); [bản ghi Plan 01](docs/reviews/2026-11-05-plan-01-remediation.md) giữ hash và kết quả của đợt cũ.
 
 Dùng Node 24, dependencies của source và một checkout sạch. Chạy **từ thư mục source**:
 

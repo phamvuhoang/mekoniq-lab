@@ -151,7 +151,66 @@ Mac browser truy cập UI phục vụ **trong Ubuntu** qua SSH loopback, giữ c
 ssh -N -a -o ExitOnForwardFailure=yes -L 127.0.0.1:4175:127.0.0.1:4175 mekoniq-amr
 ```
 
-Nếu4175 đang dùng, báo conflict và dừng launcher task-owned đúng cách, không kill tiến trình lạ. Runtime gateway/native UI lifecycle là N06 deliverable; hiện tại launcher `lab:mock` không tự biến thành native. Không mở port1880/1884, không forward operator socket. Dùng console VM cho QtVCP; không cần public VNC.
+Nếu4175 đang dùng, báo conflict và dừng launcher task-owned đúng cách, không kill tiến trình lạ. Gateway hỗ trợ opt-in `--native-config`; launcher `lab:mock` vẫn khởi động mock. Không mở port1880/1884, không forward operator socket. Dùng console VM cho QtVCP; không cần public VNC.
+
+## 6a. Khởi động BV01 native qua gateway
+
+Chỉ thực hiện sau N02/N03 standalone và N04 transport qualification. Các đường dẫn `/srv/mekoniq` dưới đây là ví dụ trong Ubuntu; thay bằng checkout/artifact đã pin thực tế. Không chạy trên Mac rồi đánh dấu native pass. Python tools và source checkout phải cùng revision với runtime export; gói offline mock không chứa ROS/LinuxCNC.
+
+Compile fixture và scenario cùng file để giữ đúng world input hash, trong môi trường đã source ROS và workspace overlay:
+
+```sh
+cd /srv/mekoniq/source/robotics/simulation
+PYTHONPATH=/srv/mekoniq/source/robotics/simulation:/srv/mekoniq/source/robotics/agent python3 -m compiler \
+  --fixture /srv/mekoniq/source/tests/fixtures/digital-twin/sil/bv01.json \
+  --scenario /srv/mekoniq/source/tests/fixtures/digital-twin/sil/bv01.json \
+  --out /var/tmp/mekoniq-native-bv01-bundle
+```
+
+Tạo config server-owned `/srv/mekoniq/native-config.json` với đường dẫn và SSH alias đã xác minh. `parentDir` phải tồn tại, thuộc coordinator và đủ ngắn cho Unix socket; thư mục con/socket mỗi run do supervisor quản lý. Không lưu credential trong JSON hoặc project browser.
+
+```json
+{
+  "sourceRoot": "/srv/mekoniq/source",
+  "bundleDirectory": "/var/tmp/mekoniq-native-bv01-bundle",
+  "environmentProfile": "utm-ubuntu-arm64",
+  "python": "python3",
+  "arm": {
+    "tunnel": {
+      "parentDir": "/run/user/1000",
+      "alias": "mekoniq-arm-lab",
+      "knownHosts": "/home/mekoniq/.ssh/known_hosts"
+    }
+  }
+}
+```
+
+UID/path/alias phải thay theo tài khoản thực, không mặc định UID1000. Alias `mekoniq-arm-lab` dùng principal Lab riêng như N04, khác operator/admin. Gateway chỉ nhận config lúc khởi động; browser không chọn host/socket.
+
+Trong hai terminal Ubuntu, chạy runtime export đã kiểm hash và Lab cùng pin:
+
+```sh
+node /srv/mekoniq/runtime/runtime.mjs --native-config /srv/mekoniq/native-config.json --data-dir /var/tmp/mekoniq-native-runs --port 4176
+```
+
+```sh
+cd /srv/mekoniq/lab
+pnpm check:source
+pnpm dev
+```
+
+Mở qua SSH loopback4175 trên Mac, chọn preset native BV01 và ghép nối bằng token một lần từ terminal gateway. Start được quyết định bởi readiness và provider admission. Native telemetry tự tiến theo Gazebo clock; các nút step/auto-run của mock không điều khiển native. Pause/resume chỉ được dùng khi runtime khai báo hỗ trợ; không coi UI pause là controller đã dừng. Reopen giữ runId và chỉ đọc/đối soát, không gửi lại motion.
+
+Campaign dùng cùng factory, compiler tạo bundle riêng cho từng lượt:
+
+```sh
+cd /srv/mekoniq/source
+node scripts/lab-sil.mjs doctor --backend linuxcnc_sim --environment-profile utm-ubuntu-arm64 --native-config /srv/mekoniq/native-config.json --json
+node scripts/lab-sil.mjs run --scenario BV01 --seed 23 --repeat 3 --backend-set coffee-simulation --environment-profile utm-ubuntu-arm64 --native-config /srv/mekoniq/native-config.json --out /var/tmp/mekoniq-evidence/N06-BV01
+node scripts/lab-sil.mjs verify --input /var/tmp/mekoniq-evidence/N06-BV01
+```
+
+Native browser check dùng `playwright.native.config.ts` với `LAB_NATIVE_BASE_URL` và `LAB_NATIVE_PAIRING_TOKEN` từ môi trường thật; đặt `CHROME_PATH` theo máy chạy browser. Không dùng `test:mock-e2e` cho bài này. Khi thiếu môi trường/token, test ghi not_run/skip và không mở native gate. Không đưa token vào evidence hoặc shell log công khai.
 
 ## 7. Kết thúc và evidence
 
