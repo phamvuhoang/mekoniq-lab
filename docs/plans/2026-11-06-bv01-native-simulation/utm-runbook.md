@@ -84,7 +84,7 @@ Sau repository setup, xem candidate trước khi install:
 
 ```sh
 apt-cache policy ros-jazzy-ros-base ros-jazzy-navigation2 ros-jazzy-ros-gz-sim
-sudo apt-get install ros-jazzy-ros-base ros-dev-tools ros-jazzy-navigation2 ros-jazzy-nav2-bringup ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge ros-jazzy-xacro ros-jazzy-robot-state-publisher ros-jazzy-launch-testing-ament-cmake ros-jazzy-ament-lint-auto
+sudo apt-get install ros-jazzy-ros-base ros-dev-tools ros-jazzy-navigation2 ros-jazzy-nav2-bringup ros-jazzy-ros-gz ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge ros-jazzy-xacro ros-jazzy-robot-state-publisher ros-jazzy-launch-testing-ament-cmake ros-jazzy-ament-lint-auto
 ```
 
 Package candidate thiếu arm64 → blocked dependency, không thay library major ngẫu nhiên. Trong source checkout, shell bash:
@@ -96,10 +96,10 @@ source install/setup.bash
 export PATH="$PWD/.venv/bin:$PATH"
 export PYTHONPATH="$PWD/robotics/simulation:$PWD/robotics/agent${PYTHONPATH:+:$PYTHONPATH}"
 export MEKONIQ_CONTRACTS_DIR="$PWD/packages/contracts/schemas"
-node scripts/lab-sil.mjs doctor --backend gazebo_nav2 --json
+node scripts/lab-sil.mjs doctor --backend gazebo_nav2 --environment-profile utm-ubuntu-arm64 --json
 ```
 
-Doctor hiện tại còn gắn image.lock.json baseline; không dùng nó làm chứng cứ image ARM64. N02 bổ sung environment-profile và thực inventory trước qualification. Sau N02 chạy FD01 rồi FD02/03/04/07 theo command trong plan. `headless` không có window vẫn cần renderer nếu fixture dùng GPU sensors; kiểm real sensor output/EGL/software renderer và lưu logs. Nếu thiếu rendering, giữ failed/not_run đúng giai đoạn; không xóa lidar/contact từ fixture.
+N02 đã thêm lựa chọn environment-profile và inventory thực. Lock ARM64 vẫn là candidate: `packageVersions` và `runtimePin` chưa được resolve, nên doctor sẽ chặn cho tới khi ghi và review inventory từ Ubuntu guest. Chạy `python3 -m bridge.native_profile --profile utm-ubuntu-arm64` trong môi trường đã source ROS/overlay để lấy `actual.packages` và `actual.runtime`; pin hai trường này vào lock sau khi kiểm dependency/paths/hashes, rồi chạy doctor lại. Không đổi `qualification` thành pass chỉ vì inventory khớp; phải chạy FD01 rồi FD02/03/04/07 theo command trong plan. `headless` không có window vẫn cần renderer nếu fixture dùng GPU sensors; kiểm real sensor output/EGL/software renderer và lưu logs. Nếu thiếu rendering, giữ failed/not_run đúng giai đoạn; không xóa lidar/contact từ fixture.
 
 ## 5. Debian — LinuxCNC SIM/QtVCP
 
@@ -120,11 +120,11 @@ Từ source root, activate `.venv`, chuyển vào arm-controller để không im
 ```sh
 cd integrations/arm-controller
 ../../.venv/bin/python -m pytest tests/test_arbiter.py tests/test_bridge_recovery.py -q
-bash scripts/smoke-sim.sh --profile configs/sim/puma560/mekoniq.ini --evidence-dir /var/tmp/mekoniq-evidence/controller-terminal
-linuxcnc configs/sim/puma560/mekoniq.ini
+bash scripts/smoke-sim.sh --profile configs/sim/puma560/mekoniq.ini --dependencies-lock packaging/dependencies.arm64-vm.lock.json --evidence-dir /var/tmp/mekoniq-evidence/controller-terminal
+bash scripts/smoke-sim.sh --profile configs/sim/puma560/mekoniq.ini --dependencies-lock packaging/dependencies.arm64-vm.lock.json --evidence-dir /var/tmp/mekoniq-evidence/controller-gui --gui
 ```
 
-Lệnh cuối mở GUI trên desktop guest. Thực hiện [HMI acceptance hiện có](../../../../source/integrations/arm-controller/docs/hmi-acceptance.md) qua đúng path workspace; nếu checkout tách, đọc file `integrations/arm-controller/docs/hmi-acceptance.md` trong source. Capture actual actions/joints/epochs, không kết luận pass chỉ từ GUI screenshot.
+Lệnh cuối stage đúng file HMI và mở GUI trên desktop guest. Dùng thư mục evidence mới cho mỗi lượt; wrapper từ chối record cũ để tránh dùng lại PASS. Đóng GUI không tự đạt acceptance: wrapper ghi `manual_verification_required/not_run` nếu chưa có checklist độc lập. Thực hiện [HMI acceptance hiện có](../../../../source/integrations/arm-controller/docs/hmi-acceptance.md) qua đúng path workspace; nếu checkout tách, đọc file `integrations/arm-controller/docs/hmi-acceptance.md` trong source. Capture actual actions/joints/epochs, không kết luận pass chỉ từ GUI screenshot.
 
 ## 6. Chạy luân phiên và integrated topology
 
