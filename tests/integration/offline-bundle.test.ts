@@ -30,6 +30,12 @@ test('offline release contains its Node, runtime, built dependency assets and lo
  expect(wrongPort.status).toBe(1);expect(wrongPort.stderr).toContain('UI_PORT_REQUIRES_4175');
  const boot=spawnSync(join(out,'bin/node'),[join(out,'start.mjs'),'--boot-only','--runtime-port','49176','--data-dir',join(root,'data')],{encoding:'utf8',env:{...process.env,PATH:'/nonexistent'},timeout:30000});
  expect(boot.status,boot.stderr).toBe(0);expect(boot.stdout).toMatch(/Offline mock ready/);
+ for(const wrong of [{platform:process.platform==='darwin'?'linux':'darwin'},{arch:process.arch==='arm64'?'x64':'arm64'}]){
+  await writeFile(join(out,'offline-manifest.json'),JSON.stringify({...manifest,...wrong}));
+  const rejected=spawnSync(join(out,'bin/node'),[join(out,'start.mjs'),'--boot-only'],{encoding:'utf8',timeout:10000});
+  expect(rejected.status).toBe(1);expect(rejected.stderr).toContain('OFFLINE_PLATFORM_MISMATCH');
+ }
+ await writeFile(join(out,'offline-manifest.json'),JSON.stringify(manifest));
  // Startup validates every packaged file before it opens ports or starts a child.
  await writeFile(join(out,'ui/index.html'),'corrupted');
  const bad=spawnSync(join(out,'bin/node'),[join(out,'start.mjs'),'--boot-only'],{encoding:'utf8',timeout:10000});
