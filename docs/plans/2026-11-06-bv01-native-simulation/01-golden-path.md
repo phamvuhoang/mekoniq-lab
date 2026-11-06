@@ -2,6 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+
+> Qualification: [evidence index](../../implementation/evidence/bv01-native-simulation/README.md). Checked boxes record completed portable steps; mixed/native/clean-target/usability steps remain open where actual execution is missing. A skipped Linux assertion is not a native pass.
+
 **Goal:** BV01 dùng chung plant ports, cup ledger đúng và report đủ fidelity; UI tái sử dụng controls hiện có.
 
 **Architecture:** Domain không đổi authority. Tách plant khỏi CoffeeDriver, thêm correlated observations, report extension và bounded configuration.
@@ -20,7 +23,7 @@
 
 **Interfaces:** Consumes existing CellReport và pending transfer identity. Produces `TransferObservation`, `CorrelatedTransferEvidence`, `CupPhysicalState`, `applyCupObservation(state, observation)` theo spec. Wrapper journal phải nhận cùng observationId+hash; không dùng pure reducer làm dedupe store.
 
-- [ ] Viết RED cho unknown không fallback nozzle, one parent, takeCup một lần, crash sau projection trước domain confirm; schema reject NaN/out-of-range/old epoch/wrong slot ở semantic validator. Core reducer example:
+- [x] Viết RED cho unknown không fallback nozzle, one parent, takeCup một lần, crash sau projection trước domain confirm; schema reject NaN/out-of-range/old epoch/wrong slot ở semantic validator. Core reducer example:
 
 ```ts
 const o: TransferObservation = {
@@ -36,10 +39,10 @@ expect(applyCupObservation(held, {...o, observationId:'obs-2', seq:'2', phase:'l
   .toMatchObject({parent:null, status:'lost'});
 ```
 
-- [ ] Run from source: `pnpm exec vitest run tests/contracts/lab-transfer-evidence.test.ts tests/integration/lab-v2-cup-ledger.test.ts`. RED phải do behavior/contract chưa có, không phải môi trường database.
-- [ ] Implement schema + generated type, ledger transition table, wrapper dedupe/hash conflict/ordering; modify plant-session to update attachment once, invoke takeCup and remove nozzle obstacle. Release thêm tray obstacle; unknown không chọn parent. Add checkpoint persistence and crash-cut tests using same temporary SQLite support as current lab-v2 suites.
-- [ ] GREEN focused command; `pnpm contracts:generate`, `pnpm contracts:check`, `pnpm typecheck`. Verify old cell observation fixtures unchanged; new evidence namespace không vô tình đổi CellReport shape.
-- [ ] Commit explicit touched files: `feat: correlate cup observations and persist physical custody`. Evidence I01 records V02/V03 outcomes; native proof còn not_run.
+- [x] Run from source: `pnpm exec vitest run tests/contracts/lab-transfer-evidence.test.ts tests/integration/lab-v2-cup-ledger.test.ts`. RED phải do behavior/contract chưa có, không phải môi trường database.
+- [x] Implement schema + generated type, ledger transition table, wrapper dedupe/hash conflict/ordering; modify plant-session to update attachment once, invoke takeCup and remove nozzle obstacle. Release thêm tray obstacle; unknown không chọn parent. Add checkpoint persistence and crash-cut tests using same temporary SQLite support as current lab-v2 suites.
+- [x] GREEN focused command; `pnpm contracts:generate`, `pnpm contracts:check`, `pnpm typecheck`. Verify old cell observation fixtures unchanged; new evidence namespace không vô tình đổi CellReport shape.
+- [x] Commit explicit touched files: `feat: correlate cup observations and persist physical custody`. Evidence I01 records V02/V03 outcomes; native proof còn not_run.
 
 ## I02 — Shared workflow, guards và stage/start
 
@@ -47,7 +50,7 @@ expect(applyCupObservation(held, {...o, observationId:'obs-2', seq:'2', phase:'l
 
 **Interfaces:** Consumes I01 and existing CellAdapter; produces `CoffeePlantPorts` and optional fourth CoffeeDriver constructor argument. Test helper new `runBv01Case(name: 'happy'|'missing-grip'|'receiver-moves'|'reboot-after-stage'): Promise<{served:number; transferCount:number; attention:string[]; motionStarts:number; physicalParents:string[]}>` drives real source session/dispatcher with injected doubles; not hardcoded expected outcomes. Use current `tests/support/lab-v2.ts` to construct session. Helper records actual events, closes resources in finally.
 
-- [ ] RED tests shared mock sequence plus guards and stage timeout. Example:
+- [x] RED tests shared mock sequence plus guards and stage timeout. Example:
 
 ```ts
 const r = await runBv01Case('missing-grip');
@@ -58,10 +61,10 @@ const recovered = await runBv01Case('reboot-after-stage');
 expect(recovered.motionStarts).toBeLessThanOrEqual(1);
 ```
 
-- [ ] Run source `pnpm exec vitest run tests/integration/lab-v2-bv01-ports.test.ts tests/integration/lab-v2-arm-stage-start.test.ts`.
-- [ ] Extract hardwired plants into default mock ports; await advance/recover/drain lifecycle. Keep mock checkpoint reader; native arm snapshot null. Pre-pick guard includes machine fault/ready/cup/brew; post-grasp requires grip; release guards dock/slot/epoch/observer. Map domain start to journaled derived stage + logical start. Timeout/unknown waits for query/reconcile; stage ACK never means job done. Add native-port double with null grip to prove no completion shortcut. Implement no-motion replay across stage/start crash cuts.
-- [ ] GREEN focused tests plus source `pnpm exec vitest run tests/integration/coffee-transfer.test.ts tests/integration/coffee-recovery.test.ts tests/integration/lab-v2-mock.test.ts`; after clean export/import run lab `pnpm test:mock-e2e -- coffee-journey.spec.ts`. Verify both recipes, cup conservation, CargoLoaded before served.
-- [ ] Commit source `refactor: share coffee workflow across simulated plant ports`; Lab test commit separate. Evidence V01/V03 uses actual source+pin.
+- [x] Run source `pnpm exec vitest run tests/integration/lab-v2-bv01-ports.test.ts tests/integration/lab-v2-arm-stage-start.test.ts`.
+- [x] Extract hardwired plants into default mock ports; await advance/recover/drain lifecycle. Keep mock checkpoint reader; native arm snapshot null. Pre-pick guard includes machine fault/ready/cup/brew; post-grasp requires grip; release guards dock/slot/epoch/observer. Map domain start to journaled derived stage + logical start. Timeout/unknown waits for query/reconcile; stage ACK never means job done. Add native-port double with null grip to prove no completion shortcut. Implement no-motion replay across stage/start crash cuts.
+- [x] GREEN focused tests plus source `pnpm exec vitest run tests/integration/coffee-transfer.test.ts tests/integration/coffee-recovery.test.ts tests/integration/lab-v2-mock.test.ts`; after clean export/import run lab `pnpm test:mock-e2e -- coffee-journey.spec.ts`. Verify both recipes, cup conservation, CargoLoaded before served.
+- [x] Commit source `refactor: share coffee workflow across simulated plant ports`; Lab test commit separate. Evidence V01/V03 uses actual source+pin.
 
 ## I03 — Controller evidence đến report, timeline và inspector
 
@@ -69,7 +72,7 @@ expect(recovered.motionStarts).toBeLessThanOrEqual(1);
 
 **Interfaces:** Consumes ArmCollisionEvidenceRecord; produces RunVerification extension from spec. Export common UI reader new `readArmVerdict(report: RunReport, cursorTick: number): 'pass'|'fail'|'not_run'` in Lab arm-view; legacy reports use existing evaluator. Native evidence tick mapping from coordinator explicit, not fake mock trace. Gateway read-only report retrieval for native run owned by authenticated session; file import uses bounded validator and origin imported.
 
-- [ ] RED legacy compatibility, native gap/empty trace, late collision and malicious artifact paths. Example lab unit after fixture built from report test support:
+- [x] RED legacy compatibility, native gap/empty trace, late collision and malicious artifact paths. Example lab unit after fixture built from report test support:
 
 ```ts
 expect(readArmVerdict(reportWithCollisionAtTick20, 10)).toBe('not_run');
@@ -78,10 +81,10 @@ expect(readArmVerdict(reportWithNoSamples, 20)).toBe('not_run');
 ```
 
 Fixtures above are new constants in the same test: native report with one interval ending at tick20 and colliding=true; identical report with empty trace. Tạo helper mới `tests/support/controller-report.ts` trong Lab: `controllerReportFixture(collisionEndTick: number | null): RunReport`, clone baseline mock report từ `tests/support/coffee-replay.ts`, đổi mode=simulation và thêm verification đúng schema; null tạo empty trace. Hai constants lấy từ helper(20) và helper(null), không type-cast report thiếu field.
-- [ ] Run source `pnpm exec vitest run tests/integration/lab-v2-controller-report.test.ts`; Lab `pnpm exec vitest run tests/unit/controller-report.test.ts`.
-- [ ] Implement schema-driven extension, mode union, mapping to existing LabEvidenceV2; null/missing evidence remains not_run. Display producer, engine, model/world revision, coverage/reasons/artifact hashes. Keep mock canonical hash stable. Validate import path/size/hash and prevent imported evidence authorizing live run. Add timeline selected command correlation and VI/JA/EN labels.
-- [ ] GREEN focused + Lab existing `tests/unit/replay-arm-collision.test.ts` and `tests/integration/arm-evidence.test.ts`; after re-pin run `pnpm test:mock-e2e -- controller-report.spec.ts arm-simulation.spec.ts coffee-journey.spec.ts`. Browser native report fixture labeled fixture/controller evidence, not native execution proof.
-- [ ] Commit source `feat: publish controller verification in run reports`, Lab `feat: inspect controller evidence and replay coverage`; screenshots + V04 evidence.
+- [x] Run source `pnpm exec vitest run tests/integration/lab-v2-controller-report.test.ts`; Lab `pnpm exec vitest run tests/unit/controller-report.test.ts`.
+- [x] Implement schema-driven extension, mode union, mapping to existing LabEvidenceV2; null/missing evidence remains not_run. Display producer, engine, model/world revision, coverage/reasons/artifact hashes. Keep mock canonical hash stable. Validate import path/size/hash and prevent imported evidence authorizing live run. Add timeline selected command correlation and VI/JA/EN labels.
+- [x] GREEN focused + Lab existing `tests/unit/replay-arm-collision.test.ts` and `tests/integration/arm-evidence.test.ts`; after re-pin run `pnpm test:mock-e2e -- controller-report.spec.ts arm-simulation.spec.ts coffee-journey.spec.ts`. Browser native report fixture labeled fixture/controller evidence, not native execution proof.
+- [x] Commit source `feat: publish controller verification in run reports`, Lab `feat: inspect controller evidence and replay coverage`; screenshots + V04 evidence.
 
 ## I04 — Minimal readiness trên control panel hiện có
 
@@ -89,17 +92,17 @@ Fixtures above are new constants in the same test: native report with one interv
 
 **Interfaces:** Consumes single requiredBackends derivation and server-defined probes. Produces ReadinessSnapshot via authenticated endpoint in spec; UI renders reasons and disables unavailable Start. Import schema/export pin changes through R02 if wire schema changes.
 
-- [ ] RED tests required backend absent, expired snapshot, wrong world/profile, probe timeout and native fixture missing. Define source pure helper `canStartFromChecks(checks: ReadinessSnapshot['checks'], expired: boolean): boolean`; assert:
+- [x] RED tests required backend absent, expired snapshot, wrong world/profile, probe timeout and native fixture missing. Define source pure helper `canStartFromChecks(checks: ReadinessSnapshot['checks'], expired: boolean): boolean`; assert:
 
 ```ts
 expect(canStartFromChecks([{id:'arm',status:'unknown',reasonCodes:['PROBE_TIMEOUT'],evidenceRef:null}], false)).toBe(false);
 expect(canStartFromChecks([{id:'arm',status:'ready',reasonCodes:[],evidenceRef:null}], true)).toBe(false);
 ```
 
-- [ ] Run source `pnpm exec vitest run tests/integration/lab-v2-readiness.test.ts`; Lab `pnpm exec vitest run tests/unit/readiness.test.ts`.
-- [ ] Implement bounded probes, TTL and immediate runtime recheck; include host arch, protocol/model/world mismatch, clock readiness and unsupported runner. Render in existing controls; no shell command input, no new dashboard framework. Readiness must list gripper unimplemented even when LinuxCNC doctor is green.
+- [x] Run source `pnpm exec vitest run tests/integration/lab-v2-readiness.test.ts`; Lab `pnpm exec vitest run tests/unit/readiness.test.ts`.
+- [x] Implement bounded probes, TTL and immediate runtime recheck; include host arch, protocol/model/world mismatch, clock readiness and unsupported runner. Render in existing controls; no shell command input, no new dashboard framework. Readiness must list gripper unimplemented even when LinuxCNC doctor is green.
 - [ ] GREEN tests + scenario matrix tests; browser smoke Start denied before journal allocation when unavailable.
-- [ ] Commit `feat: explain scenario readiness from required backend checks` in each touched repo. Record V05; UI availability is not native acceptance.
+- [x] Commit `feat: explain scenario readiness from required backend checks` in each touched repo. Record V05; UI availability is not native acceptance.
 
 ## I05 — Scheduled faults qua existing controls
 
@@ -107,7 +110,7 @@ expect(canStartFromChecks([{id:'arm',status:'ready',reasonCodes:[],evidenceRef:n
 
 **Interfaces:** Consumes FaultScheduleEntry shape/catalog from spec. New pure `dueFaults(entries: readonly FaultScheduleEntry[], firedIds: ReadonlySet<string>, elapsedSimMs: number, phase: 'brew'|'grasp'|'handoff'|'delivery'): readonly FaultScheduleEntry[]`. Persist fired IDs before dispatch; injection outcome journal separately. Unknown interrupted injection requires reconcile, not refire.
 
-- [ ] RED deterministic schedule/checkpoint and unsupported backend. Example:
+- [x] RED deterministic schedule/checkpoint and unsupported backend. Example:
 
 ```ts
 const entries: FaultScheduleEntry[] = [{id:'f1',faultId:'cup-removed',targetId:'cell-1',trigger:{kind:'phase',value:'grasp'},durationMs:1000}];
@@ -115,7 +118,7 @@ expect(dueFaults(entries, new Set(), 10, 'grasp')).toHaveLength(1);
 expect(dueFaults(entries, new Set(['f1']), 10, 'grasp')).toHaveLength(0);
 ```
 
-- [ ] Run source `pnpm exec vitest run tests/integration/lab-v2-fault-schedule.test.ts`; Lab `pnpm exec vitest run tests/unit/fault-schedule.test.ts`.
-- [ ] Implement bounded allowlisted editor fields, validate before run, freeze hash, share validation with immediate injection. Map catalog entries to existing faults; missing native implementation displays unsupported. Persist schedule in project export and replay fired markers; no arbitrary script editor.
-- [ ] GREEN test invalid durations/duplicate IDs/clock jump/phase trigger across restart and browser fault→attention→reconcile on current pin.
-- [ ] Commit `feat: schedule reproducible scenario faults`. V06 records separate protocol-double and native coverage.
+- [x] Run source `pnpm exec vitest run tests/integration/lab-v2-fault-schedule.test.ts`; Lab `pnpm exec vitest run tests/unit/fault-schedule.test.ts`.
+- [x] Implement bounded allowlisted editor fields, validate before run, freeze hash, share validation with immediate injection. Map catalog entries to existing faults; missing native implementation displays unsupported. Persist schedule in project export and replay fired markers; no arbitrary script editor.
+- [x] GREEN test invalid durations/duplicate IDs/clock jump/phase trigger across restart and browser fault→attention→reconcile on current pin.
+- [x] Commit `feat: schedule reproducible scenario faults`. V06 records separate protocol-double and native coverage.

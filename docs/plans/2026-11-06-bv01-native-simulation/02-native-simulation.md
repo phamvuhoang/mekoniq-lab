@@ -2,6 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+
+> Qualification: [evidence index](../../implementation/evidence/bv01-native-simulation/README.md). Checked boxes record completed portable steps; mixed/native/clean-target/usability steps remain open where actual execution is missing. A skipped Linux assertion is not a native pass.
+
 **Goal:** Qualify Gazebo/Nav2 và LinuxCNC trong hai Linux VM, sau đó chạy combined BV01 có nguyên nhân lỗi và evidence đầy đủ.
 
 **Architecture:** Ubuntu coordinator và worker local; Debian controller/QtVCP với Lab/operator Unix sockets riêng; SSH StreamLocal chỉ nối Lab channel. Một run journal, nhiều clock domains, SIM gripper có observation explicit.
@@ -20,7 +23,7 @@
 
 **Interfaces:** Produces guest identity/arch/kernel/UTM version, OS image URL+sha256, package manifest, SSH host key fingerprints (public), selected profile revision; required input cho N02/N03/N04. Không persist private key/password.
 
-- [ ] Preflight host storage/RAM/UTM như runbook; lưu actual values và status. Hiện tại RED=`VM_STORAGE_INSUFFICIENT`; chưa có writable destination đủ chỗ. Người dùng cung cấp volume hoặc giải phóng dung lượng; không xóa dữ liệu tự động.
+- [x] Preflight host storage/RAM/UTM như runbook; lưu actual values và status. Hiện tại RED=`VM_STORAGE_INSUFFICIENT`; chưa có writable destination đủ chỗ. Người dùng cung cấp volume hoặc giải phóng dung lượng; không xóa dữ liệu tự động.
 - [ ] Khi storage đạt budget: cài UTM chính thức, xác minh ứng dụng/signature; tạo Ubuntu `mekoniq-amr` 4 CPU/8 GiB/64 GiB và Debian `mekoniq-arm` 2 CPU/4 GiB/32 GiB, ARM64 hypervisor bật. Boot từng VM, install OS, SSH key auth, stock kernel; không USB passthrough robot. Save stopped clean baseline.
 - [ ] Kiểm trong từng guest:
 
@@ -43,9 +46,9 @@ Expected aarch64/arm64, đúng OS/version, đủ free disk. Hostname khác nhau;
 
 **Interfaces:** Consumes Ubuntu inventory, existing world compiler/worker/campaign. Produces doctor profile selection và native run artifacts cho FD01/02/03/04/07. Thêm CLI option mới `--environment-profile utm-ubuntu-arm64` cho doctor/run; expected architecture/image lock theo profile, không báo digest amd64 khi thực chạy native apt ARM64.
 
-- [ ] RED portable profile test: unknown arch/profile và missing actual package inventory bị chặn. Add fixture data `{profile:'utm-ubuntu-arm64', arch:'amd64'}`; expect `PROFILE_ARCH_MISMATCH`. Run source `pnpm exec vitest run tests/integration/lab-v2-native-profile.test.ts` và `.venv/bin/python -m pytest robotics/simulation/tests/test_native_profile.py -q`.
+- [x] RED portable profile test: unknown arch/profile và missing actual package inventory bị chặn. Add fixture data `{profile:'utm-ubuntu-arm64', arch:'amd64'}`; expect `PROFILE_ARCH_MISMATCH`. Run source `pnpm exec vitest run tests/integration/lab-v2-native-profile.test.ts` và `.venv/bin/python -m pytest robotics/simulation/tests/test_native_profile.py -q`.
 - [ ] Trong Ubuntu, install dependency theo runbook; capture apt package versions. Verify renderer bằng sample sensor thật, không chỉ `gz --version`. Không GUI window ban đầu; GPU sensor vẫn có thể cần EGL/renderer. Nếu renderer không chạy, thử configuration supported và ghi kết quả; không xóa sensors.
-- [ ] Implement explicit environment profile resolution, node/Python/ROS package checks, native headless flag propagation. GREEN portable tests. Build ROS packages với lock và local source clean revision.
+- [x] Implement explicit environment profile resolution, node/Python/ROS package checks, native headless flag propagation. GREEN portable tests. Build ROS packages với lock và local source clean revision.
 - [ ] Native commands từ source checkout trong Ubuntu, sau profile option được implement:
 
 ```sh
@@ -64,7 +67,7 @@ Sau FD01 pass, chạy cùng lệnh cho FD02, FD03, FD04, FD07 với output direc
 **Interfaces:** Consumes Debian inventory, actual LinuxCNC Python module/profile/program hashes. Produces CONTROLLER-POC ARM64 terminal + GUI evidence, không gripper qualification.
 
 - [ ] Resolve candidate từ apt repository chính thức theo Debian/ARM64; pin exact versions/checksums sau install. Debian distro package có thể khác candidate2.9.10; nếu khác, lưu candidate mới và compatibility verdict, không sửa metadata thành version chưa cài.
-- [ ] Run portable bridge tests trong interpreter riêng tránh package `bridge` trùng ROS tree:
+- [x] Run portable bridge tests trong interpreter riêng tránh package `bridge` trùng ROS tree:
 
 ```sh
 cd integrations/arm-controller
@@ -83,7 +86,7 @@ Preflight exit2→not_run; after controller starts failed assertion→fail. Nế
 
 **Interfaces:** Consumes server-defined SSH alias + pinned known_hosts + remote Lab socket, no UI arbitrary destinations. Produces local per-run Unix socket and supervisor lifecycle consumed by existing connectBridge(socketPath). New helper `withinReceiptWindow(receipts: readonly bigint[], maxSkewNs: bigint): boolean`; receipt timestamps from same coordinator, never provider clocks.
 
-- [ ] RED clock/barrier tests:
+- [x] RED clock/barrier tests:
 
 ```ts
 expect(withinReceiptWindow([], 100n)).toBe(false);
@@ -92,7 +95,7 @@ expect(withinReceiptWindow([1000n, 1300n], 100n)).toBe(false);
 ```
 
 Also require participant cardinality, mismatched duplicate barrier key error, paused-state ACK, foreign monotonic clocks with huge offset not subtracted. Run source `pnpm exec vitest run tests/unit/native-arm-tunnel.test.ts tests/integration/lab-v2-remote-arm-clock.test.ts`.
-- [ ] Implement supervisor spawn argv array/no shell; local dir0700/socket0600, bounded readiness timeout, kill only owned process; cleanup only owned socket. Use SSH `-N -a -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=5 -o ServerAliveCountMax=3 -L localSocket:remoteLabSocket alias`. No agent/X11 forwarding, no local operator socket, no auto-unlink arbitrary path.
+- [x] Implement supervisor spawn argv array/no shell; local dir0700/socket0600, bounded readiness timeout, kill only owned process; cleanup only owned socket. Use SSH `-N -a -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=yes -o ServerAliveInterval=5 -o ServerAliveCountMax=3 -L localSocket:remoteLabSocket alias`. No agent/X11 forwarding, no local operator socket, no auto-unlink arbitrary path.
 - [ ] On Debian, dedicated SSH principal only member of Lab group, no sudo/operator group; disable TCP/agent/X11 forwarding for that principal, allow local StreamLocal. Verify actual service/ACL group identities from installed profile. Do not assume PermitOpen restricts Unix sockets; filesystem ACL is authority. Verify principal cannot read/connect operator socket or modify program files.
 - [ ] GREEN portable tests; native tunnel drop, controller reboot, VM suspend/resume, stale telemetry and lease expiry. Every reconnect requires hello/epoch/query, no motion auto replay. Provider clocks recorded separately; coordinator age drives freshness. Lease still expires when Gazebo paused.
 - [ ] Save V12 transport prerequisites, commit `feat: supervise isolated arm tunnel and clock-domain barriers`. Native tunnel success alone does not imply combined BV01 pass.
@@ -103,7 +106,7 @@ Also require participant cardinality, mismatched duplicate barrier key error, pa
 
 **Interfaces:** Consumes I01 observations, I02 ports, N03 actual joints and profile, receiver-side Gazebo tray evidence. Thêm negotiated simScene/SimSceneUpdate theo spec; cập nhật source `packages/contracts/schemas/arm-command.schema.json`, `arm-observation.schema.json`, generated outputs, TS contract validators và Python `bridge/protocol.py` trong cùng task. Test strict-one-shape và reject simScene trên non-SIM/old bridge; wire actual gripper output/state vào telemetry có provenance. Produces modeled TransferObservation with producer linuxcnc_virtual_grip/gazebo_tray. New Python pure `next_grip(*, close_output: bool, cup_in_zone: bool, fault: bool) -> str` returns held/empty/open/fault; stateful wrapper adds observed timing/epoch/correlation, never directly confirms domain.
 
-- [ ] RED behavior tests:
+- [x] RED behavior tests:
 
 ```python
 def test_close_without_cup_never_proves_grasp():
@@ -112,8 +115,8 @@ def test_close_without_cup_never_proves_grasp():
 ```
 
 Additional cases controller done/null grip, cup taken twice, wrong receiver, releasing after receiver moved, stale sample, command epoch mismatch, nozzle/tray collision duplicates. Run arm-controller `../../.venv/bin/python -m pytest tests/test_sim_gripper.py tests/test_arbiter.py -q`; source `pnpm exec vitest run tests/integration/lab-v2-native-cup.test.ts`.
-- [ ] Implement virtual plant using actual controller state, SIM scene context từ coordinator với seq/lease/freshness guard và M64/M65 output0; không mở M66 increment này; finite geometry/tolerance values in fixture, unit conversions; no model commands that bypass arbiter. Extend allowlist only for explicit SIM pin/opcode/timeout; test arbitrary pin/M-code forbidden and non-SIM profile denial. Recompute program hashes/reference transforms; verify reachable pick/place and checker before native motion simulation.
-- [ ] Feed receiver observation independently from Gazebo tray state; match run/cup/transfer/command/epoch, two observers, dock/slot. Wire takeCup+ledger and attachment restoration after restart; dropped/unknown cup no longer exists at nozzle. Allowed contact phase bounded; held cup geometry remains collision-tested.
+- [x] Implement virtual plant using actual controller state, SIM scene context từ coordinator với seq/lease/freshness guard và M64/M65 output0; không mở M66 increment này; finite geometry/tolerance values in fixture, unit conversions; no model commands that bypass arbiter. Extend allowlist only for explicit SIM pin/opcode/timeout; test arbitrary pin/M-code forbidden and non-SIM profile denial. Recompute program hashes/reference transforms; verify reachable pick/place and checker before native motion simulation.
+- [x] Feed receiver observation independently from Gazebo tray state; match run/cup/transfer/command/epoch, two observers, dock/slot. Wire takeCup+ledger and attachment restoration after restart; dropped/unknown cup no longer exists at nozzle. Allowed contact phase bounded; held cup geometry remains collision-tested.
 - [ ] GREEN portable tests, then native pick/place cycle with cup present/missing/gripper fault/receiver absent. Record raw HAL I/O/joints and modeled plant outputs; produce V11. Grip remains modeled, no claim force/physical sensor.
 - [ ] Commit `feat: model controller-driven cup grip and handoff observations`. Re-pin controller programs + source runtime before combined run.
 
@@ -123,9 +126,9 @@ Additional cases controller done/null grip, cup taken twice, wrong receiver, rel
 
 **Interfaces:** Consumes I02 workflow/I03 report/I04 readiness + N02/N04/N05 providers. Produces native RunReport from same source domain and one runId; RunHandle control/subscribe/report lifecycle compatible with existing gateway caller. No native CLI run hidden behind a mock gateway run ID.
 
-- [ ] RED admission rejects absent arm/grip/fixture, campaign requires exact backend set, zero samples not pass. Use real coordinator with provider doubles for portable tests and label protocol_double. Native flag never inferred from a double's hello alone.
-- [ ] Run source `pnpm exec vitest run tests/integration/lab-v2-bv01-sil.test.ts`; current CLI preflight BV01 rejected is expected before implementation.
-- [ ] Implement BV01 fixture/registration, common CoffeeDriver invocation in SIL loop, required backend doctor dispatch including remote LinuxCNC probe, barrier transfer and report persistence. Gateway binds authenticated native run to session and streams actual observations. CLI/native UI both use the same provider factory. Implement deadline cancellation and safe teardown without fake terminal successes.
+- [x] RED admission rejects absent arm/grip/fixture, campaign requires exact backend set, zero samples not pass. Use real coordinator with provider doubles for portable tests and label protocol_double. Native flag never inferred from a double's hello alone.
+- [x] Run source `pnpm exec vitest run tests/integration/lab-v2-bv01-sil.test.ts`; current CLI preflight BV01 rejected is expected before implementation.
+- [x] Implement BV01 fixture/registration, common CoffeeDriver invocation in SIL loop, required backend doctor dispatch including remote LinuxCNC probe, barrier transfer and report persistence. Gateway binds authenticated native run to session and streams actual observations. CLI/native UI both use the same provider factory. Implement deadline cancellation and safe teardown without fake terminal successes.
 - [ ] GREEN portable tests; after resource/transport gates, run in Ubuntu:
 
 ```sh

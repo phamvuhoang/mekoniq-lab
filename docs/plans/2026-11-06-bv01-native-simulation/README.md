@@ -65,3 +65,9 @@ Các paths bắt đầu `source/` hoặc `lab/` tính từ workspace; viết t�
 | BVI-12 | R01–R03 | V13–16 |
 
 Không có task nào trong bộ này tự cho phép hardware/live mode. P1 designer/capacity/ROI được hoãn có chủ đích theo spec; không phải missing task trong scope hiện tại.
+
+## Implementation checkpoint
+
+Portable code and final qualification: source `f82b2057cae89b0029968212753df01f86f334ad`, Lab code/pin `66445c5acf24f90cc17449bae561dbc45965eba7`. See the [HTML report](../../implementation/evidence/bv01-native-simulation/implementation-report.html), [test manifest](../../implementation/evidence/bv01-native-simulation/qualification-final.json), and [review resolutions](../../implementation/evidence/bv01-native-simulation/review-resolution.md).
+
+I01–I05 and portable N02–N06 are implemented/tested. Full R01 PostgreSQL qualification passed. R02 has clean pin, browser and macOS ARM64 offline evidence; clean target/network-off/usability remain open. N01 two-VM provisioning and R03 signed clean-amd64 qualification remain blocked_external. No native/hardware/release acceptance is inferred.
