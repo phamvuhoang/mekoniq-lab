@@ -1,4 +1,5 @@
 // Twin presets: a server-owned scenario id + backend set, run against a fixture project. Names are entity labels (data), not UI copy.
+import nativeFixture from '../../fixtures/twins/native-bv01-v2.json';
 import coffeeFixture from '../../fixtures/twins/coffee-cell-v2.json';
 import restaurantFixture from '../../fixtures/twins/restaurant-v2.json';
 import type {AssetRevision,LabProjectV2} from '../shared/types';
@@ -20,6 +21,7 @@ for(const [id,scenarioId,seed,title,summary] of [
  ['mixed','FD02-cups',42,()=>tr('Món ăn và cà phê cùng chuyến','料理とコーヒーを同じ便で','Food and coffee together'),()=>tr('Một mission giao món ăn và cốc cà phê đã xác định.','1つのミッションで料理と識別済みカップを配送。','One mission carries food and its identified coffee cup.')],
  ['campaign','CAMPAIGN-FD02-FD07-BV01-BV03',3,()=>tr('Chiến dịch hai robot','2台ロボットの連続シナリオ','Two-robot campaign'),()=>tr('Hai AMR dùng chung hành lang, món ăn và hai recipe cà phê.','2台のAMRが通路を共有し、料理と2種のコーヒーを配送。','Two AMRs share a corridor while delivering food and two coffee recipes.')],
 ] as const)presets.push({...presets[0]!,id,scenarioId,seed,title,summary,project:structuredClone(mixedProject),names:{...presets[0]!.names,'amr-2':'AMR-2'},roles:{entities:['amr','arm','coffee_machine'],points:['kitchen','coffee_pickup','table','parking']}});
+presets.push({...presets[0]!,id:'native-bv01',mode:'simulation',backendSetId:'coffee-simulation',seed:23,project:nativeFixture.project as LabProjectV2,assets:nativeFixture.assets as AssetRevision[],title:()=>tr('BV01 native SIM','BV01 ネイティブSIM','BV01 native SIM'),summary:()=>tr('Gazebo + LinuxCNC · hình học PUMA560 SIM đã ghim · chưa xác minh phần cứng','Gazebo + LinuxCNC · 固定PUMA560 SIM形状 · 実機未検証','Gazebo + LinuxCNC · pinned PUMA560 SIM geometry · no hardware validation')});
 export const presetById=(id:string)=>presets.find(p=>p.id===id);
 /** Display name of an entity, point, cup or job; unknown ids are shown as-is, never invented. */
 export function nameOf(preset:TwinPreset|undefined,id:string):string {
