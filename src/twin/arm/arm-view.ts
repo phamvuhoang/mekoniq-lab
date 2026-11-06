@@ -23,7 +23,7 @@ export interface Arm03Status {result:'pass'|'fail'|'not_run';reason:string;engin
 export function arm03Status(report:RunReport|null,tick:number):Arm03Status {
  if(report?.verification||report?.manifest.mode==='simulation'){
   const v=report.verification,a=v?.arm,none=(reason:string):Arm03Status=>({result:'not_run',reason,engine:a?.engine??null,intervals:0,geometryRevision:a?.geometryRevision??null});
-  if(!validVerification(v)||!a)return none('CONTROLLER_EVIDENCE_INVALID_OR_MISSING');
+  if(!validVerification(v)||v.execution!=='ran'||!a)return none('CONTROLLER_EVIDENCE_INVALID_OR_MISSING');
   if(a.worldRevision.id!==report.manifest.world.id||a.worldRevision.revision!==report.manifest.world.revision||a.worldRevision.hash!==report.manifest.world.hash)return none('VERIFICATION_WORLD_MISMATCH');
   if(!Number.isFinite(tick)||!a.trace||!v.armTickMap?.length)return none('TRACE_OR_TICK_MAPPING_MISSING');
   const runTick=(sample:number)=>v.armTickMap!.find(m=>m.sampleTick===sample)?.runTick??Infinity;

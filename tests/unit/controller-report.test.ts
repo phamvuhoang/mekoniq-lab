@@ -33,3 +33,15 @@ test('report exports keep safe relative artifact references and mapped controlle
  report.telemetry!.samples=[{...sample(20,2),entityId:'arm-1',bootId:'controller',simTimeNs:null,origin:'controller_sim',observed:{jointsRad:[0,0,0,0,0,0]}}];
  expect(reportJson(report)).toContain('evidence/trace.json');expect(reportHtml(report)).toContain('Controller verification');expect(reportCsv(report)).toContain(',20,arm-1,');
 });
+test('unexecuted controller evidence never publishes a subsystem pass',async()=>{
+ const {validVerification}=await import('../../src/reports/verification');const r=controllerReportFixture(20),v=r.verification!;
+ v.execution='not_run';v.result='not_run';v.arm!.result='pass';v.arm!.reasonCodes=[];v.arm!.colliding=[];
+ expect(validVerification(v)).toBe(false);expect(arm03Status(r,20).result).toBe('not_run');
+});
+test('import rejects malformed enclosing metadata, events and telemetry before persistence',async()=>{
+ const {importControllerBundle}=await import('../../src/reports/verification');
+ for(const mutate of [(r:any)=>{r.manifest.runId=42;},(r:any)=>{r.telemetry.samples[0].seq='bad';},(r:any)=>{r.businessEvents[0]=null;},(r:any)=>{r.businessEvents[0].state.steps=42;},(r:any)=>{r.businessEvents.push({...r.businessEvents[0],kind:'fulfillment',state:{served:'NaN'}});},(r:any)=>{r.coffee.jobs[0].steps=null;}]){
+  const report=controllerReportFixture(20);mutate(report);
+  await expect(importControllerBundle([new File([JSON.stringify(report)],'report.json')])).rejects.toThrow('REPORT_INVALID');
+ }
+});

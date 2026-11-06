@@ -14,7 +14,7 @@ const {reportKpis}=await import('../../src/reports/compare');
 const {armRows}=await import('../../src/twin/coffee-cell');
 const nodes=new Map<string,{innerHTML:string;outerHTML:string;dataset:Record<string,string>}>();
 const node=(id:string)=>{const n={innerHTML:'',outerHTML:'',dataset:{} as Record<string,string>};nodes.set(id,n);return n;};
-vi.stubGlobal('document',{getElementById:(id:string)=>nodes.get(id)??null,activeElement:null});
+vi.stubGlobal('document',{querySelector:()=>null,getElementById:(id:string)=>nodes.get(id)??null,activeElement:null});
 type Harness={view:RunView;report:RunReport;runPreset:ReturnType<typeof presetById>;store:TwinStore;link:Link;vs:ViewState;frame():TwinFrame;tick():void};
 function workspace(){const w=new TwinWorkspace(()=>{}, {paired:false} as TwinRuntime),h=w as unknown as Harness;Object.assign(h,coffeeReplay(),{runPreset:presetById('coffee')});return {w,h};}
 afterEach(()=>{nodes.clear();vi.restoreAllMocks();});
