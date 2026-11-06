@@ -1,6 +1,7 @@
 // Arm inspector rows from telemetry and run evidence (plan 03 A05). Pure, read-only: joints actual/commanded with provenance and age,
 // and the ARM03 status derived from the report's recorded checker evidence (engine, intervals, failure) — never from a viewer overlap.
 // No checker evidence in the report means ARM03 is not run for that cursor, whatever the picture shows.
+import {validVerification} from '../../reports/verification';
 import type {RunReport} from '../../scenarios/controls';
 import type {Row} from '../amr';
 import {fmt} from '../amr';
@@ -20,6 +21,17 @@ export function armTelemetryRows(v:ArmJointsView|null):Row[] {
 export interface Arm03Status {result:'pass'|'fail'|'not_run';reason:string;engine:string|null;intervals:number;geometryRevision:string|null}
 /** ARM03 from the recorded evidence up to `tick`: the checker must have run (intervals retained, geometry named); a picture is never a pass. */
 export function arm03Status(report:RunReport|null,tick:number):Arm03Status {
+ if(report?.verification||report?.manifest.mode==='simulation'){
+  const v=report.verification,a=v?.arm,none=(reason:string):Arm03Status=>({result:'not_run',reason,engine:a?.engine??null,intervals:0,geometryRevision:a?.geometryRevision??null});
+  if(!validVerification(v)||!a)return none('CONTROLLER_EVIDENCE_INVALID_OR_MISSING');
+  if(a.worldRevision.id!==report.manifest.world.id||a.worldRevision.revision!==report.manifest.world.revision||a.worldRevision.hash!==report.manifest.world.hash)return none('VERIFICATION_WORLD_MISMATCH');
+  if(!Number.isFinite(tick)||!a.trace||!v.armTickMap?.length)return none('TRACE_OR_TICK_MAPPING_MISSING');
+  const runTick=(sample:number)=>v.armTickMap!.find(m=>m.sampleTick===sample)?.runTick??Infinity;
+  const collisions=a.colliding.filter(c=>runTick(c.interval.toTick)<=tick);
+  if(collisions.length)return {result:'fail',reason:collisions.map(c=>`${c.reason}:${c.pair.join('/')}`).join(', '),engine:a.engine,intervals:a.coverage?.intervals??0,geometryRevision:a.geometryRevision};
+  if(runTick(a.trace.toTick)>tick)return none('NO_COMPLETE_CHECKER_SPAN_AT_CURSOR');
+  return {result:a.result,reason:a.reasonCodes.join(', '),engine:a.engine,intervals:a.coverage?.intervals??0,geometryRevision:a.geometryRevision};
+ }
  const c=report?.coffee?.armTrace.collision;
  if(!report||!c)return {result:'not_run',reason:'CHECKER_EVIDENCE_MISSING',engine:null,intervals:0,geometryRevision:null};
  const intervals=(c.evidence?.intervals??[]).filter(i=>i.firstTick<=tick);
@@ -36,3 +48,5 @@ export function arm03Rows(report:RunReport|null,tick:number):Row[] {
  const s=arm03Status(report,tick),label=s.result==='pass'?tr('đạt','合格','pass'):s.result==='fail'?tr('không đạt','不合格','fail'):tr('chưa chạy','未実行','not run');
  return [{key:'arm03',label:'ARM03 · '+tr('kiểm va chạm hình học','幾何衝突チェック','geometric collision check'),observed:`${label}${s.reason?` · ${s.reason}`:''}`,commanded:s.engine?`${s.engine} · ${s.intervals} ${tr('khoảng','区間','intervals')}${s.geometryRevision?` · ${s.geometryRevision.slice(0,8)}`:''}`:'—',unit:'',source:s.result==='not_run'?'unknown':'modeled',ageMs:null}];
 }
+
+export const readArmVerdict=(report:RunReport,cursorTick:number)=>arm03Status(report,cursorTick).result;

@@ -1,4 +1,6 @@
 // Replay, trace, compare and export of the run report. Read-only: built on reports/replay (no runtime client), every runtime string escaped.
+import {arm03Status} from '../twin/arm/arm-view';
+import {validVerification} from '../reports/verification';
 import type {RunReport} from '../scenarios/controls';
 import type {openReplayV2} from '../reports/replay';
 import {compareRuns} from '../reports/compare';
@@ -33,6 +35,7 @@ export function reportPanel(report:RunReport|null,o:{replay:ReplayState|null;pre
  if(!report)return '';
  const s=summarizeReportV2(report),cmp=!o.replay&&o.previous?compareRuns(o.previous,report):null;
  const streams=reportSummary(report,o.business);
+ const verification=controllerVerificationHtml(report,o.replay?.tick??report.outcome.tick);
  const r=o.replay;
  const replay=r?`<div class="replay" data-testid="replay-panel"><div class="replay-controls"><button class="button secondary" data-action="twin-replay-play">${icon(r.playing?'cross':'play',16)}${r.playing?tr('Dừng phát','停止','Pause'):tr('Phát','再生','Play')}</button>
 <label for="twin-replay-cursor" class="visually-hidden">${tr('Vị trí xem lại (tick)','再生位置(tick)','Replay position (tick)')}</label><input id="twin-replay-cursor" type="range" min="0" max="${r.rp.range.toTick}" step="5" value="${r.tick}">
@@ -43,5 +46,11 @@ export function reportPanel(report:RunReport|null,o:{replay:ReplayState|null;pre
 ${cmp.inputs.length?`<p class="field-help">${tr('Đầu vào khác','異なる入力','Changed inputs')}: ${cmp.inputs.map(i=>`${esc(i.field)} ${esc(String(i.a).slice(0,12))} → ${esc(String(i.b).slice(0,12))}`).join(' · ')}</p>`:''}
 <table class="eng-table"><thead><tr><th scope="col">KPI</th><th scope="col">${tr('Trước','前回','Previous')}</th><th scope="col">${tr('Lần này','今回','This run')}</th><th scope="col">Δ</th><th scope="col">${tr('Đơn vị','単位','Unit')}</th></tr></thead><tbody>${cmp.kpis.map(k=>`<tr><th scope="row" title="${esc(k.definition)}">${esc(k.id)}</th><td>${k.a===null?`<span class="unknown-text">${tr('không có','なし','n/a')}</span>`:fmt(k.a)}</td><td>${k.b===null?`<span class="unknown-text">${tr('không có','なし','n/a')}</span>`:fmt(k.b)}</td><td>${k.delta===null?'—':fmt(k.delta)}</td><td>${esc(k.unit)}</td></tr>`).join('')}</tbody></table></div>`:'';
  const exports=`<div class="run-actions" role="group" aria-label="${tr('Xuất báo cáo','レポート出力','Export report')}">${['json','csv','html'].map(f=>`<button class="button quiet" data-action="twin-export" data-value="${f}">${icon('arrow',14)}${f.toUpperCase()}</button>`).join('')}</div>`;
- return `<section class="panel report-panel" data-testid="report-panel" aria-labelledby="report-title"><div class="panel-heading"><h2 id="report-title">${tr('Xem lại & báo cáo','再生とレポート','Replay & report')}</h2><span class="pill">${esc(s.evidence)}</span></div>${streams}${replay}${compare}${exports}<button class="button quiet" data-action="twin-save-evidence">${tr('Lưu báo cáo bất biến','不変レポートを保存','Save immutable report')}</button></section>`;
+ return `<section class="panel report-panel" data-testid="report-panel" aria-labelledby="report-title"><div class="panel-heading"><h2 id="report-title">${tr('Xem lại & báo cáo','再生とレポート','Replay & report')}</h2><span class="pill">${esc(s.evidence)}</span></div>${streams}${verification}${replay}${compare}${exports}<button class="button quiet" data-action="twin-save-evidence">${tr('Lưu báo cáo bất biến','不変レポートを保存','Save immutable report')}</button></section>`;
+}
+
+export function controllerVerificationHtml(report:RunReport,tick:number):string{
+ const v=report.verification,a=v?.arm,verdict=arm03Status(report,tick);
+ const verification=v&&validVerification(v)?`<div data-testid="controller-verification"><h3>${tr('Bằng chứng controller','コントローラ検証記録','Controller evidence')}</h3><p>${esc(v.target)} · ${esc(v.execution)} · ARM03: <b>${esc(verdict.result)}</b> · ${esc(verdict.reason)}</p><p>${tr('Nguồn / độ trung thực','ソース / 忠実度','Producer / fidelity')}: ${v.aspects.map(x=>`${esc(x.producer)} / ${esc(x.fidelity)}`).join(' · ')||'—'}</p><p>${esc(a?.engine??'—')} · model ${esc(a?.modelRevision??'—')} · world ${esc(a?.worldRevision.hash??'—')} · ${tr('Khoảng kiểm tra','検査区間','Checked intervals')}: ${verdict.intervals}</p><p>${esc(v.blockers.join(', '))}</p><details><summary>${tr('Artifact và SHA256','成果物とSHA256','Artifacts and SHA256')}</summary><ul>${v.artifacts.map(x=>`<li>${esc(x.path)} · ${x.bytes} B · <code>${esc(x.sha256)}</code></li>`).join('')}</ul></details></div>`:`<p data-testid="controller-verification">${tr('Legacy / chưa có native evidence','旧形式 / ネイティブ実行の証跡なし','Legacy / no native evidence')}</p>`;
+ return verification;
 }

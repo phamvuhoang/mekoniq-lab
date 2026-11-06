@@ -4,7 +4,7 @@ import type {RunReport} from '../scenarios/controls';
 import {hashJson} from '../twin/hash';
 export type EvidenceScope='model'|'world'|'recipe'|'profile';
 type ScopeHashes=Record<EvidenceScope,string>;
-export interface SavedEvidence {id:string;capturedAt:string;report:RunReport;project:LabProjectV2;hash:string;inputs:ScopeHashes;runtime:ScopeHashes}
+export interface SavedEvidence {origin?:'local'|'imported';id:string;capturedAt:string;report:RunReport;project:LabProjectV2;hash:string;inputs:ScopeHashes;runtime:ScopeHashes}
 const sorted=<T,>(rows:T[])=>[...rows].sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
 export function inputScopes(project:LabProjectV2):ScopeHashes {
  return {model:hashJson(sorted(project.entities.map(e=>({id:e.id,kind:e.kind,assetRef:e.assetRef})))),world:hashJson(project.world),

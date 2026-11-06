@@ -1,5 +1,6 @@
 // Read-only replay of a v2 run report: scrub/playback over recorded business events (durable) and telemetry (lossy), and a causal trace
 // command -> observation -> business transition. No runtime client is imported here: replay cannot send anything.
+import {validVerification} from './verification';
 import type {RunReport,RunView,AmrView,CoffeeJobView,CupView,ArmCollisionView,ArmCollisionScene,ArmStopView} from '../scenarios/controls';
 import type {TwinSample} from '../twin/store';
 type Event=RunReport['businessEvents'][number];
@@ -46,8 +47,9 @@ function stopAt(report:RunReport,tick:number):ArmStopView|null {
  return {events,latched:events.at(-1)?.stage!=='reset',reconcileRequired:true,reason:observed.reason};
 }
 export function openReplayV2(report:RunReport,o:{maxGapTicks?:number}={}){
- const tickMs=report.manifest.clock.tickMs,tickOfSample=(s:TwinSample)=>Number(BigInt(s.simTimeNs??'0')/BigInt(tickMs*1000000));
- const samples=[...report.telemetry?.samples??[]].filter(s=>s.simTimeNs!==null).sort((a,b)=>tickOfSample(a)-tickOfSample(b)||(BigInt(a.seq)<BigInt(b.seq)?-1:BigInt(a.seq)>BigInt(b.seq)?1:0)),gaps=report.telemetry?.gaps??[];
+ const tickMs=report.manifest.clock.tickMs,map=validVerification(report.verification)?report.verification.armTickMap??[]:[];
+ const tickOfSample=(s:TwinSample)=>s.simTimeNs!==null?Number(BigInt(s.simTimeNs)/BigInt(tickMs*1000000)):map.find(m=>m.entityId===s.entityId&&m.bootId===s.bootId&&m.seq===s.seq)?.runTick??NaN;
+ const samples=[...report.telemetry?.samples??[]].filter(s=>Number.isFinite(tickOfSample(s))).sort((a,b)=>tickOfSample(a)-tickOfSample(b)||(BigInt(a.seq)<BigInt(b.seq)?-1:BigInt(a.seq)>BigInt(b.seq)?1:0)),gaps=report.telemetry?.gaps??[];
  // virtual-clock origin: a telemetry sample carries both its sim time and the sim-mapped wall time; otherwise the first event is tick 0
  const s0=samples.find(s=>s.observedAt&&s.simTimeNs!==null);
  const epoch=s0?Date.parse(s0.observedAt!)-Number(BigInt(s0.simTimeNs!)/1000000n):report.businessEvents.length?Date.parse(report.businessEvents[0]!.at):0;
@@ -127,8 +129,7 @@ export function openReplayV2(report:RunReport,o:{maxGapTicks?:number}={}){
    const names=(x:unknown)=>JSON.stringify(x).includes(JSON.stringify(id));
    const rows:TraceRow[]=events.filter(e=>e.id===id||names(e.state??{})).map(e=>({tick:e.tick,layer:COMMAND.test(e.type)?'command':OBSERVATION.test(e.type)?'observation':'business',type:e.type,id:e.id,sequence:e.sequence}));
    for(const f of report.effects??[])if(names(f.payload)){const cmd=String(f.payload.commandId??''),issued=events.find(e=>e.id===cmd&&COMMAND.test(e.type));rows.push({tick:issued?.tick??0,layer:'effect',type:f.type,id:f.id,detail:`${f.status} · attempts ${f.attempts}`});}
-   const sample=samples.find(s=>s.causationId===id||s.entityId===id);
-   if(sample)rows.push({tick:tickOfSample(sample),layer:'telemetry',type:'TwinSample',id:`${sample.entityId}#${sample.seq}`,entityId:sample.entityId,detail:`${sample.quality} · ${sample.bootId}`});
+   for(const sample of samples.filter(s=>s.causationId===id||s.entityId===id))rows.push({tick:tickOfSample(sample),layer:'telemetry',type:'TwinSample',id:`${sample.entityId}#${sample.seq}`,entityId:sample.entityId,detail:`${sample.quality} · ${sample.bootId}`});
    return rows.sort((a,b)=>a.tick-b.tick);
   },
  };
