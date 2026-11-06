@@ -12,7 +12,7 @@ export function supportMatrix(health:TwinHealth|null,fixture:CampaignFixture):Su
   if(!health.scenarioIds.includes(s.id))reasons.push('SCENARIO_NOT_OFFERED');
   const set=health.backendSets.find(x=>x.id===backendSetId);
   if(!set)reasons.push(`BACKEND_SET_UNKNOWN:${backendSetId}`);
-  else for(const id of mode==='simulation'?s.simulation.requires:set.backends){
+  else for(const id of health.scenarioRequirements?.[s.id]?.[mode]??(mode==='simulation'?s.simulation.requires:set.backends)){
    const b=health.backends.find(x=>x.id===id);
    if(!set.backends.includes(id))reasons.push(`BACKEND_NOT_IN_SET:${id}`);
    else if(!b)reasons.push(`BACKEND_UNKNOWN:${id}`);
