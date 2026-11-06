@@ -1,5 +1,6 @@
 // Read-only replay of a v2 run report: scrub/playback over recorded business events (durable) and telemetry (lossy), and a causal trace
 // command -> observation -> business transition. No runtime client is imported here: replay cannot send anything.
+import {reportClock} from './clock';
 import {validVerification} from './verification';
 import type {RunReport,RunView,AmrView,CoffeeJobView,CupView,ArmCollisionView,ArmCollisionScene,ArmStopView} from '../scenarios/controls';
 import type {TwinSample} from '../twin/store';
@@ -47,13 +48,9 @@ function stopAt(report:RunReport,tick:number):ArmStopView|null {
  return {events,latched:events.at(-1)?.stage!=='reset',reconcileRequired:true,reason:observed.reason};
 }
 export function openReplayV2(report:RunReport,o:{maxGapTicks?:number}={}){
- const tickMs=report.manifest.clock.tickMs,map=validVerification(report.verification)?report.verification.armTickMap??[]:[];
- const tickOfSample=(s:TwinSample)=>s.simTimeNs!==null?Number(BigInt(s.simTimeNs)/BigInt(tickMs*1000000)):map.find(m=>m.entityId===s.entityId&&m.bootId===s.bootId&&m.seq===s.seq)?.runTick??NaN;
+ const tickMs=report.manifest.clock.tickMs,{sampleTick:tickOfSample,eventTick}=reportClock(report);
  const samples=[...report.telemetry?.samples??[]].filter(s=>Number.isFinite(tickOfSample(s))).sort((a,b)=>tickOfSample(a)-tickOfSample(b)||(BigInt(a.seq)<BigInt(b.seq)?-1:BigInt(a.seq)>BigInt(b.seq)?1:0)),gaps=report.telemetry?.gaps??[];
- // virtual-clock origin: a telemetry sample carries both its sim time and the sim-mapped wall time; otherwise the first event is tick 0
- const s0=samples.find(s=>s.observedAt&&s.simTimeNs!==null);
- const epoch=s0?Date.parse(s0.observedAt!)-Number(BigInt(s0.simTimeNs!)/1000000n):report.businessEvents.length?Date.parse(report.businessEvents[0]!.at):0;
- const tickOf=(e:Event)=>Math.round((Date.parse(e.at)-epoch)/tickMs);
+ const tickOf=(e:Event)=>eventTick(e.at);
  const events=report.businessEvents.map(e=>({...structuredClone(e),tick:tickOf(e)}));
  const toTick=samples.reduce((n,s)=>Math.max(n,tickOfSample(s)),events.reduce((n,e)=>Math.max(n,e.tick),report.outcome.tick));
  // ponytail: default max interpolation gap = 2 recording periods (10 ticks at 10 Hz); a profile value belongs in the manifest when one exists

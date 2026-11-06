@@ -1,3 +1,4 @@
+import {reportClock} from './clock';
 import type {RunEvent} from '../shared/types';
 interface RecordedReport {schemaVersion:1;mode:'business_sim';sourceCommit:string;snapshot:{status:string;served:string;elapsedMs:number;events:RunEvent[]};effects:{type:string;attempts?:number}[];}
 function parseReport(value:unknown):RecordedReport {
@@ -49,12 +50,11 @@ export const reportJson=(r:RunReportV2)=>JSON.stringify(redact(r),null,2);
 const cell=(v:unknown)=>{const raw=v===null||v===undefined?'':typeof v==='string'?v:JSON.stringify(v),s=/^[=+\-@\t\r]/.test(raw)&&!(raw.trim()!==''&&Number.isFinite(Number(raw)))?`'${raw}`:raw;return /[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;};
 /** One table, both streams, labelled by `stream`; business rows keep their journal sequence, telemetry rows their provider seq. */
 export function reportCsv(report:RunReportV2){
- const r=redact(report) as RunReportV2,tickMs=r.manifest.clock.tickMs,t0=r.businessEvents.length?Date.parse(r.businessEvents[0]!.at):0;
- const s0=r.telemetry?.samples.find(s=>s.observedAt&&s.simTimeNs!==null),epoch=s0?Date.parse(s0.observedAt!)-Number(BigInt(s0.simTimeNs!)/1000000n):t0;
- const rows=[['stream','sequence_or_seq','time','tick','entity_or_kind','id','type','quality','detail'],
-  ...r.businessEvents.map(e=>['business',e.sequence,e.at,Math.round((Date.parse(e.at)-epoch)/tickMs),e.kind,e.id,e.type,'',e.state??{}]),
-  ...(r.telemetry?.samples??[]).map(s=>['telemetry',s.seq,s.observedAt,s.simTimeNs!==null?Number(BigInt(s.simTimeNs)/BigInt(tickMs*1000000)):r.verification?.armTickMap?.find(m=>m.entityId===s.entityId&&m.bootId===s.bootId&&m.seq===s.seq)?.runTick??'',s.entityId,`${s.providerId}/${s.bootId}`,'TwinSample',s.quality,{observed:s.observed,commanded:s.commanded,reasonCodes:s.reasonCodes}]),
-  ...reportKpis(r).map(k=>['kpi','','','',k.unit,k.id,k.definition,k.available?'available':'unavailable',k.available?k.value:k.reason])];
+ const r=redact(report) as RunReportV2,{sampleTick,eventTick}=reportClock(r);
+ const rows=[['stream','sequence_or_seq','time','tick','entity_or_kind','id','type','quality','detail','raw_sim_time_ns'],
+  ...r.businessEvents.map(e=>['business',e.sequence,e.at,eventTick(e.at),e.kind,e.id,e.type,'',e.state??{},'']),
+  ...(r.telemetry?.samples??[]).map(s=>['telemetry',s.seq,s.observedAt,Number.isFinite(sampleTick(s))?sampleTick(s):'',s.entityId,`${s.providerId}/${s.bootId}`,'TwinSample',s.quality,{simTimeNs:s.simTimeNs,providerId:s.providerId,observed:s.observed,commanded:s.commanded,reasonCodes:s.reasonCodes},s.simTimeNs]),
+  ...reportKpis(r).map(k=>['kpi','','','',k.unit,k.id,k.definition,k.available?'available':'unavailable',k.available?k.value:k.reason,''])];
  return rows.map(x=>x.map(cell).join(',')).join('\n')+'\n';
 }
 /** Self-contained static HTML: no script, no external resource; every runtime string escaped. */

@@ -81,7 +81,7 @@ test('exports: JSON and CSV keep ids; HTML is self-contained and escapes every r
  expect(JSON.stringify(clean)).not.toMatch(/secret-csrf|\/Users\/someone|privateKey/);
  const json=reportJson(r as unknown as RunReport);expect(json).not.toMatch(/secret-csrf|\/Users\/someone|privateKey/);expect(JSON.parse(json).businessEvents).toHaveLength(8);
  const csv=reportCsv(r as unknown as RunReport);
- expect(csv.split('\n')[0]).toBe('stream,sequence_or_seq,time,tick,entity_or_kind,id,type,quality,detail');
+ expect(csv.split('\n')[0]).toBe('stream,sequence_or_seq,time,tick,entity_or_kind,id,type,quality,detail,raw_sim_time_ns');
  expect(csv).toContain('business,2,2026-11-01T00:00:00.040Z,2,robot-command,cmd-1,RobotCommandIssued');
  expect(csv).toContain('telemetry,5,');expect(csv).toMatch(/"Khách ""A"" <b>"|note/); // quoted CSV
  const html=reportHtml(r as unknown as RunReport,{compareWith:report({seed:43})});
@@ -98,4 +98,8 @@ test('CSV neutralises spreadsheet formulas but keeps numbers and ids; redact als
  const csv=reportCsv(r as unknown as RunReport);
  expect(csv).toContain(`"'=HYPERLINK(""http://x"")"`);expect(csv).toContain(",'+cmd");expect(csv).toContain(",'@SUM(A1)");expect(csv).toContain(',-12.5,');expect(csv).not.toMatch(/,=|,\+cmd|,@SUM/);
  expect(redact({note:'failed to open /Users/someone/runs/abc/journal.db and C:\\Users\\x\\a.txt'})).toEqual({note:'failed to open [redacted path] and [redacted path]'});
+});
+test('native origin aligns raw navigation, business, fault and CSV ticks through JSON roundtrip',()=>{
+ const r=report({mode:'simulation'});r.manifest.clock.native={provider:'gazebo_nav2',originNs:'10000000000',businessEpochMs:EPOCH};r.outcome.tick=100;r.businessEvents=[ev(1,0,'Started','run','r'),ev(2,50,'Arrived','mission','m')];r.faults=[{tick:50,faultId:'cut',entityId:'amr-1'}];r.telemetry!.samples=[pose(0,1),pose(100,3)].map(s=>({...s,providerId:'gazebo_nav2',observedAt:null,simTimeNs:String(BigInt(s.simTimeNs!)+10000000000n)}));
+ for(const imported of [r,JSON.parse(reportJson(r))]){const replay=openReplayV2(imported);expect(replay.range.toTick).toBe(100);expect(replay.seek(0).entities['amr-1']?.observed?.xM).toBe(1);expect(replay.seek(49).events).toHaveLength(1);expect(replay.seek(49).faults).toEqual([]);expect(replay.seek(50).events).toHaveLength(2);expect(replay.seek(100).entities['amr-1']?.observed?.xM).toBe(3);expect(reportCsv(imported)).toContain('telemetry,0,,0,amr-1');expect(reportCsv(imported)).toContain('telemetry,100,,100,amr-1');expect(reportCsv(imported).split('\n').find((line:string)=>line.startsWith('telemetry,100,'))).toMatch(/,12000000000$/);}
 });

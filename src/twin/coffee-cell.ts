@@ -42,6 +42,7 @@ export function explain(a:Attention):{waiting:string;observed:string;rule:string
 }
 /** Resolve only identities the view actually knows. Mission-level attention can name its robot separately. */
 export function reconciliationSubject(a:Attention,view:RunView):string|null {
+ if(view.run.mode==='simulation'&&view.run.status==='needs_attention')return view.run.id;
  const job=jobsOf(view).find(j=>j.jobId===a.subjectId);
  if(job)return job.status==='needs_attention'?job.jobId:null;
  const knownRobot=(id:string|undefined)=>id&&view.entities.some(r=>r.id===id)?id:null;
