@@ -16,3 +16,8 @@ test('replay exposes fired and window-ended markers only at or before the cursor
  const rp=openReplayV2(r),render=(tick:number)=>replayBody({rp,tick,playing:false},null);
  expect(render(5)).not.toContain('schedule:f1');expect(render(10)).toContain('schedule:f1:fired');expect(render(10)).not.toContain('window-ended');expect(render(20)).toContain('window-ended');
 });
+test('native schedule editor exposes supported phase-target faults without changing geometry',async()=>{
+ const {faultScheduleEditor}=await import('../../src/ui/fault-schedule'),native=await import('../../fixtures/twins/native-bv01-v2.json');const p=validateProjectV2(native.default.project),entry:FaultScheduleEntry={id:'cut',faultId:'tunnel-loss',targetId:'arm-1',trigger:{kind:'phase',value:'handoff'},durationMs:100};
+ const edited=editSchedule(p,[entry],'simulation');expect(edited.entities).toEqual(p.entities);expect(edited.world).toEqual(p.world);expect(edited.faultSchedule).toEqual([entry]);expect(()=>editSchedule(p,[{...entry,targetId:'amr-1'}],'simulation')).toThrow();
+ const html=faultScheduleEditor(p,{faultId:'tunnel-loss',targetId:'arm-1',trigger:'phase',value:'handoff',durationMs:'100'},false,'simulation');expect(html).toContain('tunnel-loss');expect(html).toContain('controller-restart');expect(html).not.toContain('arm-following-error');expect(html).not.toContain('disabled');
+});

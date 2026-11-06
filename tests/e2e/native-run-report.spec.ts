@@ -1,25 +1,24 @@
-import fixture from '../../fixtures/twins/native-bv01-v2.json';
-import type {RunView,RunReport} from '../../src/scenarios/controls';
+import {readFile} from 'node:fs/promises';
+import type {RunReport} from '../../src/scenarios/controls';
 import {expect,test} from '@playwright/test';
-// Execution is not_run without an operator-provided native environment and pairing token.
-// Run: LAB_NATIVE_BASE_URL=http://127.0.0.1:4175 LAB_NATIVE_PAIRING_TOKEN=... pnpm exec playwright test -c playwright.native.config.ts
 const token=process.env.LAB_NATIVE_PAIRING_TOKEN;
-test.skip(!token||!process.env.LAB_NATIVE_BASE_URL,'not_run: NATIVE_PROVIDER_ENVIRONMENT_UNAVAILABLE');
-test('one authenticated native BV01 run carries actual engine evidence into the report',async({page})=>{
- await page.goto('/#twin');await page.locator('[data-action="twin-preset"][data-value="native-bv01"]').click();
- const health=await page.request.get('/lab/v2/health');expect(health.ok()).toBe(true);const h=await health.json();
- for(const id of ['gazebo_nav2','linuxcnc_sim','coffee_io_sim'])expect(h.backends.find((b:{id:string})=>b.id===id)).toMatchObject({enabled:true});
- // Browser origin pairing and action requests use the same session and CSRF boundary as the UI.
- const result=await page.evaluate(async ({token,project})=>{
-  let csrf='';const request=async(path:string,body?:unknown)=>{const r=await fetch('/lab/v2'+path,{method:body===undefined?'GET':'POST',credentials:'same-origin',headers:body===undefined?{}:{'Content-Type':'application/json',...csrf?{'X-CSRF-Token':csrf}:{}},...body===undefined?{}:{body:JSON.stringify(body)}});const result=await r.json();if(!r.ok)throw new Error(JSON.stringify(result));return result;};
-  csrf=(await request('/sessions',{token})).csrfToken;const h=await request('/health');
-  const readiness=await request('/readiness',{scenarioId:'BV01',backendSetId:'coffee-simulation',project});if(!readiness.canStart)throw new Error(JSON.stringify(readiness.checks));
-  let v=await request('/runs',{project,scenarioId:'BV01',scenarioRevision:1,seed:23,mode:'simulation',access:'simulated',backendSetId:'coffee-simulation',runtimeIdentity:{sourceCommit:h.sourceCommit,schemaHash:h.schemaHash}});
-  v=await request(`/runs/${v.run.id}/actions`,{actionId:crypto.randomUUID(),expectedRevision:v.run.runRevision,kind:'start',payload:{}});
-  const end=Date.now()+200000;while(v.run.status==='running'&&Date.now()<end){await new Promise(r=>setTimeout(r,250));v=await request(`/runs/${v.run.id}`);}
-  return {view:v,report:await request(`/runs/${v.run.id}/report`)};
- },{token:token!,project:fixture.project}) as {view:RunView;report:RunReport};
- expect(result.report.manifest.mode).toBe('simulation');expect(result.report.manifest.runId).toBe(result.view.run.id);expect(result.report.outcome).toMatchObject({status:'completed',served:'2'});
- expect(result.report.verification).toMatchObject({execution:'ran',result:'pass',blockers:[]});expect(result.report.verification?.arm?.result).toBe('pass');expect(result.report.verification?.armTickMap?.length).toBeGreaterThan(1);
- expect(result.report.coffee?.armTrace.samples).toEqual([]);expect(result.report.telemetry?.samples.some(s=>s.providerId==='gazebo_nav2')).toBe(true);expect(result.report.telemetry?.samples.some(s=>s.providerId==='linuxcnc_sim')).toBe(true);
+// External native environment only: neither test starts a mock provider or upgrades fixture evidence.
+test('native UI pairing, start, SSE, report download and read-only replay',async({page})=>{
+ test.skip(!token||!process.env.LAB_NATIVE_BASE_URL,'not_run: NATIVE_PROVIDER_ENVIRONMENT_UNAVAILABLE');
+ const writes:string[]=[];page.on('request',r=>{if(r.method()==='POST')writes.push(r.url());});
+ await page.goto('/#twin');await page.getByRole('button',{name:'EN',exact:true}).click();await page.locator('[data-action="twin-preset"][data-value="native-bv01"]').click();
+ await page.locator('#twin-pair-token').fill(token!);await page.getByRole('button',{name:'Pair runtime',exact:true}).click();
+ const start=page.getByRole('button',{name:'Run native simulation',exact:true});await expect(start).toBeEnabled({timeout:15000});await start.click();
+ await expect(page.getByTestId('twin-telemetry')).toContainText('SSE',{timeout:20000});
+ await expect(page.getByTestId('run-status')).toHaveText('Completed',{timeout:210000});await expect(page.getByTestId('run-served')).toHaveText('2');
+ const downloaded=page.waitForEvent('download');await page.locator('[data-action="twin-export"][data-value="json"]').click();const report=JSON.parse(await readFile(await (await downloaded).path(),'utf8')) as RunReport;
+ expect(report.manifest.mode).toBe('simulation');expect(report.manifest.runId).toBe(await page.getByTestId('run-id').textContent());expect(report.verification).toMatchObject({execution:'ran',result:'pass',blockers:[]});expect(report.verification?.arm?.result).toBe('pass');expect(report.coffee?.armTrace.samples).toEqual([]);
+ for(const provider of ['gazebo_nav2','linuxcnc_sim'])expect(report.telemetry?.samples.some(s=>s.providerId===provider)).toBe(true);
+ await page.locator('[data-action="twin-replay"]').click();const before=writes.length;await page.locator('#twin-replay-cursor').fill(String(Math.floor(report.outcome.tick/2)));await expect(page.getByTestId('replay-panel')).toContainText('Read-only');expect(writes.length).toBe(before);
+});
+test('import actual native bundle through UI verifies hashes and replays without commands',async({page})=>{
+ const bundle=process.env.LAB_NATIVE_IMPORT_BUNDLE;test.skip(!bundle||!process.env.LAB_NATIVE_BASE_URL,'not_run: NATIVE_IMPORT_BUNDLE_UNAVAILABLE');
+ const report=JSON.parse(await readFile(`${bundle}/report.json`,'utf8')) as RunReport;expect(report.verification).toMatchObject({execution:'ran',result:'pass'});
+ const writes:string[]=[];page.on('request',r=>{if(r.method()==='POST')writes.push(r.url());});await page.goto('/#twin');await page.getByRole('button',{name:'EN',exact:true}).click();await page.locator('#twin-import-evidence').setInputFiles(bundle!);
+ await expect(page.getByRole('status').filter({hasText:'Read-only evidence imported'})).toBeVisible();await page.locator('[data-action="twin-open-evidence"]').filter({hasText:report.manifest.runId.slice(0,8)}).click();await expect(page.getByTestId('replay-panel')).toContainText('Read-only');await page.locator('#twin-replay-cursor').fill(String(Math.floor(report.outcome.tick/2)));expect(writes).toEqual([]);
 });
