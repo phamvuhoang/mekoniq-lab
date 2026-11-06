@@ -5,7 +5,8 @@ import type {LabProjectV2} from '../shared/types';
 import type {TwinSample} from '../twin/store';
 export interface TwinHealth {protocolMajors:number[];sourceCommit:string;schemaHash:string;scenarioIds:string[];
  backends:{id:string;modes:string[];installed:boolean;compatible:boolean;reachable:boolean;commissioned:boolean;enabled:boolean;reason?:string}[];
- backendSets:{id:string;mode:string;access:string;backends:string[]}[];features?:{polling?:boolean;sse?:boolean};}
+ backendSets:{id:string;mode:string;access:string;backends:string[]}[];features?:{polling?:boolean;sse?:boolean;readiness?:boolean};}
+export interface ReadinessSnapshot {checkedAt:string;expiresAt:string;scenarioId:string;backendSetId:string;checks:{id:string;status:'ready'|'blocked'|'unknown';reasonCodes:string[];evidenceRef:string|null}[];canStart:boolean}
 export interface RunSnapshotV2 {schemaVersion:2;id:string;mode:'mock'|'simulation'|'hardware';access:string;backendSetId:string;backends:string[];
  status:'ready'|'running'|'paused'|'awaiting_confirmation'|'needs_attention'|'completed'|'cancelled'|'failed';runRevision:number;eventCursor:string|null;telemetryCursor:string|null;
  fidelity:string;ageMs:number;sourceCommit:string;scenarioId:string;scenarioRevision:number;seed:number;}
@@ -44,6 +45,7 @@ export interface RunReport {manifest:{armCollisionScene?:{hash:string;profile:La
 export interface CreateRun {project:LabProjectV2;scenarioId:string;scenarioRevision:number;seed:number;mode:'mock';backendSetId:string;access:'simulated'}
 export type ActionKind='start'|'pause'|'resume'|'cancel'|'step'|'confirm'|'injectFault'|'reconcile'|'restoreCup';
 export interface TwinRuntime {
+ readiness?(scenarioId:string,backendSetId:string):Promise<ReadinessSnapshot>;
  health():Promise<TwinHealth>;pair(token:string):Promise<void>;readonly paired:boolean;
  /** Drop the in-memory CSRF token after the runtime lost the session (restart): the pair form shows again. */
  forget():void;
@@ -69,6 +71,7 @@ export function httpTwinRuntime(base='/lab/v2'):TwinRuntime {
  return {
   get paired(){return !!csrf;},forget(){csrf='';},
   health:()=>request<TwinHealth>('/health'),
+  readiness:(scenarioId,backendSetId)=>request<ReadinessSnapshot>(`/readiness?scenarioId=${encodeURIComponent(scenarioId)}&backendSetId=${encodeURIComponent(backendSetId)}`),
   async pair(token){const r=await request<{csrfToken?:string}>('/sessions',{token});if(!r.csrfToken)throw new TwinRuntimeError('INVALID_PAIRING_RESPONSE',[],502);csrf=r.csrfToken;},
   async create(r,identity){const {reclaimToken,...view}=await request<RunView&{reclaimToken?:string}>('/runs',{...r,runtimeIdentity:identity});if(reclaimToken){proofs[view.run.id]=reclaimToken;try{localStorage.setItem(storageKey,JSON.stringify(proofs));}catch{/* current tab retains the proof if storage is unavailable */}}return view;},
   get recoverableRunIds(){return Object.keys(proofs);},

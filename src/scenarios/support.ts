@@ -18,6 +18,9 @@ export function supportMatrix(health:TwinHealth|null,fixture:CampaignFixture):Su
    else if(!b)reasons.push(`BACKEND_UNKNOWN:${id}`);
    else if(!b.installed)reasons.push(`BACKEND_NOT_INSTALLED:${id}${b.reason?` (${b.reason})`:''}`);
    else if(!b.enabled)reasons.push(`BACKEND_NOT_ENABLED:${id}`);
+   else if(!b.compatible)reasons.push(`BACKEND_INCOMPATIBLE:${id}`);
+   else if(!b.reachable)reasons.push(`BACKEND_UNREACHABLE:${id}`);
+   else if(!b.commissioned)reasons.push(`BACKEND_NOT_COMMISSIONED:${id}`);
   }
   return {scenarioId:s.id,mode,backendSetId,status:reasons.length?'unavailable':'available',reasons};
  }));

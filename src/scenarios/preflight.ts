@@ -1,11 +1,13 @@
 // Preflight before a run: every item is pass/fail with a reason (text, not color) and, when it is about the project, the affected entity.
 // It only explains; the runtime re-checks everything on create and is the authority.
-import type {TwinHealth} from './controls';
+import type {TwinHealth,ReadinessSnapshot} from './controls';
 import type {TwinPreset} from './catalog';
 import {tr} from '../i18n';
 export interface Check {id:string;ok:boolean;label:string;detail:string;entityId?:string}
-export function preflight(p:TwinPreset,health:TwinHealth|null,paired:boolean):Check[] {
- const set=health?.backendSets.find(s=>s.id===p.backendSetId),off=set?.backends.filter(b=>!health!.backends.find(x=>x.id===b)?.enabled)??[];
+export function preflight(p:TwinPreset,health:TwinHealth|null,paired:boolean,snapshot:ReadinessSnapshot|null=null,now=Date.now()):Check[] {
+ const matching=snapshot?.scenarioId===p.scenarioId&&snapshot.backendSetId===p.backendSetId;
+ const set=health?.backendSets.find(s=>s.id===p.backendSetId),required=matching?snapshot.checks.filter(c=>c.id.startsWith('backend:')).map(c=>c.id.slice(8)):set?.backends;
+ const off=required?.filter(b=>!health!.backends.find(x=>x.id===b)?.enabled)??[];
  const checks:Check[]=[
   {id:'runtime',ok:!!health,label:tr('Runtime cục bộ','ローカルランタイム','Local runtime'),detail:health?`source ${health.sourceCommit.slice(0,7)} · protocol ${health.protocolMajors.join('/')}`:tr('Không kết nối được /lab/v2. Khởi động runtime trên máy phát triển.','/lab/v2に接続できません。開発機でランタイムを起動してください。','Cannot reach /lab/v2. Start the runtime on your development machine.')},
   {id:'protocol',ok:!!health?.protocolMajors.includes(2),label:'Protocol v2',detail:health?(health.protocolMajors.includes(2)?'v2':tr('Runtime không hỗ trợ v2','v2非対応','Runtime does not offer v2')):'—'},
@@ -15,6 +17,12 @@ export function preflight(p:TwinPreset,health:TwinHealth|null,paired:boolean):Ch
  ];
  for(const kind of p.roles.entities){const e=p.project.entities.find(x=>x.kind===kind);checks.push({id:`entity-${kind}`,ok:!!e,label:`${tr('Thực thể','エンティティ','Entity')} ${kind}`,detail:e?e.id:tr('Thiếu trong dự án','プロジェクトに不足','Missing from the project'),...e?{entityId:e.id}:{}});}
  for(const kind of p.roles.points){const q=p.project.world.points.find(x=>x.kind===kind);checks.push({id:`point-${kind}`,ok:!!q,label:`${tr('Điểm','地点','Point')} ${kind}`,detail:q?`${q.name} (${q.x}, ${q.y}) m`:tr('Thiếu trong mặt bằng','レイアウトに不足','Missing from the layout')});}
+ if(health?.features?.readiness){
+  const age=matching?now-Date.parse(snapshot.checkedAt):NaN,ttl=matching?Date.parse(snapshot.expiresAt)-Date.parse(snapshot.checkedAt):NaN;
+  const fresh=matching&&Number.isFinite(age)&&age>=-5000&&ttl>0&&ttl<=30000&&now<Date.parse(snapshot.expiresAt);
+  const ok=!!fresh&&snapshot.canStart===true&&snapshot.checks.length>0&&snapshot.checks.every(c=>c.status==='ready'&&!c.reasonCodes.length);
+  checks.push({id:'readiness',ok,label:tr('Sẵn sàng theo runtime','ランタイムの準備状況','Runtime readiness'),detail:!matching?'READINESS_NOT_CHECKED':!fresh?'READINESS_EXPIRED':ok?tr('Đủ điều kiện bắt đầu; chưa phải kết quả nghiệm thu','開始条件を満たしています。検収結果ではありません','Ready to start; this is not acceptance evidence'):snapshot.checks.flatMap(c=>c.reasonCodes).join(', ')||'READINESS_UNKNOWN'});
+ }
  return checks;
 }
 export const ready=(checks:Check[])=>checks.every(c=>c.ok);
