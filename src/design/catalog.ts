@@ -1,5 +1,5 @@
 import type {BomLine,DesignSummary,Issue,RobotDesign} from '../shared/types';
-import fixture from '../../fixtures/catalog/service-illustrative.json';
+import fixture from '../../fixtures/catalog/service-illustrative.json' with {type:'json'};
 import {calculateBom} from '../cost/bom';
 import {estimateEnergy} from '../estimates/energy';
 

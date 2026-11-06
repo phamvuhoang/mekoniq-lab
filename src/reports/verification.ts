@@ -1,9 +1,9 @@
 import Ajv from 'ajv';
 import {validReportShape} from './report-shape';
 import addFormats from 'ajv-formats';
-import schema from './contracts/lab-run-verification.schema.json';
-import armSchema from './contracts/lab-arm-collision-evidence.schema.json';
-import transferSchema from './contracts/lab-transfer-evidence.schema.json';
+import schema from './contracts/lab-run-verification.schema.json' with {type:'json'};
+import armSchema from './contracts/lab-arm-collision-evidence.schema.json' with {type:'json'};
+import transferSchema from './contracts/lab-transfer-evidence.schema.json' with {type:'json'};
 import type {RunVerification} from './contracts/verification-types';
 import {validateProjectV2} from '../project/schema';
 import type {LabProjectV2} from '../shared/types';

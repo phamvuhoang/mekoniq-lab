@@ -1,5 +1,5 @@
 import Ajv from 'ajv';
-import schema from './contracts/lab-fault-schedule.schema.json';
+import schema from './contracts/lab-fault-schedule.schema.json' with {type:'json'};
 import type {LabProjectV2} from '../shared/types';
 export interface FaultScheduleEntry {id:string;faultId:string;targetId:string;trigger:{kind:'elapsed_sim_ms';value:number}|{kind:'phase';value:'brew'|'grasp'|'handoff'|'delivery'};durationMs:number}
 const shape=new Ajv({strict:true}).compile<FaultScheduleEntry>(schema);

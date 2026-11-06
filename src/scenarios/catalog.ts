@@ -1,7 +1,7 @@
 // Twin presets: a server-owned scenario id + backend set, run against a fixture project. Names are entity labels (data), not UI copy.
-import nativeFixture from '../../fixtures/twins/native-bv01-v2.json';
-import coffeeFixture from '../../fixtures/twins/coffee-cell-v2.json';
-import restaurantFixture from '../../fixtures/twins/restaurant-v2.json';
+import nativeFixture from '../../fixtures/twins/native-bv01-v2.json' with {type:'json'};
+import coffeeFixture from '../../fixtures/twins/coffee-cell-v2.json' with {type:'json'};
+import restaurantFixture from '../../fixtures/twins/restaurant-v2.json' with {type:'json'};
 import type {AssetRevision,LabProjectV2} from '../shared/types';
 import {tr} from '../i18n';
 export interface TwinPreset {mode?:'mock'|'simulation';id:string;title:()=>string;summary:()=>string;scenarioId:string;scenarioRevision:number;backendSetId:string;seed:number;

@@ -1,5 +1,5 @@
 import type {LabProject} from '../shared/types';
-import worldFixture from '../../fixtures/worlds/restaurant-six-tables.json';
+import worldFixture from '../../fixtures/worlds/restaurant-six-tables.json' with {type:'json'};
 /** Fresh mutable project; illustrative dimensions are never hardware measurements. */
 export function defaultProject():LabProject {
   return {

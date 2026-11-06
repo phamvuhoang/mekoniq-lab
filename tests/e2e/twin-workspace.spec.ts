@@ -92,8 +92,9 @@ test.describe.serial("paired source runtime", () => {
     await expect(eng.getByTestId("eng-pose-x")).toContainText(" m");
     await expect(eng.getByTestId("eng-yaw")).toContainText("rad");
     await page.getByTestId("entity-list").getByRole("button", { name: /Cánh tay 1/ }).click();
-    // before the arm moves there is no trace sample: shown as unknown, not as zero
-    await expect(eng.getByTestId("eng-joint-1")).toContainText("chưa có mẫu");
+    // Mock has no observed encoder samples; the commanded angle is a separate column.
+    await expect(eng.getByTestId("eng-joint-1").locator("td").nth(0)).toHaveText("không có");
+    await expect(eng.getByTestId("eng-joint-1").locator("td").nth(1)).toContainText("0.0000");
     for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "+5 s" }).click();
     await expect(page.getByTestId("run-tick")).toContainText("35.0 s");
     await expect(eng.getByTestId("eng-joint-1")).toContainText("rad");

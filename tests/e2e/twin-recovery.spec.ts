@@ -92,7 +92,7 @@ test("telemetry stream, stale/frozen states, reconnect, read-only replay, compar
   for (const s of ["Source manifest", "Seeds", "Sample counts", "Missing evidence", "Business events (durable)", "Telemetry (lossy, coalesced)"]) expect(text).toContain(s);
   const [csv] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "CSV" }).click()]);
   const rows = (await readFile((await csv.path())!, "utf8")).split("\n");
-  expect(rows[0]).toBe("stream,sequence_or_seq,time,tick,entity_or_kind,id,type,quality,detail");
+  expect(rows[0]).toBe("stream,sequence_or_seq,time,tick,entity_or_kind,id,type,quality,detail,raw_sim_time_ns");
   expect(rows.some((r) => r.startsWith("business,"))).toBe(true);
   expect(rows.some((r) => r.startsWith("telemetry,"))).toBe(true);
 
