@@ -23,7 +23,8 @@ export function replayBody(r:ReplayState,selected:string|null):string{
 ${f.gaps.length?`<p class="unknown-text" data-testid="replay-gaps">${icon('info',14)}${f.gaps.map(g=>`${tr('Khoảng trống telemetry','テレメトリ欠落','Telemetry gap')}: ${esc(g.reason)}`).join(' · ')}</p>`:''}
 <h4>${tr('Sự kiện nghiệp vụ tới thời điểm này','この時点までの業務イベント','Business events up to here')} (${f.events.length})</h4>
 <ol class="replay-events" data-testid="replay-events">${last.map(e=>`<li><code>#${esc(e.sequence)}</code> ${esc(e.type)} <small>${esc(e.kind)} ${esc(e.id)}</small></li>`).join('')||`<li class="empty-inline">—</li>`}</ol>
-<h4>${tr('Trạng thái đã ghi','記録された状態','Recorded state')}</h4>
+<h4>${tr('Lỗi đã chèn tới thời điểm này','この時点までの注入障害','Injected faults up to here')}</h4><ol data-testid="replay-faults">${f.faults.map(x=>`<li>tick ${x.tick} · ${esc(x.faultId)} · ${esc(x.entityId??'—')}</li>`).join('')||'<li>—</li>'}</ol>
+<h4>${tr('Trạng thái đã ghi' ,'記録された状態','Recorded state')}</h4>
 <ul class="replay-entities" data-testid="replay-entities">${Object.values(f.entities).map(s=>`<li><b>${esc(s.entityId)}</b> <span class="state-text">${esc(s.quality)}</span> ${esc(sampleText(s))}</li>`).join('')||`<li class="empty-inline">${tr('Không có telemetry ghi lại','記録テレメトリなし','No recorded telemetry')}</li>`}</ul>
 ${selected?`<h4>${tr('Trace','トレース','Trace')}: ${esc(selected)}</h4><ol class="trace-rows" data-testid="trace-rows">${trace.map(x=>`<li><span class="source-tag ${x.layer==='command'?'commanded':x.layer==='observation'||x.layer==='telemetry'?'observed':'derived'}">${esc(x.layer)}</span> tick ${x.tick} · ${esc(x.type)} <small>${esc(x.id)}${x.detail?` · ${esc(x.detail)}`:''}</small></li>`).join('')||`<li class="empty-inline">${tr('Không có bản ghi nhắc tới đối tượng này','この対象の記録なし','No record names this object')}</li>`}</ol>`:''}`;
 }

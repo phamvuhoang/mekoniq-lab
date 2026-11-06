@@ -82,7 +82,7 @@ export function openReplayV2(report:RunReport,o:{maxGapTicks?:number}={}){
  const seek=(t:number)=>{
   const tick=clamp(t),entities:Record<string,TwinSample>={};
   for(const [id,list] of byEntity){const last=list.filter(s=>tickOfSample(s)<=tick).at(-1);if(last)entities[id]=structuredClone(last);}
-  return {tick,simTimeNs:String(BigInt(tick)*BigInt(tickMs)*1000000n),events:structuredClone(events.filter(e=>e.tick<=tick)),entities,gaps:gaps.filter(g=>(g.fromTick??-Infinity)<=tick&&tick<=g.toTick)};
+  return {tick,faults:structuredClone(report.faults.filter(x=>x.tick<=tick)),simTimeNs:String(BigInt(tick)*BigInt(tickMs)*1000000n),events:structuredClone(events.filter(e=>e.tick<=tick)),entities,gaps:gaps.filter(g=>(g.fromTick??-Infinity)<=tick&&tick<=g.toTick)};
  };
  return {
   range:{fromTick:0,toTick,tickMs},

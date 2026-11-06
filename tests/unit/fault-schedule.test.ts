@@ -1,4 +1,5 @@
-import {expect,test} from 'vitest';
+vi.mock('../../src/i18n',()=>({tr:(vi:string)=>vi}));
+import {expect,test,vi} from 'vitest';
 import {editSchedule,validateSchedule,type FaultScheduleEntry} from '../../src/scenarios/fault-schedule';
 import {validateProjectV2} from '../../src/project/schema';
 import fixture from '../../fixtures/twins/coffee-cell-v2.json';
@@ -8,4 +9,10 @@ test('schedule export roundtrip preserves bounded typed entries without mutating
  expect(p.faultSchedule).toBeUndefined();expect(validateProjectV2(JSON.parse(JSON.stringify(updated))).faultSchedule).toEqual([{...e,targetId:target}]);
  for(const entries of [[e,e],[{...e,durationMs:Infinity}],[{...e,durationMs:60001}],[{...e,trigger:{kind:'phase',value:'shell'}}],[{...e,command:'rm'}]])expect(()=>validateSchedule(entries)).toThrow();
  expect(()=>editSchedule(p,[{...e,targetId:'arm-1'}])).toThrow('FAULT_TARGET_UNSUPPORTED');
+});
+test('replay exposes fired and window-ended markers only at or before the cursor',async()=>{
+ const {coffeeReplay}=await import('../support/coffee-replay');const {openReplayV2}=await import('../../src/reports/replay');const {replayBody}=await import('../../src/ui/report-panel');const r=coffeeReplay().report;
+ r.faults=[{tick:10,faultId:'schedule:f1:fired',entityId:'coffee-1'},{tick:20,faultId:'schedule:f1:window-ended',entityId:null}];
+ const rp=openReplayV2(r),render=(tick:number)=>replayBody({rp,tick,playing:false},null);
+ expect(render(5)).not.toContain('schedule:f1');expect(render(10)).toContain('schedule:f1:fired');expect(render(10)).not.toContain('window-ended');expect(render(20)).toContain('window-ended');
 });
