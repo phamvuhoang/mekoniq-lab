@@ -13,15 +13,17 @@ import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 import os from 'node:os';
+import {parseRecorderArgs} from './recorder-options.mjs';
 import {captureRegressionIdentity,assertRecordableIdentity,assertStableRecording,LAB_EVIDENCE_MUTABLE_PATHS} from '../../source/tests/support/regression-identity.ts';
-const LAB=resolve(fileURLToPath(new URL('..',import.meta.url))),W=resolve(LAB,'..'),SRC=resolve(W,'source'),OUT=resolve(LAB,'docs/implementation/evidence/digital-twin-v2/regression');
-const ci=process.argv.includes('--ci');
+const LAB=resolve(fileURLToPath(new URL('..',import.meta.url))),W=resolve(LAB,'..'),SRC=resolve(W,'source');
+// --suite physical-robot-lab --out <new dir>: a fresh evidence root (never replaced, never the historical one). Without options the legacy behaviour is unchanged.
+const opts=parseRecorderArgs(process.argv.slice(2),LAB),{ci,suite,out:OUT,explicitOut}=opts;
 const python=resolve(SRC,process.env.LAB_PYTHON||'.venv/bin/python');
 // Freeze before replacing prior evidence. Node 24 loads the shared, erasable-TypeScript test helper directly.
 const startIdentity=captureRegressionIdentity(SRC,LAB);assertRecordableIdentity(startIdentity);
 const identityCheckpoints=[];
 function identityCheckpoint(id){const identity=captureRegressionIdentity(SRC,LAB);assertStableRecording(startIdentity,identity);identityCheckpoints.push({id,identity});}
-rmSync(OUT,{recursive:true,force:true});mkdirSync(OUT,{recursive:true});
+if(!explicitOut)rmSync(OUT,{recursive:true,force:true});mkdirSync(OUT,{recursive:true});
 const env={...process.env,LAB_V2_REQUIRE_LAB_FIXTURES:'1'};
 const sha=f=>createHash('sha256').update(readFileSync(f)).digest('hex');
 // paths and anything shaped like a key/token are removed before a file is stored or hashed
@@ -58,6 +60,11 @@ run('source-contracts-check','source','pnpm',['-s','contracts:check']);
 if(!ci)run('source-referenced','source',process.execPath,[V,'run',...referenced,'--reporter=json',out('source-referenced.json')],{kind:'vitest',files:['source-referenced.json'],extraEnv:{LAB_V2_CLEAN_EXPORT:'1'}});
 run('source-unit','source',process.execPath,[V,'run','tests/unit','--reporter=json',out('source-unit.json')],{kind:'vitest',files:['source-unit.json']});
 run('source-contracts','source',process.execPath,[V,'run','tests/contracts','--reporter=json',out('source-contracts.json')],{kind:'vitest',files:['source-contracts.json']});
+if(suite==='physical-robot-lab'){
+ run('source-engineering','source',process.execPath,[V,'run','tests/integration/engineering','tests/integration/lab-','tests/security/engineering','tests/unit/engineering','tests/contracts','--reporter=json',out('source-engineering.json')],{kind:'vitest',files:['source-engineering.json']});
+ if(existsSync(python))run('source-pytest-simulation','source',python,['-m','pytest','robotics/simulation/tests','-q',`--junitxml=${OUT}/source-pytest-simulation.xml`],{kind:'junit',files:['source-pytest-simulation.xml']});
+ else notRun.push({id:'source-pytest-simulation',reason:scrub(`Python executable missing: ${python}`)});
+}
 if(ci){
  run('source-build','source','pnpm',['-s','build']);
  run('source-adapters','source',process.execPath,[V,'run','tests/adapters','--reporter=json',out('source-adapters.json')],{kind:'vitest',files:['source-adapters.json']});
@@ -69,19 +76,29 @@ run('lab-check-source','lab','pnpm',['-s','check:source']);
 run('lab-typecheck','lab','pnpm',['-s','typecheck']);
 run('lab-vitest','lab',`${LAB}/node_modules/.bin/vitest`,['run','tests/unit','tests/integration','--reporter=json',out('lab-vitest.json')],{kind:'vitest',files:['lab-vitest.json']});
 run('lab-build','lab','pnpm',['-s','build']);
+if(suite==='legacy'){
 run('lab-e2e-ui','lab','pnpm',['exec','playwright','test','ui.spec.ts'],{kind:'playwright',files:['lab-pw-ui.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-ui.json`}});
 run('lab-twin-e2e','lab','pnpm',['-s','test:twin-e2e','--evidence'],{kind:'playwright',files:['lab-pw-twin-twin-workspace.json','lab-pw-twin-coffee-journey.json','lab-pw-twin-twin-recovery.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-twin.json`}});
 run('lab-mock-e2e','lab','pnpm',['-s','test:mock-e2e'],{kind:'playwright',files:['lab-pw-mock-twin-recovery.json','lab-pw-mock-coffee-journey.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-mock.json`}});
 run('lab-runtime-e2e','lab','pnpm',['-s','test:runtime-e2e'],{kind:'playwright',files:['lab-pw-runtime.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-runtime.json`}});
 run('lab-plan01-e2e','lab',process.execPath,['scripts/test-mock-e2e.mjs','--evidence','twin-plan01.spec.ts','twin-inputs.spec.ts'],{kind:'playwright',files:['lab-pw-plan01-twin-plan01.json','lab-pw-plan01-twin-inputs.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-plan01.json`}});
 run('lab-ui-performance','lab',process.execPath,['scripts/measure-twin-ui.mjs','--duration-ms','60000','--output',`${OUT}/lab-ui-performance.json`],{kind:'measurement',files:['lab-ui-performance.json']});
+}else{
+ // physical-robot-lab: every browser suite, none of them through the launcher's --evidence flag (that writes into the historical digital-twin-v2 evidence)
+ const MOCK_SPECS=['twin-workspace','coffee-journey','twin-recovery','twin-inputs','fault-schedule','arm-simulation','twin-plan01','legacy-campaign'];
+ const screens={LAB_EVIDENCE_DIR:`${OUT}/screens`};mkdirSync(screens.LAB_EVIDENCE_DIR,{recursive:true});
+ run('lab-e2e-browser','lab','pnpm',['exec','playwright','test'],{kind:'playwright',files:['lab-pw-browser.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-browser.json`}});
+ run('lab-mock-e2e','lab',process.execPath,['scripts/test-mock-e2e.mjs',...MOCK_SPECS.map(x=>`${x}.spec.ts`)],{kind:'playwright',files:MOCK_SPECS.map(x=>`lab-pw-mock-${x}.json`),extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-mock.json`,...screens}});
+ run('lab-runtime-e2e','lab','pnpm',['-s','test:runtime-e2e'],{kind:'playwright',files:['lab-pw-runtime.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-runtime.json`}});
+ run('lab-ui-performance','lab',process.execPath,['scripts/measure-twin-ui.mjs','--duration-ms','60000','--output',`${OUT}/lab-ui-performance.json`],{kind:'measurement',files:['lab-ui-performance.json']});
+}
 const offline=mkdtempSync(resolve(os.tmpdir(),'mekoniq-offline-regression-')),bundle=resolve(offline,'bundle');
 try{
  run('lab-offline-build','lab',process.execPath,['scripts/build-offline.mjs','--out',bundle]);
  run('lab-offline-e2e','lab',process.execPath,['scripts/test-mock-e2e.mjs','twin-recovery.spec.ts','coffee-journey.spec.ts'],{kind:'playwright',files:['lab-pw-offline-twin-recovery.json','lab-pw-offline-coffee-journey.json'],extraEnv:{LAB_TEST_OFFLINE_ROOT:bundle,LAB_PW_JSON:`${OUT}/lab-pw-offline.json`}});
 }finally{rmSync(offline,{recursive:true,force:true});}
 const endIdentity=captureRegressionIdentity(SRC,LAB);assertStableRecording(startIdentity,endIdentity);
-writeFileSync(`${OUT}/manifest.json`,JSON.stringify({schema:'lab-v2-regression/1',recorder:'lab/scripts/record-regression.mjs'+(ci?' --ci':''),
+writeFileSync(`${OUT}/manifest.json`,JSON.stringify({schema:'lab-v2-regression/1',recorder:'lab/scripts/record-regression.mjs'+(ci?' --ci':'')+(suite==='legacy'?'':` --suite ${suite}`),suite,
  note:'Synthetic test data only; absolute paths scrubbed to <workspace>/<home>/<tmp>, key/token shapes to <jwt>/<supabase-key>. sha256 is of the stored (scrubbed) file.',
  host:{platform:os.platform(),release:os.release(),arch:os.arch(),cpu:os.cpus()[0]?.model,cpus:os.cpus().length,memGiB:Math.round(os.totalmem()/2**30),node:process.version,pnpm:execFileSync('pnpm',['-v']).toString().trim(),python:existsSync(python)?{executable:scrub(python),version:execFileSync(python,['--version'],{encoding:'utf8'}).trim()}:null},
  revisions:{source:startIdentity.source.commit,sourceDirty:false,lab:startIdentity.lab.commit,labDirty:false},
