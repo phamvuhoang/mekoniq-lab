@@ -1,4 +1,4 @@
-// Synced from source packages/contracts/generated/engineering.ts @ afcb5926dc8ba06054dd085e259aa39aa4a8c1e7 (sha256 b5ab8da57477b14ca60825195e12cef025b4560175fccdd32ee7f3d3b0c024e5). Run node scripts/sync-engineering-contracts.mjs; do not edit.
+// Synced from source packages/contracts/generated/engineering.ts @ 80e61a4184b43f93004483aa3e14ebdb05f0bbf9 (sha256 6c39b2552a8dca26c61cf52bb909c914fbdfd21d516ed8e0ce3cd195be609bdc). Run node scripts/sync-engineering-contracts.mjs; do not edit.
 /* Generated from the engineering schemas. Run pnpm contracts:generate; do not edit. */
 import type {LabProjectV2,AssetRevision} from './types';
 export type CoffeeRecipe=Record<string,unknown>;
@@ -1651,4 +1651,120 @@ export interface EngineeringCandidate {
     reason: string;
   }[];
   checksum: Digest;
+}
+/**
+ * This interface was referenced by `EngineeringContracts`'s JSON-Schema
+ * via the `definition` "CalibrationPolicy".
+ */
+export interface CalibrationPolicy {
+  channels: {
+    [k: string]: {
+      absoluteTolerance: number;
+      relativeTolerance: number;
+    };
+  };
+  minTrialsPerCondition: number;
+  maxClockGapNs: number;
+  capabilities: {
+    [k: string]: 'geometry' | 'rigidBody' | 'actuator' | 'sensor' | 'grasp' | 'process';
+  };
+}
+/**
+ * This interface was referenced by `EngineeringContracts`'s JSON-Schema
+ * via the `definition` "CalibrationTrial".
+ */
+export interface CalibrationTrial {
+  trialId: string;
+  split: 'tune' | 'validation';
+  condition: string;
+  /**
+   * @maxItems 100000
+   */
+  timesNs: number[];
+  channels: {
+    /**
+     * @maxItems 100000
+     */
+    [k: string]: number[];
+  };
+}
+/**
+ * This interface was referenced by `EngineeringContracts`'s JSON-Schema
+ * via the `definition` "PredictionSeries".
+ */
+export interface PredictionSeries {
+  configDigest: string;
+  clockDomain: 'sim' | 'wall' | 'instrument';
+  units: {
+    [k: string]: string;
+  };
+  /**
+   * @maxItems 500
+   */
+  trials: {
+    trialId: string;
+    /**
+     * @maxItems 100000
+     */
+    timesNs: number[];
+    channels: {
+      /**
+       * @maxItems 100000
+       */
+      [k: string]: number[];
+    };
+  }[];
+}
+/**
+ * This interface was referenced by `EngineeringContracts`'s JSON-Schema
+ * via the `definition` "CalibrationResult".
+ */
+export interface CalibrationResult {
+  status: 'pass' | 'fail' | 'not_run';
+  reasons: string[];
+  residuals: {
+    [k: string]: {
+      samples: number;
+      meanAbs: number;
+      maxAbs: number;
+      withinTolerance: boolean;
+    };
+  };
+  domain: {
+    [k: string]: {
+      min: number;
+      max: number;
+    };
+  };
+  calibratedCapabilities: string[];
+  invalidatedBy: string | null;
+}
+/**
+ * This interface was referenced by `EngineeringContracts`'s JSON-Schema
+ * via the `definition` "CalibrationDataset".
+ */
+export interface CalibrationDataset {
+  schemaVersion: 1;
+  configDigest: string;
+  instrument: {
+    id: string;
+    revision: string;
+  };
+  units: {
+    [k: string]: string;
+  };
+  clockMapping: {
+    domain: 'sim' | 'wall' | 'instrument';
+    offsetNs: number;
+  };
+  uncertainty: {
+    [k: string]: number;
+  };
+  rawDigest: string;
+  sourceKind: 'measured' | 'simulated' | 'synthetic';
+  policy: CalibrationPolicy;
+  /**
+   * @maxItems 500
+   */
+  trials: CalibrationTrial[];
 }
