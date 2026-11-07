@@ -2,9 +2,10 @@
 import type {LabProjectV2} from '../shared/types';
 import type {RunReport} from '../scenarios/controls';
 import {hashJson} from '../twin/hash';
-export type EvidenceScope='model'|'world'|'recipe'|'profile';
-type ScopeHashes=Record<EvidenceScope,string>;
-export interface SavedEvidence {origin?:'local'|'imported';id:string;capturedAt:string;report:RunReport;project:LabProjectV2;hash:string;inputs:ScopeHashes;runtime:ScopeHashes}
+type ScopeHashes=Record<'model'|'world'|'recipe'|'profile',string>;
+/** 'assembly' exists only for engineering evidence: the project digest the run was compiled from. */
+export type EvidenceScope=keyof ScopeHashes|'assembly';
+export interface SavedEvidence {origin?:'local'|'imported';id:string;capturedAt:string;report:RunReport;project:LabProjectV2;hash:string;inputs:ScopeHashes;runtime:ScopeHashes;engineering?:{bundleDigest:string;projectDigest:string}}
 const sorted=<T,>(rows:T[])=>[...rows].sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
 export function inputScopes(project:LabProjectV2):ScopeHashes {
  return {model:hashJson(sorted(project.entities.map(e=>({id:e.id,kind:e.kind,assetRef:e.assetRef})))),world:hashJson(project.world),
@@ -18,11 +19,13 @@ function runtimeScopes(report:RunReport):ScopeHashes {
 }
 export function captureEvidence(report:RunReport,project:LabProjectV2):SavedEvidence {
  const snapshot=structuredClone(report),input=structuredClone(project),hash=hashJson({report:snapshot,project:input});
- return {id:`${report.manifest.runId}:${hash}`,capturedAt:new Date().toISOString(),report:snapshot,project:input,hash,inputs:inputScopes(input),runtime:runtimeScopes(snapshot)};
+ return {id:`${report.manifest.runId}:${hash}`,capturedAt:new Date().toISOString(),report:snapshot,project:input,hash,inputs:inputScopes(input),runtime:runtimeScopes(snapshot),...snapshot.manifest.engineering?{engineering:{...snapshot.manifest.engineering}}:{}};
 }
-export function evidenceStatus(saved:SavedEvidence,project:LabProjectV2,currentReport?:RunReport|null){
+export function evidenceStatus(saved:SavedEvidence,project:LabProjectV2,currentReport?:RunReport|null,current_?:{engineeringProjectDigest?:string}){
  const current=inputScopes(project),runtime=currentReport?runtimeScopes(currentReport):null;
- const scopes=(Object.keys(current) as EvidenceScope[]).filter(k=>current[k]!==saved.inputs[k]||runtime&&runtime[k]!==saved.runtime[k]);
+ const scopes:EvidenceScope[]=(Object.keys(current) as (keyof ScopeHashes)[]).filter(k=>current[k]!==saved.inputs[k]||runtime&&runtime[k]!==saved.runtime[k]);
+ // engineering evidence applies only to the design it was compiled from; an unknown current design is not proof it still applies
+ if(saved.engineering&&current_?.engineeringProjectDigest!==saved.engineering.projectDigest)scopes.push('assembly');
  return {stale:scopes.length>0,scopes,runtimeChecked:runtime!==null};
 }
 export class EvidenceStore {

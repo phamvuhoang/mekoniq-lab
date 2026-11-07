@@ -4,6 +4,7 @@ import {validVerification} from '../reports/verification';
 import type {RunReport} from '../scenarios/controls';
 import type {openReplayV2} from '../reports/replay';
 import {compareRuns} from '../reports/compare';
+import {engineeringView} from '../reports/engineering-view';
 import {summarizeReportV2} from '../reports/metrics';
 import {icon,esc} from './icons';
 import {tr} from '../i18n';
@@ -32,6 +33,16 @@ export function reportSummary(report:RunReport,business=0):string {
  const s=summarizeReportV2(report),t=s.telemetry;
  return `<p class="field-help" id="twin-report-summary" data-testid="report-streams">${tr('Sự kiện nghiệp vụ (bền, từ journal)','業務イベント(永続、ジャーナル)','Business events (durable, journal)')}: <b>${s.businessEvents}</b> · ${tr('Telemetry (có thể mất, gộp)','テレメトリ(損失可・集約)','Telemetry (lossy, coalesced)')}: ${t?`<b>${t.samples}</b> ${tr('mẫu','件','samples')} (${Object.entries(t.sampleCounts).map(([k,v])=>`${esc(k)} ${v}`).join(', ')}) · drop ${t.dropped} · gap ${t.gaps}`:tr('runtime này không ghi','このランタイムは未記録','not recorded by this runtime')}${business?` · ${tr('đã nhận qua stream','ストリーム受信','streamed')} ${business}`:''}</p>`;
 }
+/** Engineering assessment: blockers when the run did not pass, capability levels always. Absent on legacy reports. */
+export function engineeringHtml(report:RunReport):string{
+ const v=engineeringView(report);if(!v)return '';
+ const label={pass:tr('Đạt','合格','Pass'),fail:tr('Không đạt','不合格','Fail'),not_run:tr('Chưa chạy','未実行','Not run')}[v.status];
+ const level={unsupported:tr('không hỗ trợ','未対応','unsupported'),modeled:tr('mô hình hoá','モデル','modeled'),verified:tr('đã xác minh','検証済み','verified')};
+ return `<div data-testid="engineering-evidence" data-tone="${v.tone}"><h3>${tr('Bằng chứng kỹ thuật','エンジニアリング検証','Engineering evidence')}</h3><p><b>${label}</b>${v.ref?` · <code>${esc(v.ref.bundleDigest.slice(0,12))}</code>`:''}</p>
+${v.blockers.length?`<ul class="blockers" data-testid="engineering-blockers">${v.blockers.map(b=>`<li>${esc(b)}</li>`).join('')}</ul>`:''}
+<ul class="capabilities">${v.capabilities.map(c=>`<li data-capability="${esc(c.id)}" data-level="${c.level}"><b>${esc(c.id)}</b> ${level[c.level]}</li>`).join('')}</ul>
+<p class="source-note">${tr('Mô phỏng không phải bằng chứng phần cứng; chỉ mức "đã xác minh" dựa trên hiệu chuẩn đo thật.','シミュレーションはハード証拠ではありません。「検証済み」は実測校正のみ。','Simulation is not hardware evidence; only "verified" rests on measured calibration.')}</p></div>`;
+}
 export function reportPanel(report:RunReport|null,o:{replay:ReplayState|null;previous:RunReport|null;selected:string|null;business:number}):string{
  if(!report)return '';
  const s=summarizeReportV2(report),cmp=!o.replay&&o.previous?compareRuns(o.previous,report):null;
@@ -47,7 +58,7 @@ export function reportPanel(report:RunReport|null,o:{replay:ReplayState|null;pre
 ${cmp.inputs.length?`<p class="field-help">${tr('Đầu vào khác','異なる入力','Changed inputs')}: ${cmp.inputs.map(i=>`${esc(i.field)} ${esc(String(i.a).slice(0,12))} → ${esc(String(i.b).slice(0,12))}`).join(' · ')}</p>`:''}
 <table class="eng-table"><thead><tr><th scope="col">KPI</th><th scope="col">${tr('Trước','前回','Previous')}</th><th scope="col">${tr('Lần này','今回','This run')}</th><th scope="col">Δ</th><th scope="col">${tr('Đơn vị','単位','Unit')}</th></tr></thead><tbody>${cmp.kpis.map(k=>`<tr><th scope="row" title="${esc(k.definition)}">${esc(k.id)}</th><td>${k.a===null?`<span class="unknown-text">${tr('không có','なし','n/a')}</span>`:fmt(k.a)}</td><td>${k.b===null?`<span class="unknown-text">${tr('không có','なし','n/a')}</span>`:fmt(k.b)}</td><td>${k.delta===null?'—':fmt(k.delta)}</td><td>${esc(k.unit)}</td></tr>`).join('')}</tbody></table></div>`:'';
  const exports=`<div class="run-actions" role="group" aria-label="${tr('Xuất báo cáo','レポート出力','Export report')}">${['json','csv','html'].map(f=>`<button class="button quiet" data-action="twin-export" data-value="${f}">${icon('arrow',14)}${f.toUpperCase()}</button>`).join('')}</div>`;
- return `<section class="panel report-panel" data-testid="report-panel" aria-labelledby="report-title"><div class="panel-heading"><h2 id="report-title">${tr('Xem lại & báo cáo','再生とレポート','Replay & report')}</h2><span class="pill">${esc(s.evidence)}</span></div>${streams}${verification}${replay}${compare}${exports}<button class="button quiet" data-action="twin-save-evidence">${tr('Lưu báo cáo bất biến','不変レポートを保存','Save immutable report')}</button></section>`;
+ return `<section class="panel report-panel" data-testid="report-panel" aria-labelledby="report-title"><div class="panel-heading"><h2 id="report-title">${tr('Xem lại & báo cáo','再生とレポート','Replay & report')}</h2><span class="pill">${esc(s.evidence)}</span></div>${streams}${engineeringHtml(report)}${verification}${replay}${compare}${exports}<button class="button quiet" data-action="twin-save-evidence">${tr('Lưu báo cáo bất biến','不変レポートを保存','Save immutable report')}</button></section>`;
 }
 
 export function controllerVerificationHtml(report:RunReport,tick:number):string{

@@ -5,7 +5,7 @@ import type {RunVerification} from '../reports/contracts/verification-types';
 // TODO(interim-copy): RunView/RunReport mirror source packages/lab-runtime/src/v2/{scenario-runner,report}.ts; replace with the pinned artifact types (F07).
 import type {LabProjectV2} from '../shared/types';
 import type {TwinSample} from '../twin/store';
-import type {BundleReceipt,EngineeringProject,EngineeringRef} from '../shared/engineering';
+import type {BundleReceipt,EngineeringAssessment,EngineeringProject,EngineeringRef} from '../shared/engineering';
 export interface TwinHealth {scenarioRequirements?:Record<string,{mock:string[];simulation:string[]}>;
  /** Server-advertised optional features, e.g. engineering_bundle_v1. Absent on runtimes that predate engineering. */
  capabilities?:string[];
@@ -39,7 +39,7 @@ export interface ArmCollisionEvidence {
 }
 export interface ArmCollisionView {world:unknown[];checks:number|null;last:ArmCollisionResult|null;scene?:ArmCollisionScene;evidence?:ArmCollisionEvidence}
 export interface ArmStopView {latched:boolean;reconcileRequired:boolean;reason:string;events:{tick:number;stage:'requested'|'acknowledged'|'observed'|'reset';reason:string;provenance:'modelled'}[]}
-export interface RunReport {verification?:RunVerification;manifest:{armCollisionScene?:{hash:string;profile:LabProjectV2['armCollisionProfile']|null;profileHash:string|null;world:LabProjectV2['world'];worldHash:string;robotGeometry:{id:string;radiusM:number|null}[]};hashAlgorithm?:string;designHash?:string;models?:{id:string;revision:string|number;hash:string;provenance:string}[];recipes?:{id:string;revision:number;hash:string}[];profiles?:{id:string;revision:number;hash:string;provenance:string}[];adapterHash?:string;calibration?:{status:string;revision:string|number|null;hash:string|null;reason?:string};runId:string;sourceCommit:string;mode:string;access:string;backendSetId:string;backends:{id:string;version:string;model:string;dynamics:boolean}[];clock:{tickMs:number;native?:{provider:'gazebo_nav2';originNs:string;businessEpochMs:number}};seed:number;
+export interface RunReport {verification?:RunVerification;/** Present only on engineering runs; older reports have neither field. */engineeringEvidence?:EngineeringAssessment;manifest:{engineering?:{bundleDigest:string;projectDigest:string};armCollisionScene?:{hash:string;profile:LabProjectV2['armCollisionProfile']|null;profileHash:string|null;world:LabProjectV2['world'];worldHash:string;robotGeometry:{id:string;radiusM:number|null}[]};hashAlgorithm?:string;designHash?:string;models?:{id:string;revision:string|number;hash:string;provenance:string}[];recipes?:{id:string;revision:number;hash:string}[];profiles?:{id:string;revision:number;hash:string;provenance:string}[];adapterHash?:string;calibration?:{status:string;revision:string|number|null;hash:string|null;reason?:string};runId:string;sourceCommit:string;mode:string;access:string;backendSetId:string;backends:{id:string;version:string;model:string;dynamics:boolean}[];clock:{tickMs:number;native?:{provider:'gazebo_nav2';originNs:string;businessEpochMs:number}};seed:number;
   scenario:{id:string;revision:number;hash:string};project:{id:string;revision:number;hash:string};world:{id:string;revision:number;hash:string};assets:{id:string;revision:number;contentHash:string;resolved:boolean}[]};
  outcome:{status:string;served:string;tick:number;simTimeNs:string};
  metrics:{maxConcurrentMovers?:number;distanceM:Record<string,number>;collision:{available:boolean;reason?:string;contacts:number|null;minSeparationM:number|null}};

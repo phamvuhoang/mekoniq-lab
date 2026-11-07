@@ -80,10 +80,13 @@ export function compareRuns(a:RunReport,b:RunReport){
  if(key(ma.backends)!==key(mb.backends))reasons.push('BACKENDS_DIFFER');
  if(ma.clock.tickMs!==mb.clock.tickMs)reasons.push('CLOCK_DIFFERS');
  if(FIDELITY.some(f=>!!a.coverage[f]!==!!b.coverage[f]))reasons.push('FIDELITY_DIFFERS');
+ if(!ma.engineering!==!mb.engineering)reasons.push('ENGINEERING_DIFFERS');
+ // a modeled and a verified actuator are different evidence scales even when every KPI looks alike
+ else if(JSON.stringify(a.engineeringEvidence?.capabilities??null)!==JSON.stringify(b.engineeringEvidence?.capabilities??null))reasons.push('CAPABILITY_DIFFERS');
  const comparable=!reasons.length;
  // changed inputs are shown, not judged: a layout or seed change is what an A/B compare is for
  const inputs=[['seed',ma.seed,mb.seed],['project.hash',ma.project.hash,mb.project.hash],['world.hash',ma.world.hash,mb.world.hash],['scenario',`${ma.scenario.id} r${ma.scenario.revision}`,`${mb.scenario.id} r${mb.scenario.revision}`],
-  ['backendSetId',ma.backendSetId,mb.backendSetId],['sourceCommit',ma.sourceCommit,mb.sourceCommit],['assets',JSON.stringify(ma.assets),JSON.stringify(mb.assets)]]
+  ['backendSetId',ma.backendSetId,mb.backendSetId],['engineering.bundleDigest',ma.engineering?.bundleDigest??'',mb.engineering?.bundleDigest??''],['sourceCommit',ma.sourceCommit,mb.sourceCommit],['assets',JSON.stringify(ma.assets),JSON.stringify(mb.assets)]]
   .filter(([,x,y])=>x!==y).map(([field,x,y])=>({field:field as string,a:x as string|number,b:y as string|number}));
  const ka=reportKpis(a),kb=reportKpis(b);
  const kpis=ka.map((x,i)=>{const y=kb[i]!,available=x.available&&y.available;
