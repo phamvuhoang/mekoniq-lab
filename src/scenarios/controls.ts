@@ -1,10 +1,16 @@
+import {hashJson} from '../twin/hash';
 import type {RunVerification} from '../reports/contracts/verification-types';
 // The twin's only path to execution: a small client over the source v2 gateway (/lab/v2). The UI never decides an outcome; every action
 // is a request the runtime accepts or refuses, and a ViewState (selection, layers, view) is never an execution permission.
 // TODO(interim-copy): RunView/RunReport mirror source packages/lab-runtime/src/v2/{scenario-runner,report}.ts; replace with the pinned artifact types (F07).
 import type {LabProjectV2} from '../shared/types';
 import type {TwinSample} from '../twin/store';
-export interface TwinHealth {scenarioRequirements?:Record<string,{mock:string[];simulation:string[]}>;protocolMajors:number[];sourceCommit:string;schemaHash:string;scenarioIds:string[];
+import type {BundleReceipt,EngineeringProject,EngineeringRef} from '../shared/engineering';
+export interface TwinHealth {scenarioRequirements?:Record<string,{mock:string[];simulation:string[]}>;
+ /** Server-advertised optional features, e.g. engineering_bundle_v1. Absent on runtimes that predate engineering. */
+ capabilities?:string[];
+ /** scenarioId -> backendSetId -> what that pairing needs; engineering clients must read this instead of scenarioRequirements. */
+ scenarioRequirementsByBackendSet?:Record<string,Record<string,{supported:boolean;required:string[];reasonCodes:string[]}>>;protocolMajors:number[];sourceCommit:string;schemaHash:string;scenarioIds:string[];
  backends:{id:string;modes:string[];installed:boolean;compatible:boolean;reachable:boolean;commissioned:boolean;enabled:boolean;reason?:string}[];
  backendSets:{id:string;mode:string;access:string;backends:string[]}[];features?:{polling?:boolean;sse?:boolean;readiness?:boolean};}
 export interface ReadinessSnapshot {checkedAt:string;expiresAt:string;scenarioId:string;backendSetId:string;checks:{id:string;status:'ready'|'blocked'|'unknown';reasonCodes:string[];evidenceRef:string|null}[];canStart:boolean}
@@ -15,7 +21,9 @@ export interface Attention {reason:string;tick:number;robotId?:string;subjectId?
 export interface AmrView {sampleAgeMs?:number;id:string;kind:'amr';pose:{x:number;y:number;yawRad:number};quality:'valid'|'stale';moving:boolean;hold:string|null;goal:{commandId:string;state:string}|null;path:[number,number][];distanceM:number}
 export interface CoffeeJobView {canRestoreCup?:boolean;waitingReason?:string|null;jobId:string;status:string;recipeId:string;cupId:string;attentionReason:string|null}
 export interface CupView {cupId:string;ownerKind:string;ownerId:string}
-export interface RunView {lockedInput?:CreateRun&{sourceCommit?:string};controlAccess?:'view_reconcile';run:RunSnapshotV2;tick:number;simTimeNs:string;model:string;entities:AmrView[];
+/** The inputs a run was created from, as stored by the runtime. Engineering runs also carry the exact project, projection and bundle ref. */
+export type LockedInput=CreateRun&{sourceCommit?:string;engineering?:{ref:EngineeringRef;project:EngineeringProject;runtimeProjection:{project:LabProjectV2;assets:unknown[]}}};
+export interface RunView {lockedInput?:LockedInput;controlAccess?:'view_reconcile';run:RunSnapshotV2;tick:number;simTimeNs:string;model:string;entities:AmrView[];
  workload:{actor:string;tableId:string;status:string;missionId?:string}[];awaiting:{subjectId:string;confirmationType:string;missionId:string;robotId:string}[];
  attention:Attention[];served:string;coffee:{jobs:CoffeeJobView[];cups:CupView[]}|null;}
 export interface Quantity {amount:string;unit:string;provenance:string;tolerance?:string}
@@ -43,11 +51,36 @@ export interface RunReport {verification?:RunVerification;manifest:{armCollision
  reconciliations:{subjectId:string;commandId:string|null;nativeState:string;tick:number}[];coverage:Record<string,boolean>;limitations:string[];
  coffee?:{plantLog?:Record<string,unknown>[];jobs:{jobId:string;recipeId:string;recipeRevision:number;status:string;steps:JobStep[]}[];cups:{cupId:string;ownerKind:string;ownerId:string;movements:{transferId:string;provenance:string;observedBy:string;at:string}[]}[];
   armTrace:{collision?:ArmCollisionView|null;stop?:ArmStopView|null;tag:string;interpolation:string;modelRevision:string;limitsOk:boolean;samples:{tick:number;q:number[];tcp:[number,number,number]}[]}};}
-export interface CreateRun {project:LabProjectV2;scenarioId:string;scenarioRevision:number;seed:number;mode:'mock'|'simulation';backendSetId:string;access:'simulated'}
-export function requestForPreset(p:import('./catalog').TwinPreset):CreateRun{return {project:structuredClone(p.project),scenarioId:p.scenarioId,scenarioRevision:p.scenarioRevision,seed:p.seed,mode:p.mode??'mock',backendSetId:p.backendSetId,access:'simulated'};}
+interface CreateRunBase {scenarioId:string;scenarioRevision:number;seed:number;mode:'mock'|'simulation';backendSetId:string;access:'simulated'}
+/** Legacy request: the project travels with it and there is no engineeringRef. */
+export interface LegacyCreateRun extends CreateRunBase {project:LabProjectV2;engineeringRef?:undefined}
+/** Engineering request: the server derives the project from the bundle; a project, if sent at all, must equal the locked projection. */
+export interface EngineeringCreateRun extends CreateRunBase {engineeringRef:EngineeringRef;project?:LabProjectV2}
+export type CreateRun=LegacyCreateRun|EngineeringCreateRun;
+export function requestForPreset(p:import('./catalog').TwinPreset):CreateRun{
+ const base={scenarioId:p.scenarioId,scenarioRevision:p.scenarioRevision,seed:p.seed,mode:p.mode??'mock',backendSetId:p.backendSetId,access:'simulated'} as const;
+ // engineering never falls back to the preset project: the receipt that matches this exact draft is the only way to a ref
+ if (p.engineering) return {...base,engineeringRef:engineeringRefFor(p.engineering.project,p.engineering.receipt)};
+ return {project:structuredClone(p.project),...base};
+}
+/** Only a compiled receipt for exactly this project yields a ref; a blocked, missing or stale receipt is a typed refusal before any request. */
+export function engineeringRefFor(project:EngineeringProject,receipt:BundleReceipt|null):EngineeringRef {
+ if (!receipt) throw new TwinRuntimeError('ENGINEERING_NOT_COMPILED',[],0);
+ if (receipt.state!=='compiled') throw new TwinRuntimeError('ENGINEERING_COMPILE_BLOCKED',receipt.problems.map(p=>p.code),0);
+ if (receipt.projectDigest!==hashJson(project)) throw new TwinRuntimeError('ENGINEERING_RECEIPT_STALE',['ENGINEERING_IDENTITY_MISMATCH'],0);
+ return {bundleDigest:receipt.bundleDigest,projectDigest:receipt.projectDigest};
+}
+/** Reset is a new run from what the chosen run was created with, never from the open draft or preset. */
+export function requestFromLocked(locked:LockedInput):CreateRun {
+ const {sourceCommit:_c,engineering,...rest}=locked as LockedInput&{runtimeIdentity?:unknown};void _c;
+ const {project,runtimeIdentity:_r,...base}=rest as LegacyCreateRun&{runtimeIdentity?:unknown};void _r;
+ return engineering?{...base,engineeringRef:engineering.ref}:{...base,project:structuredClone(project)};
+}
 export type ActionKind='start'|'pause'|'resume'|'cancel'|'step'|'confirm'|'injectFault'|'reconcile'|'restoreCup';
 export interface TwinRuntime {
- readiness?(scenarioId:string,backendSetId:string,project?:LabProjectV2):Promise<ReadinessSnapshot>;
+ readiness?(scenarioId:string,backendSetId:string,project?:LabProjectV2,engineeringRef?:EngineeringRef):Promise<ReadinessSnapshot>;
+ /** Present only against a runtime that advertises engineering_bundle_v1. */
+ compileEngineering?(project:EngineeringProject):Promise<BundleReceipt>;
  health():Promise<TwinHealth>;pair(token:string):Promise<void>;readonly paired:boolean;
  /** Drop the in-memory CSRF token after the runtime lost the session (restart): the pair form shows again. */
  forget():void;
@@ -73,7 +106,8 @@ export function httpTwinRuntime(base='/lab/v2'):TwinRuntime {
  return {
   get paired(){return !!csrf;},forget(){csrf='';},
   health:()=>request<TwinHealth>('/health'),
-  readiness:(scenarioId,backendSetId,project)=>project?request<ReadinessSnapshot>('/readiness',{scenarioId,backendSetId,project}):request<ReadinessSnapshot>(`/readiness?scenarioId=${encodeURIComponent(scenarioId)}&backendSetId=${encodeURIComponent(backendSetId)}`),
+  compileEngineering:project=>request<BundleReceipt>('/engineering/compile',{project}),
+  readiness:(scenarioId,backendSetId,project,engineeringRef)=>engineeringRef?request<ReadinessSnapshot>('/readiness',{scenarioId,backendSetId,engineeringRef,...project?{project}:{}}):project?request<ReadinessSnapshot>('/readiness',{scenarioId,backendSetId,project}):request<ReadinessSnapshot>(`/readiness?scenarioId=${encodeURIComponent(scenarioId)}&backendSetId=${encodeURIComponent(backendSetId)}`),
   async pair(token){const r=await request<{csrfToken?:string}>('/sessions',{token});if(!r.csrfToken)throw new TwinRuntimeError('INVALID_PAIRING_RESPONSE',[],502);csrf=r.csrfToken;},
   async create(r,identity){const {reclaimToken,...view}=await request<RunView&{reclaimToken?:string}>('/runs',{...r,runtimeIdentity:identity});if(reclaimToken){proofs[view.run.id]=reclaimToken;try{localStorage.setItem(storageKey,JSON.stringify(proofs));}catch{/* current tab retains the proof if storage is unavailable */}}return view;},
   get recoverableRunIds(){return Object.keys(proofs);},

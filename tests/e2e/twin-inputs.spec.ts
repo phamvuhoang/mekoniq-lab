@@ -44,7 +44,7 @@ test('UX05/UX18/QA09b: reset, speed-limit draft, saved report reopening and repl
 
  // Reset keeps the original immutable inputs; only an explicit new-input run uses the draft limit.
  const edited=await createRun(page,'Run with edited inputs',reset.id);
- const limits=edited.input.project.entities.filter(entity=>entity.kind==='amr').map(entity=>entity.speedLimitMps);
+ const limits=edited.input.project!.entities.filter(entity=>entity.kind==='amr').map(entity=>entity.speedLimitMps);
  expect(limits.length).toBeGreaterThan(0);expect(limits.every(limit=>limit===0.2)).toBe(true);
  const editedReport=await report(page,edited.id);
  expect(editedReport.manifest.configuration.hash).not.toBe(originalReport.manifest.configuration.hash);

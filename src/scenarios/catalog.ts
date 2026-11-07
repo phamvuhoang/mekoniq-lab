@@ -4,7 +4,9 @@ import coffeeFixture from '../../fixtures/twins/coffee-cell-v2.json' with {type:
 import restaurantFixture from '../../fixtures/twins/restaurant-v2.json' with {type:'json'};
 import type {AssetRevision,LabProjectV2} from '../shared/types';
 import {tr} from '../i18n';
-export interface TwinPreset {mode?:'mock'|'simulation';id:string;title:()=>string;summary:()=>string;scenarioId:string;scenarioRevision:number;backendSetId:string;seed:number;
+/** Present only on an engineering preset: the exact draft that was compiled and the receipt for it. */
+export interface EngineeringPresetInput {project:import('../shared/engineering').EngineeringProject;receipt:import('../shared/engineering').BundleReceipt|null}
+export interface TwinPreset {engineering?:EngineeringPresetInput;mode?:'mock'|'simulation';id:string;title:()=>string;summary:()=>string;scenarioId:string;scenarioRevision:number;backendSetId:string;seed:number;
  project:LabProjectV2;assets:AssetRevision[];names:Record<string,string>;roles:{entities:LabProjectV2['entities'][number]['kind'][];points:string[]};}
 export const presets:TwinPreset[]=[
  {id:'coffee',title:()=>tr('Cà phê sữa đá','アイスミルクコーヒー','Iced milk coffee'),summary:()=>tr('BV01 · espresso + cà phê sữa đá · máy pha → arm → khay robot → bàn','BV01 · エスプレッソ + アイスミルクコーヒー · マシン → アーム → ロボットトレイ → テーブル','BV01 · espresso + iced milk coffee · machine → arm → robot tray → table'),
