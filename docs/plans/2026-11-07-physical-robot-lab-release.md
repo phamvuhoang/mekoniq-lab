@@ -36,19 +36,19 @@ Files: lab/src/reports/compare.ts, lab/scripts/recorder-options.mjs, lab/scripts
 ## Task 4 — Integration, runtime pin and recording
 
 - [x] Independently review Tasks 1–3 and resolve findings.
-- [ ] Verify source lint, tsc, contracts, applicable unit/integration/security/contract suites, Python simulation; verify Lab typecheck/tests/build/browser flows.
-- [ ] Commit Source fixes on main; export a clean runtime; import/pin it in Lab and commit Lab fixes/pin.
-- [ ] Run the physical-robot-lab recorder with a fresh --out and run acceptance with LAB_V2_REGRESSION_DIR pointing at it. Capture exact failures/not_run reasons; do not relabel skipped native checks as passes.
-- [ ] Push verified main branches and deploy the existing production targets using their established tooling; verify public endpoints and deployment identities. Do not create new infrastructure or run unrelated database migrations.
+- [x] Verify source lint, tsc, contracts, applicable unit/integration/security/contract suites, Python simulation; verify Lab typecheck/tests/build/browser flows.
+- [x] Commit Source fixes on main; export a clean runtime; import/pin it in Lab and commit Lab fixes/pin.
+- [x] Run the physical-robot-lab recorder with a fresh --out and run acceptance with LAB_V2_REGRESSION_DIR pointing at it. Capture exact failures/not_run reasons; do not relabel skipped native checks as passes.
+- [x] Push verified main branches and deploy the existing production targets using their established tooling; verify public endpoints and deployment identities. Do not create new infrastructure or run unrelated database migrations.
 
 ## Task 5 — Updated standalone guide
 
 Reference: source/artifacts/src/platform-guide/ and source/artifacts/mekoniq-platform-lab-guide-2026-11-06.html.
 
-- [ ] Create editable sources for a 2026-11-07 guide, preserving the prior artifact. Keep Vietnamese and offline operation, matching the reference guide.
-- [ ] Capture fresh Source/Lab screenshots with explicit capture environment, commits, runtime pin and timestamps. Use local synthetic data for authenticated/stateful flows; do not include production customer data or credentials.
-- [ ] Cover existing platform/Lab functions, Physical Robot Lab contracts/catalog/resolver/compiler/store/UI/evidence, the fixes, release verification and production URLs, and remaining native/shared-project/hardware work.
-- [ ] Generate the standalone HTML, validate desktop/mobile/offline/filter/print interactions, inspect representative screenshots, and commit the sources, captures, artifact and verification receipt.
+- [x] Create editable sources for a 2026-11-07 guide, preserving the prior artifact. Keep Vietnamese and offline operation, matching the reference guide.
+- [x] Capture fresh Source/Lab screenshots with explicit capture environment, commits, runtime pin and timestamps. Use local synthetic data for authenticated/stateful flows; do not include production customer data or credentials.
+- [x] Cover existing platform/Lab functions, Physical Robot Lab contracts/catalog/resolver/compiler/store/UI/evidence, the fixes, release verification and production URLs, and remaining native/shared-project/hardware work.
+- [x] Generate the standalone HTML, validate desktop/mobile/offline/filter/print interactions, inspect representative screenshots, and commit the sources, captures, artifact and verification receipt.
 
 ## Verification commands
 
@@ -67,3 +67,7 @@ pnpm build
 pnpm exec playwright test engineering-design.spec.ts engineering-pairing.spec.ts --workers=1
 # Recorder/acceptance paths are chosen as fresh absolute paths at execution and recorded in the release receipt.
 ```
+
+## Completion receipt
+
+Completed the scoped repairs, portable verification, main integration, production deployment and updated guide. See [release receipt](../implementation/evidence/physical-robot-lab/release-2026-11-07.md) and [current evidence index](../implementation/evidence/physical-robot-lab/README.md). R3 explicitly reuses 19 unchanged successful R2 commands and retries only the two failed commands; historical failures are preserved. Native/hardware and listed UI development remain open.

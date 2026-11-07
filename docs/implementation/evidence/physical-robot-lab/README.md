@@ -1,3 +1,69 @@
+# Physical Robot Lab — bằng chứng release hiện tại (07/11/2026)
+
+Danh tính mã đã kiểm: Source `899a83769726aa6840c40a32fb0e89d17a137cb7`, Lab `582f9f46eb4a6fed40e3df97ce50c580c5ea850d`. Runtime được export từ cây Source sạch `899a83769726aa6840c40a32fb0e89d17a137cb7`, SHA-256 artifact `7180f99d1a168ce25f3bf90607cd9afddfddec8e4d41d31403f1939607de6ec0`, SHA-256 schema `7f93a1e1d27b345a64e766c8d67df93a3dc2bbffd92aa7ee16754bccbfc6f222`. Đây là snapshot mã đã kiểm/export; commit chỉ thêm tài liệu về sau không đổi nguồn gốc runtime.
+
+[Biên bản sửa, deployment và guide](release-2026-11-07.md) · [Production smoke](production-2026-11-07.json) · [GitHub CI Source](source-ci-2026-11-07.json).
+
+## Biên bản portable hiện tại (release-2026-11-07-r3)
+
+R3 là biên bản phục hồi có nguồn gốc: giữ nguyên **19 lệnh đã pass từ R2**, chỉ chạy lại **2 lệnh thất bại**. Không phải toàn bộ bộ lệnh được chạy mới ở R3. Manifest R2: [release-2026-11-07-r2/manifest.json](release-2026-11-07-r2/manifest.json), SHA-256 `792b6d486d33ad04999141a01443825f15125aa44033deff5e303e1560852e63`. Bytes và metadata của kết quả tái sử dụng đã được đối chiếu; thời gian chạy gốc được giữ nguyên.
+
+Lệnh giữ từ R2: `lab-build`, `lab-check-source`, `lab-e2e-browser`, `lab-mock-e2e`, `lab-offline-build`, `lab-offline-e2e`, `lab-runtime-e2e`, `lab-typecheck`, `lab-vitest`, `source-adapters`, `source-build`, `source-contracts`, `source-contracts-check`, `source-engineering`, `source-lint`, `source-pytest`, `source-pytest-simulation`, `source-typecheck`, `source-unit`.
+
+Lệnh chạy lại ở R3: `lab-ui-performance`, `source-integration`.
+
+R2 được giữ nguyên, gồm hai lần thất bại sau:
+
+- [source-integration.json](release-2026-11-07-r2/source-integration.json): exit 1; 858 passed, 11 failed, 125 skipped; SHA-256 `95d3e6b1f9a4af1fe8968cbdbfed4faac078eef93ed7b7e4cdc60aa3ec855002`.
+
+- [lab-ui-performance.json](release-2026-11-07-r2/lab-ui-performance.json): exit 1; desktop-3d: frame p95 16.80 ms, paint p95 40.20 ms, ngưỡng 33 ms, meetsTarget=False; tablet-2d-emulated: frame p95 16.70 ms, paint p95 1.80 ms, ngưỡng 50 ms, meetsTarget=True; SHA-256 `ede73ba612e2b7add0b1fa98bdefc716d6e2e76f3c7be69d9aa6ba67fbc553df`.
+
+Operator ghi nhận OrbStack/Postgres treo khi chạy integration và thời điểm khởi động lại OrbStack trùng benchmark. Đây là bối cảnh vận hành, chưa chứng minh nguyên nhân benchmark thất bại. Kết quả R3 được đánh giá từ chính biên bản retry; lịch sử R2 không bị đổi thành pass.
+
+- [release-2026-11-07-r3/manifest.json](release-2026-11-07-r3/manifest.json): 21 lệnh, 0 thất bại; 73 hash artifact trong manifest, 116 file lưu trữ riêng biệt đã kiểm hash. SHA-256 manifest `51731eae15c2b09f8c377ae0f3acfbd9726c6db1f0381fa71e7d47513f10f8bd`.
+- [Biên bản test acceptance](release-2026-11-07-r3/acceptance-vitest.json): 41 passed, 0 failed, 0 skipped, 0 not_run. [Biên bản coverage](release-2026-11-07-r3/acceptance.json): 96/106 coverage rows pass; 4 not_run:UNSUPPORTED_FIDELITY, 5 not_run:NEEDS_HUMAN, 1 not_run:BLOCKED_EXTERNAL. Coverage thuộc phạm vi mock/macro; chưa hoàn tất nghiệm thu engineering vật lý.
+- [Bảng bảo toàn NR01–NR12](compatibility.json): giữ nguyên baseline; mỗi dòng candidate ghi tên test, kết quả, tham chiếu lần chạy và hash thực. Test chỉ skip vẫn ghi skip. Lần mock chạy pass được giữ riêng với lần browser mặc định skip; chạy lặp không tăng coverage riêng biệt.
+- Kiểm điều kiện native: 48.11 GiB free; VM budget 120 GiB + system reserve 20 GiB; Linux/ROS/native engine not provisioned; [biên bản](host-preflight-2026-11-07.json), exit 2 / `not_run`.
+
+| Kết quả lưu trữ | Trạng thái | Nguồn lần chạy | Số lượng / phạm vi |
+|---|---|---|---|
+| [source-unit.json](release-2026-11-07-r3/source-unit.json) | pass | reused | 235 passed, 0 failed, 0 skipped, 0 not_run |
+| [source-contracts.json](release-2026-11-07-r3/source-contracts.json) | pass | reused | 51 passed, 0 failed, 0 skipped, 0 not_run |
+| [source-engineering.json](release-2026-11-07-r3/source-engineering.json) | pass | reused | 611 passed, 0 failed, 3 skipped, 0 not_run |
+| [source-pytest-simulation.xml](release-2026-11-07-r3/source-pytest-simulation.xml) | pass | reused | 183 passed, 0 failed, 1 skipped, 0 not_run |
+| [source-adapters.json](release-2026-11-07-r3/source-adapters.json) | pass | reused | 50 passed, 0 failed, 0 skipped, 0 not_run |
+| [source-integration.json](release-2026-11-07-r3/source-integration.json) | pass | retried | 992 passed, 0 failed, 2 skipped, 0 not_run |
+| [source-pytest.xml](release-2026-11-07-r3/source-pytest.xml) | pass | reused | 178 passed, 0 failed, 0 skipped, 0 not_run |
+| [lab-vitest.json](release-2026-11-07-r3/lab-vitest.json) | pass | reused | 279 passed, 0 failed, 1 skipped, 0 not_run |
+| [lab-pw-browser.json](release-2026-11-07-r3/lab-pw-browser.json) | pass | reused | 38 passed, 0 failed, 15 skipped, 0 not_run |
+| [lab-pw-mock-twin-workspace.json](release-2026-11-07-r3/lab-pw-mock-twin-workspace.json) | pass | reused | 5 passed, 0 failed, 0 skipped, 0 not_run |
+| [lab-pw-mock-coffee-journey.json](release-2026-11-07-r3/lab-pw-mock-coffee-journey.json) | pass | reused | 1 passed, 0 failed, 0 skipped, 0 not_run |
+| [lab-pw-mock-twin-recovery.json](release-2026-11-07-r3/lab-pw-mock-twin-recovery.json) | pass | reused | 1 passed, 0 failed, 0 skipped, 0 not_run |
+| [lab-pw-mock-twin-inputs.json](release-2026-11-07-r3/lab-pw-mock-twin-inputs.json) | pass | reused | 1 passed, 0 failed, 0 skipped, 0 not_run |
+| [lab-pw-mock-fault-schedule.json](release-2026-11-07-r3/lab-pw-mock-fault-schedule.json) | pass | reused | 1 passed, 0 failed, 0 skipped, 0 not_run |
+| [lab-pw-mock-arm-simulation.json](release-2026-11-07-r3/lab-pw-mock-arm-simulation.json) | pass | reused | 1 passed, 0 failed, 0 skipped, 0 not_run |
+| [lab-pw-mock-twin-plan01.json](release-2026-11-07-r3/lab-pw-mock-twin-plan01.json) | pass | reused | 1 passed, 0 failed, 0 skipped, 0 not_run |
+| [lab-pw-mock-legacy-campaign.json](release-2026-11-07-r3/lab-pw-mock-legacy-campaign.json) | pass | reused | 3 passed, 0 failed, 0 skipped, 0 not_run |
+| [lab-pw-runtime.json](release-2026-11-07-r3/lab-pw-runtime.json) | pass | reused | 1 passed, 0 failed, 0 skipped, 0 not_run |
+| [lab-ui-performance.json](release-2026-11-07-r3/lab-ui-performance.json) | pass | retried | {"durationMs": 60000, "profiles": [{"id": "desktop-3d", "p95Ms": 16.700000000004366, "paintP95Ms": 20.100000143051147, "limitMs": 33}, {"id": "tablet-2d-emulated", "p95Ms": 16.700000000004366, "paintP95Ms": 1.6999998092651367, "limitMs": 50}]} |
+| [lab-pw-offline-twin-recovery.json](release-2026-11-07-r3/lab-pw-offline-twin-recovery.json) | pass | reused | 1 passed, 0 failed, 0 skipped, 0 not_run |
+| [lab-pw-offline-coffee-journey.json](release-2026-11-07-r3/lab-pw-offline-coffee-journey.json) | pass | reused | 1 passed, 0 failed, 0 skipped, 0 not_run |
+| [lab-pw-offline-offline-bv01.json](release-2026-11-07-r3/lab-pw-offline-offline-bv01.json) | pass | reused | 1 passed, 0 failed, 0 skipped, 0 not_run |
+
+## Gate và việc còn mở
+
+G0 vẫn **blocked**: browser portable V14/V19 và hành trình project chung Designer/Twin chưa hoàn tất. G1/G2 **not_run** vì chưa có Linux/ROS/engine native và campaign native. G3 cần dataset đo hiệu chuẩn thật. Qualification phần cứng nằm ngoài phạm vi release này. Biên bản không đóng gate distribution/native/hardware. Smoke mock offline trên cùng host chưa chứng minh qualification máy sạch/offline-native.
+
+Entity-binding editor (owner chỉ đọc; thêm assembly tự dùng entity runtime đầu tiên, chưa có selector), provenance/model inspector, inspector link/joint/port, exploded view, project chung, stability UI, thông số catalog thật/vendor qualification và hành trình browser engineering-run native vẫn mở. Test assembly/compiler/pure/mock chỉ chứng minh assertion đã ghi. Chức năng cũ tiếp tục được theo dõi qua NR01–NR12, giữ nguyên baseline.
+
+R1 (`release-2026-11-07`) được giữ nguyên làm lịch sử. XML JUnit simulation đã lưu bị sai cú pháp do placeholder đường dẫn không escape; không dùng làm biên bản JUnit cuối. Mọi XML JUnit trong biên bản hiện tại phải qua parser nghiêm ngặt trước khi tạo mục lục này.
+
+## Ghi chú triển khai lịch sử (số liệu và runtime pin cũ)
+
+Phần dưới giữ nguyên văn để truy vết. Trạng thái, pin và nhận định về recorder bên dưới thuộc lịch sử; release hiện tại dùng mục biên bản hiện tại và candidate compatibility phía trên.
+
+---
+
 # Physical Robot Lab — evidence index (07/11/2026)
 
 Chỉ ghi những gì đã chạy thật trên host macOS arm64 (Node 24.22.2). **Không có gate G1/G2/G3, distribution hay hardware nào được đóng.** Mọi mục native là `not_run` kèm blocker; mô phỏng không được nâng thành bằng chứng phần cứng.
