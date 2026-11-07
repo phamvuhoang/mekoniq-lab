@@ -12,11 +12,13 @@ import { icon, esc } from "./ui/icons";
 import type { Viewer } from "./viewer/robot";
 import { robotSvg } from "./viewer/fallback";
 import { TwinWorkspace } from "./ui/workspace";
+import { AssemblyWorkspace } from "./ui/assembly-page";
 
-type Page = "design" | "restaurant" | "scenarios" | "twin" | "results" | "deployment";
-const PAGES: Page[] = ["design", "restaurant", "scenarios", "twin", "results", "deployment"];
+type Page = "design" | "assembly" | "restaurant" | "scenarios" | "twin" | "results" | "deployment";
+const PAGES: Page[] = ["design", "assembly", "restaurant", "scenarios", "twin", "results", "deployment"];
 const names = () => ({
   design: tr("Thiết kế", "設計", "Design"),
+  assembly: tr("Lắp ráp", "組立", "Assembly"),
   restaurant: tr("Mặt bằng", "レストラン", "Restaurant"),
   scenarios: tr("Kịch bản", "シナリオ", "Scenarios"),
   twin: tr("Bản sao số", "デジタルツイン", "Digital twin"),
@@ -90,6 +92,7 @@ export class LabApp {
   private backendCompatible = false;
   private faultKind = "blocked";
   private twin = new TwinWorkspace(() => this.render());
+  private assembly = new AssemblyWorkspace(() => this.render(), undefined, (name, data) => this.download(name, data));
   constructor(host: HTMLElement) {
     this.host = host;
     this.bind();
@@ -228,7 +231,7 @@ export class LabApp {
 <button aria-label="${tr("Đóng", "閉じる", "Dismiss")}" data-action="dismiss">${icon("cross", 16)}</button>
 </div>`
         : ""
-    }${this.page === "design" ? this.design() : this.page === "restaurant" ? this.restaurant() : this.page === "scenarios" ? this.scenarios() : this.page === "twin" ? this.twin.html() : this.page === "results" ? this.results() : this.deployment()}<footer class="main-footer">
+    }${this.page === "design" ? this.design() : this.page === "restaurant" ? this.restaurant() : this.page === "scenarios" ? this.scenarios() : this.page === "twin" ? this.twin.html() : this.page === "assembly" ? this.assembly.html() : this.page === "results" ? this.results() : this.deployment()}<footer class="main-footer">
 <span>MEKONIQ ROBOT LAB <span class="footer-divider">/</span> ${tr("Không gian kỹ thuật mở", "オープンエンジニアリング", "An open engineering workspace")}</span>
 <span>${icon("info", 13)} ${tr("Mô hình minh họa · chưa nghiệm thu phần cứng", "参考モデル · 実機未検証", "Illustrative model · hardware unvalidated")}</span>
 </footer>
@@ -900,6 +903,8 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
     }
     if (this.page === "twin") this.twin.mounted();
     else this.twin.leave();
+    if (this.page === "assembly") this.assembly.mounted();
+    else this.assembly.leave();
     if (focusId)
       document.getElementById(focusId)?.focus({ preventScroll: true });
     else if (focusAction) {
@@ -951,6 +956,7 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
       const a = b.dataset.action,
         v = b.dataset.value;
       if (a?.startsWith("twin-")) return this.twin.click(a, v);
+      if (a?.startsWith("asm-")) return this.assembly.click(a, v);
       if (a === "locale") {
         setLocale(v as Locale);
         this.render();
@@ -1155,7 +1161,7 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
     this.host.addEventListener("submit", (e) => {
       e.preventDefault();
       const form = e.target as HTMLFormElement;
-      if (this.twin.submit(form)) return;
+      if (this.twin.submit(form) || this.assembly.submit(form)) return;
       if (form.id === "pair-form") {
         const token = (
           document.getElementById("pair-token") as HTMLInputElement

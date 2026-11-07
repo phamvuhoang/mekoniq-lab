@@ -80,3 +80,23 @@ describe('http client',()=>{
     expect(calls[2]!.body).toEqual({scenarioId:p.scenarioId,backendSetId:p.backendSetId,project:p.project});
   });
 });
+
+describe('bundle reads',()=>{
+  test('the scene comes from the bundle\'s own scene.json and is verified against its name',async()=>{
+    const {loadCompiledScene,loadBom}=await import('../../src/scenarios/engineering');
+    const {sha256Hex}=await import('../../src/twin/hash');
+    const scene=new TextEncoder().encode(JSON.stringify({schemaVersion:1,links:[]})),bom=new TextEncoder().encode(JSON.stringify({lines:[],missingPriceLineIds:[],total:null,incompleteTotal:false}));
+    const manifest={schemaVersion:1,projectDigest:'a'.repeat(64),assemblyDigest:'b'.repeat(64),sceneDigest:sha256Hex(scene),profile:'engineering-rigid-v1',compilerVersion:'t',files:[{path:'scene.json',sha256:sha256Hex(scene),sizeBytes:scene.length},{path:'bom.json',sha256:sha256Hex(bom),sizeBytes:bom.length}]};
+    const blobs=new Map([[sha256Hex(scene),scene],[sha256Hex(bom),bom]]);
+    vi.stubGlobal('fetch',vi.fn(async(url:string)=>{
+      if(url.includes('/manifest'))return new Response(JSON.stringify(manifest));
+      const bytes=blobs.get(decodeURIComponent(url.split('/').pop()!));return bytes?new Response(bytes):new Response('{"error":"X"}',{status:403});
+    }));
+    const runtime=httpTwinRuntime();
+    expect((await loadCompiledScene(runtime,'d'.repeat(64))).schemaVersion).toBe(1);
+    expect((await loadBom(runtime,'d'.repeat(64))).lines).toEqual([]);
+    blobs.set(sha256Hex(scene),new TextEncoder().encode('tampered'));
+    await expect(loadCompiledScene(runtime,'d'.repeat(64))).rejects.toMatchObject({code:'ENGINEERING_BLOB_CORRUPT'});
+    await expect(loadCompiledScene({} as never,'d'.repeat(64))).rejects.toMatchObject({code:'ENGINEERING_CAPABILITY_REQUIRED'});
+  });
+});

@@ -2455,3 +2455,17 @@ input:disabled, select:disabled { opacity: 1; background: var(--raised); color: 
     --blue:var(--mekoniq-ink); --amber:var(--mekoniq-ink); --danger:var(--mekoniq-ink);
   }
 }
+
+/* Engineering assembly page */
+.assembly-page .asm-toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+.assembly-page .asm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.assembly-page table{width:100%;border-collapse:collapse}
+.assembly-page td,.assembly-page th{padding:6px 8px;border-bottom:1px solid var(--mq-border);text-align:left;vertical-align:top}
+.assembly-page .chip{display:inline-block;padding:1px 8px;border:1px solid var(--mq-border);border-radius:var(--mq-radius-badge);font-size:.8rem}
+.assembly-page .chip.warn{border-color:var(--mq-warning);color:var(--mq-warning)}
+.assembly-page .asm-problems{padding-left:18px}
+.assembly-page .asm-problems code{font-family:var(--mq-font-mono)}
+.assembly-page .asm-connect{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
+.assembly-page .asm-scene{min-height:80px;border:1px solid var(--mq-border);border-radius:var(--mq-radius-panel);padding:8px;color:var(--mq-text-muted)}
+.assembly-page .asm-scene canvas{width:100%;display:block}
+.assembly-page .asm-status{color:var(--mq-text-muted)}

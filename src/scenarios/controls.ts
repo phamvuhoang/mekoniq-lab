@@ -1,4 +1,4 @@
-import {hashJson} from '../twin/hash';
+import {hashJson,sha256Hex} from '../twin/hash';
 import type {RunVerification} from '../reports/contracts/verification-types';
 // The twin's only path to execution: a small client over the source v2 gateway (/lab/v2). The UI never decides an outcome; every action
 // is a request the runtime accepts or refuses, and a ViewState (selection, layers, view) is never an execution permission.
@@ -77,10 +77,14 @@ export function requestFromLocked(locked:LockedInput):CreateRun {
  return engineering?{...base,engineeringRef:engineering.ref}:{...base,project:structuredClone(project)};
 }
 export type ActionKind='start'|'pause'|'resume'|'cancel'|'step'|'confirm'|'injectFault'|'reconcile'|'restoreCup';
+export interface EngineeringManifest {schemaVersion:1;projectDigest:string;assemblyDigest:string;sceneDigest:string;profile:string;compilerVersion:string;files:{path:string;sha256:string;sizeBytes:number}[]}
 export interface TwinRuntime {
  readiness?(scenarioId:string,backendSetId:string,project?:LabProjectV2,engineeringRef?:EngineeringRef):Promise<ReadinessSnapshot>;
  /** Present only against a runtime that advertises engineering_bundle_v1. */
  compileEngineering?(project:EngineeringProject):Promise<BundleReceipt>;
+ /** Read access to a bundle this session compiled (or reclaimed): its manifest and content-addressed blobs. */
+ engineeringManifest?(bundleDigest:string):Promise<EngineeringManifest>;
+ engineeringBlob?(sha256:string):Promise<Uint8Array>;
  health():Promise<TwinHealth>;pair(token:string):Promise<void>;readonly paired:boolean;
  /** Drop the in-memory CSRF token after the runtime lost the session (restart): the pair form shows again. */
  forget():void;
@@ -107,6 +111,15 @@ export function httpTwinRuntime(base='/lab/v2'):TwinRuntime {
   get paired(){return !!csrf;},forget(){csrf='';},
   health:()=>request<TwinHealth>('/health'),
   compileEngineering:project=>request<BundleReceipt>('/engineering/compile',{project}),
+  engineeringManifest:digest=>request<EngineeringManifest>(`/engineering/bundles/${encodeURIComponent(digest)}/manifest`),
+  async engineeringBlob(sha256){
+   const response=await fetch(`${base}/engineering/blobs/${encodeURIComponent(sha256)}`,{credentials:'same-origin',cache:'no-store'});
+   if(!response.ok){const data=await response.json().catch(()=>({error:'INVALID_RUNTIME_RESPONSE'}));throw new TwinRuntimeError(String(data.error??'RUNTIME_REQUEST_FAILED'),[],response.status);}
+   const bytes=new Uint8Array(await response.arrayBuffer());
+   // content addressing is checked here too: a blob that does not hash to its name is never rendered
+   if(sha256Hex(bytes)!==sha256)throw new TwinRuntimeError('ENGINEERING_BLOB_CORRUPT',[],409);
+   return bytes;
+  },
   readiness:(scenarioId,backendSetId,project,engineeringRef)=>engineeringRef?request<ReadinessSnapshot>('/readiness',{scenarioId,backendSetId,engineeringRef,...project?{project}:{}}):project?request<ReadinessSnapshot>('/readiness',{scenarioId,backendSetId,project}):request<ReadinessSnapshot>(`/readiness?scenarioId=${encodeURIComponent(scenarioId)}&backendSetId=${encodeURIComponent(backendSetId)}`),
   async pair(token){const r=await request<{csrfToken?:string}>('/sessions',{token});if(!r.csrfToken)throw new TwinRuntimeError('INVALID_PAIRING_RESPONSE',[],502);csrf=r.csrfToken;},
   async create(r,identity){const {reclaimToken,...view}=await request<RunView&{reclaimToken?:string}>('/runs',{...r,runtimeIdentity:identity});if(reclaimToken){proofs[view.run.id]=reclaimToken;try{localStorage.setItem(storageKey,JSON.stringify(proofs));}catch{/* current tab retains the proof if storage is unavailable */}}return view;},
