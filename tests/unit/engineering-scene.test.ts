@@ -33,3 +33,19 @@ test('pose samples move only the matching link and are the only thing that does'
   expect(worldOf(moved,'battery/pack').x).toBeCloseTo(1);
   expect(worldOf(moved,'tray/plate').toArray()).toEqual(worldOf(base,'tray/plate').toArray());
 });
+
+test('moving the chassis moves everything mounted on it', () => {
+  const base=renderEngineeringScene(compiled),moved=renderEngineeringScene(compiled,[{kind:'pose',entityId:'amr-1',frameId:'chassis/base',values:{x:1,y:0,z:0,qx:0,qy:0,qz:0,qw:1}}]);
+  for (const id of ['battery/pack','tray/plate','wheel-left/rim','wheel-right/hub']) {
+    const a=worldOf(base,id),b=worldOf(moved,id);
+    expect(b.x-a.x,id).toBeCloseTo(1);              // ROS +x is Three +x
+    expect(b.y,id).toBeCloseTo(a.y);expect(b.z,id).toBeCloseTo(a.z);
+  }
+  expect(worldOf(moved,'battery/pack').x).toBeCloseTo(0.9);
+});
+test('a pose sample for a mounted part overrides only that part and what hangs under it', () => {
+  const moved=renderEngineeringScene(compiled,[{kind:'pose',entityId:'amr-1',frameId:'wheel-left/hub',values:{x:0,y:0.225,z:1,qx:0,qy:0,qz:0,qw:1}}]);
+  expect(worldOf(moved,'wheel-left/hub').toArray().map(n=>Math.round(n*1e6)/1e6)).toEqual([0,1,-0.225]);
+  expect(worldOf(moved,'wheel-left/rim').y).toBeCloseTo(1);     // the rim hangs under the hub
+  expect(worldOf(moved,'wheel-right/rim').y).toBeCloseTo(0);
+});

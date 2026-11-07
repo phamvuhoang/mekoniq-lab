@@ -2,6 +2,8 @@ import {expect,test} from 'vitest';
 import {engineeringEstimateInputs} from '../../src/design/engineering-estimates';
 import {estimateDrive} from '../../src/estimates/drive';
 import {makeEngineeringArchive} from '../support/engineering';
+import {sha256Hex} from '../../src/twin/hash';
+import {componentDigest} from '../../src/project/engineering-archive';
 
 test('drive inputs come from the design: wheel radius, ratio, efficiency and total AMR mass',()=>{
   const archive=makeEngineeringArchive(),r=engineeringEstimateInputs(archive.manifest.project,archive);
@@ -29,4 +31,30 @@ test('missing model blob, capacity and support polygon are reported and nothing 
   expect(r.problems.map(p=>p.code)).toEqual(expect.arrayContaining(['MODEL_BLOB_MISSING','DRIVE_MODEL_UNAVAILABLE','ENERGY_CAPACITY_UNAVAILABLE','STABILITY_UNAVAILABLE']));
   expect(r.stability).toBeNull();
   expect(r.energy).toEqual({volts:25.5});
+});
+
+test('a model blob that is not a valid model gives a problem and no drive estimate, never an exception', () => {
+  const archive=makeEngineeringArchive();
+  const modelFile=Object.keys(archive.files).find(f=>archive.manifest.blobs.find(b=>b.file===f)!.mediaType==='application/json')!;
+  const bytes=new TextEncoder().encode('not json'),digest=sha256Hex(bytes);
+  const broken=structuredClone(archive);
+  // keep the archive self-consistent: re-point the chassis at a blob whose hash really is the garbage bytes
+  const chassis=broken.manifest.components.find(c=>c.id==='amr-chassis')!;
+  const before=componentDigest(chassis);
+  chassis.models[0]!.digest=digest;
+  for (const i of broken.manifest.project.assembly.instances) if (i.componentDigest===before) i.componentDigest=componentDigest(chassis);
+  delete broken.files[modelFile];broken.files[`blobs/${digest}`]=bytes;
+  const r=engineeringEstimateInputs(broken.manifest.project,broken);
+  expect(r.drive).toBeNull();
+  expect(r.problems.map(p=>p.code)).toContain('MODEL_INVALID');
+  const shapeless=structuredClone(archive);shapeless.files[modelFile]=new TextEncoder().encode('{"transmission":{}}');
+  expect(()=>engineeringEstimateInputs(shapeless.manifest.project,shapeless)).not.toThrow();
+});
+test('without every bound component the AMR mass is unknown, so there is no drive estimate', () => {
+  const archive=makeEngineeringArchive(),battery=archive.manifest.components.find(c=>c.id==='battery-24v')!;
+  const partial=structuredClone(archive);
+  partial.manifest.components=partial.manifest.components.filter(c=>c.id!==battery.id);
+  const r=engineeringEstimateInputs(partial.manifest.project,partial);
+  expect(r.drive).toBeNull();
+  expect(r.problems.map(p=>p.code)).toEqual(expect.arrayContaining(['COMPONENT_MISSING','DRIVE_MASS_INCOMPLETE']));
 });

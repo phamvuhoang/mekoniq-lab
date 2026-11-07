@@ -35,17 +35,21 @@ export function renderEngineeringScene(scene:CompiledScene,state:PhysicsSampleVi
     });
     groups.set(link.id,group);
   }
-  // link groups sit directly under the root, each at its world pose, composed from the frame chain
-  const world=(id:string,seen=new Set<string>()):THREE.Matrix4=>{
-    const f=frames.get(id),m=new THREE.Matrix4();
-    if (!f||seen.has(id)) return m;
-    const local=new THREE.Object3D();applyPose(local,f.pose);local.updateMatrix();
-    return f.parent?world(f.parent,new Set(seen).add(id)).multiply(local.matrix):local.matrix.clone();
-  };
-  for (const [id,group] of groups) {world(id).decompose(group.position,group.quaternion,group.scale);root.add(group);}
-  for (const s of state) {
-    const group=s.kind==='pose'?groups.get(s.frameId):undefined;
-    if (group) {group.position.set(s.values.x!,s.values.y!,s.values.z!);group.quaternion.set(s.values.qx!,s.values.qy!,s.values.qz!,s.values.qw!);}
+  // the frame hierarchy is the scene graph: a link's group lives under its parent's group at the frame's local pose, so moving a parent moves what is mounted on it
+  for (const [id,group] of groups) {
+    const f=frames.get(id);if (f) applyPose(group,f.pose);
+    const parentGroup=f?.parent?groups.get(f.parent):undefined;
+    (parentGroup??root).add(group);
+  }
+  const depth=(id:string):number=>{let n=0,f=frames.get(id);while (f?.parent&&n<1000) {n+=1;f=frames.get(f.parent);}return n;};
+  const rootInverse=new THREE.Matrix4();
+  for (const s of state.filter(x=>x.kind==='pose'&&groups.has(x.frameId)).sort((a,b)=>depth(a.frameId)-depth(b.frameId))) {
+    // sample poses are world (ROS) poses: convert to the local pose under the already-placed parent
+    root.updateMatrixWorld(true);rootInverse.copy(root.matrixWorld).invert();
+    const group=groups.get(s.frameId)!,parent=group.parent!;
+    const worldPose=new THREE.Matrix4().compose(new THREE.Vector3(s.values.x!,s.values.y!,s.values.z!),new THREE.Quaternion(s.values.qx!,s.values.qy!,s.values.qz!,s.values.qw!),new THREE.Vector3(1,1,1));
+    const parentInRos=parent===root?new THREE.Matrix4():rootInverse.clone().multiply(parent.matrixWorld);
+    parentInRos.invert().multiply(worldPose).decompose(group.position,group.quaternion,group.scale);
   }
   root.userData.fixedJointMapping=scene.fixedJointMapping;root.userData.wheelBindings=scene.wheelBindings;
   return root;

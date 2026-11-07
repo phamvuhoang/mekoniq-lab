@@ -6,6 +6,8 @@ import archiveSchema from '../shared/engineering-schemas/engineering-project-arc
 import type {ComponentRevision,EngineeringArchive,EngineeringProject} from '../shared/engineering';
 import {validateProjectV2} from './schema';
 import {canonicalJson,sha256Hex} from '../twin/hash';
+import {verifyAssetHash} from '../twin/model';
+import type {AssetRevision} from '../shared/types';
 
 /** The manifest plus the bytes of every blob it lists, keyed by the manifest's relative file name. Lab-only: the wire form is EngineeringArchive. */
 export interface EngineeringArchiveFiles {manifest:EngineeringArchive;files:Record<string,Uint8Array>}
@@ -30,6 +32,15 @@ export const validateEngineeringProjectShape=(project:unknown):string[]=>{
   try {validateProjectV2(runtime);} catch (e) {return [`PROJECT_INVALID:runtimeProject ${(e as Error).message}`];}
   return [];
 };
+// An archive is data to hand to another person or machine: nothing in it may carry authority, a session or a secret, wherever it hides.
+const FORBIDDEN=new Set(['credentials','password','privatekey','secret','token','accesstoken','refreshtoken','controllerendpoint','endpoint','session','sessionid','commandqueue','missionqueue','proof','reclaimtoken','controlepoch','grants','robotip']);
+function forbiddenKeys(value:unknown,path='',depth=0):string[] {
+  if (depth>60||!value||typeof value!=='object'||value instanceof Uint8Array) return [];
+  if (Array.isArray(value)) return value.flatMap((v,i)=>forbiddenKeys(v,`${path}/${i}`,depth+1));
+  return Object.entries(value).flatMap(([k,v])=>(FORBIDDEN.has(k.toLowerCase().replace(/[_-]/g,''))?[`FORBIDDEN_FIELD:${path}/${k}`]:[]).concat(forbiddenKeys(v,`${path}/${k}`,depth+1)));
+}
+const isAsset=(a:unknown):boolean=>{try {return !!a&&typeof a==='object'&&(a as {schemaVersion?:unknown}).schemaVersion===2&&typeof (a as {id?:unknown}).id==='string'&&verifyAssetHash(a as AssetRevision);} catch {return false;}};
+const isRecipe=(r:unknown):boolean=>!!r&&typeof r==='object'&&typeof (r as {id?:unknown}).id==='string'&&Number.isSafeInteger((r as {revision?:unknown}).revision)&&/^[0-9a-f]{64}$/.test(String((r as {hash?:unknown}).hash));
 export const validateComponentShape=(component:unknown):string[]=>run('engineering-component.schema.json',component,'COMPONENT_INVALID');
 /** Content digest of a component revision, the key instances use to refer to it. */
 export const componentDigest=(c:ComponentRevision):string=>sha256Hex(new TextEncoder().encode(canonicalJson(c)));
@@ -52,7 +63,7 @@ export function checkArchive(input:unknown):ArchiveCheck {
   const problems=run('engineering-project-archive.schema.json',a.manifest,'ARCHIVE_SCHEMA_INVALID');
   if (problems.length) return {ok:false,problems};
   const m=a.manifest;
-  problems.push(...validateEngineeringProjectShape(m.project),...m.components.flatMap((c,i)=>validateComponentShape(c).map(p=>`${p} (#${i})`)));
+  problems.push(...forbiddenKeys(m),...m.assets.flatMap((a,i)=>isAsset(a)?[]:[`ASSET_INVALID:${i}`]),...m.recipes.flatMap((r,i)=>isRecipe(r)?[]:[`RECIPE_INVALID:${i}`]),...validateEngineeringProjectShape(m.project),...m.components.flatMap((c,i)=>validateComponentShape(c).map(p=>`${p} (#${i})`)));
   const known=new Set(m.components.map(componentDigest));
   for (const i of m.project.assembly.instances) if (!known.has(i.componentDigest)) problems.push(`COMPONENT_MISSING:${i.id}`);
   let total=0;const declared=new Set<string>();

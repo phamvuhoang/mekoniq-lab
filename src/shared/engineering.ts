@@ -1,4 +1,4 @@
-// Synced from source packages/contracts/generated/engineering.ts @ 54bf2034ff6a001ea0622af6911cebdc4353e3b6 (sha256 854c9c8815e89a4a1bb94644bf3ba55c4ee409d735bdb7a6d05bf1356160f1db). Run node scripts/sync-engineering-contracts.mjs; do not edit.
+// Synced from source packages/contracts/generated/engineering.ts @ 23fde60c274f1d3141c7e734ac9c8d78c4c25691 (sha256 49d723e3a5de2caa9d9901cfe0c4636122a1dc68deaa79c9a8491344b0fa728f). Run node scripts/sync-engineering-contracts.mjs; do not edit.
 /* Generated from the engineering schemas. Run pnpm contracts:generate; do not edit. */
 import type {LabProjectV2,AssetRevision} from './types';
 export type CoffeeRecipe=Record<string,unknown>;
@@ -1861,4 +1861,10 @@ export interface EngineeringRunManifest {
    * @maxItems 200
    */
   artifacts: string[];
+  configDigest: string;
+  lastSequence: number;
+  window: {
+    startSimTimeNs: string;
+    endSimTimeNs: string;
+  };
 }

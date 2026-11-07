@@ -76,3 +76,31 @@ test('the legacy database is not touched and an incompatible database version is
   const dbs=(await indexedDB.databases()).map(d=>d.name);
   expect(dbs).not.toContain('mekoniq-robot-lab');
 });
+
+test('bytes changed after save() is called are not what gets stored (the archive is snapshotted first)', async () => {
+  const repository=fresh(),archive=makeEngineeringArchive(),file=Object.keys(archive.files)[0]!;
+  const original=new Uint8Array(archive.files[file]!);
+  const pending=repository.save(archive);
+  archive.files[file]![0]=archive.files[file]![0]!^0xff;      // the caller mutates while the save is in flight
+  archive.manifest.project.id='mutated-after-call';
+  await pending;
+  const loaded=(await repository.loadActive())!;
+  expect(loaded.manifest.project.id).not.toBe('mutated-after-call');
+  expect(loaded.files[file]).toEqual(original);
+  expect(checkArchive(loaded).ok).toBe(true);
+});
+
+test('assets and recipes are validated, and anything that looks like authority or a secret is refused anywhere in the archive', () => {
+  for (const key of ['credentials','controllerEndpoint','session','commandQueue','proof','token']) {
+    const a=makeEngineeringArchive();
+    a.manifest.assets=[{ [key]: 'x' } as never];
+    expect(checkArchive(a).ok,key).toBe(false);
+    const r=makeEngineeringArchive();
+    r.manifest.recipes=[{ id:'espresso', revision:1, hash:'a'.repeat(64), nested:{ [key]:'x' } } as never];
+    expect(checkArchive(r).ok,key).toBe(false);
+  }
+  const notAnAsset=makeEngineeringArchive();notAnAsset.manifest.assets=[{id:'x'} as never];
+  expect((checkArchive(notAnAsset) as {problems:string[]}).problems.join()).toContain('ASSET_INVALID');
+  const notARecipe=makeEngineeringArchive();notARecipe.manifest.recipes=[{id:'espresso'} as never];
+  expect((checkArchive(notARecipe) as {problems:string[]}).problems.join()).toContain('RECIPE_INVALID');
+});

@@ -28,14 +28,21 @@ export function engineeringEstimateInputs(project:EngineeringProject,content:Eng
   const mine=known.filter(p=>bound.has(p.instance.id));
   // drive: the AMR's drive model is the single source of wheel radius, ratio and efficiency
   let drive:EngineeringEstimateInputs['drive']=null;
+  type Model={drive?:{wheelRadiusM:Scalar};transmission:{ratio:Scalar;efficiency:Scalar};torqueSpeedTable:{torque:Scalar}[]};
+  const num=(s:unknown,positive=true)=>!!s&&typeof (s as Scalar).value==='number'&&Number.isFinite((s as Scalar).value)&&(!positive||(s as Scalar).value>0);
+  const usable=(m:Model|null):m is Model=>!!m&&typeof m==='object'&&num(m.transmission?.ratio)&&num(m.transmission?.efficiency)&&m.transmission.efficiency.value<=1&&Array.isArray(m.torqueSpeedTable)&&m.torqueSpeedTable.length>0&&m.torqueSpeedTable.every(r=>num(r?.torque,false))&&(!m.drive||num(m.drive.wheelRadiusM));
   const modelOf=(c:ComponentRevision)=>c.models.filter(m=>m.kind==='actuator').flatMap(m=>{
     const bytes=content.files[`blobs/${m.digest}`];
     if (!bytes) {problems.push(miss('MODEL_BLOB_MISSING',`/components/${c.id}/models/${m.id}`,m.digest));return [];}
-    return [JSON.parse(new TextDecoder().decode(bytes)) as {drive?:{wheelRadiusM:Scalar};transmission:{ratio:Scalar;efficiency:Scalar};torqueSpeedTable:{torque:Scalar}[]}];
+    let parsed:Model|null=null;
+    try {parsed=JSON.parse(new TextDecoder().decode(bytes)) as Model;} catch {/* reported below */}
+    if (!usable(parsed)) {problems.push(miss('MODEL_INVALID',`/components/${c.id}/models/${m.id}`,'the blob is not a usable actuator model'));return [];}
+    return [parsed];
   });
   const driveModel=mine.flatMap(p=>modelOf(p.component!)).find(m=>m.drive);
   if (!amr) problems.push(miss('NO_AMR_ENTITY','/runtimeProject/entities','the project has no AMR'));
   else if (!driveModel) problems.push(miss('DRIVE_MODEL_UNAVAILABLE',`/entityBindings/${amr.id}`,'no drive model with explicit wheel radius is available'));
+  else if (parts.some(p=>bound.has(p.instance.id)&&!p.component)) problems.push(miss('DRIVE_MASS_INCOMPLETE',`/entityBindings/${amr.id}`,'a bound component is missing, so the AMR mass is unknown'));
   else {
     const ratio=driveModel.transmission.ratio.value,eff=driveModel.transmission.efficiency.value,stall=Math.max(...driveModel.torqueSpeedTable.map(r=>r.torque.value));
     const massKg=mine.flatMap(p=>p.component!.links).reduce((n,l)=>n+l.massKg.value,0);

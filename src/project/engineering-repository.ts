@@ -6,6 +6,7 @@ import {checkArchive,type EngineeringArchiveFiles} from './engineering-archive';
 const DB_VERSION=1;
 const STORES=['projects','originals','content','metadata'] as const;
 export class EngineeringStorageError extends Error {constructor(readonly code:string,readonly problems:string[]=[]){super(problems.length?`${code}: ${problems.join('; ')}`:code);this.name='EngineeringStorageError';}}
+const snapshotArchive=(a:EngineeringArchiveFiles):EngineeringArchiveFiles=>({manifest:structuredClone(a.manifest),files:Object.fromEntries(Object.entries(a.files).map(([k,v])=>[k,v instanceof Uint8Array?new Uint8Array(v):v]))});
 type ProjectRecord={id:string;manifest:EngineeringArchiveFiles['manifest']};
 
 /**
@@ -48,7 +49,9 @@ export class EngineeringProjectRepository {
   }
   private static request<T>(r:IDBRequest<T>):Promise<T> {return new Promise((resolve,reject)=>{r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 
-  async save(archive:EngineeringArchiveFiles,options:{original?:unknown}={}):Promise<void> {
+  async save(input:EngineeringArchiveFiles,options:{original?:unknown}={}):Promise<void> {
+    // snapshot synchronously: everything below awaits, and validated bytes must be exactly the bytes that get stored
+    const archive=snapshotArchive(input);
     const checked=checkArchive(archive);
     if (!checked.ok) throw new EngineeringStorageError('ARCHIVE_REJECTED',checked.problems);
     const id=archive.manifest.project.id,{blobs}=archive.manifest;

@@ -42,6 +42,12 @@ Sáu lỗi Critical/Important đã sửa, mỗi lỗi có test đỏ trước: `
 
 ## Quyết định (rulings) nằm ở `.superpowers/sdd/01-components-assembly/progress.md` (cục bộ, không commit).
 
-## Minor chưa sửa (ghi nhận từ review)
+## Đợt sửa thứ hai (review của người dùng: 5 P1, 6 P2, 3 deferred)
 
-Hai compile song song cùng project có thể va `rename` (500 thay vì trả bundle sẵn có); `Lifecycle.fail` dừng ở cleanup đầu tiên ném lỗi; `EvidenceQueue.put` không kiểm `failed` sau `drain`; `assessCalibration` bỏ qua validation trial không có kênh đo (có thể `pass` với `residuals` rỗng); reclaim/resume không kiểm lại closure; instance chưa bind bị compiler Python từ chối với `COMPILER_FAILED` thay vì mã resolver; URDF 9 chữ số có nghĩa so với `scene.json` đầy đủ; `dt` lớn vượt `maxDurationSec` vẫn xả cả `dt`.
+Đã sửa, mỗi mục có test đỏ trước: grasp xác nhận khi thiếu contact (hai stream phải phủ toàn bộ khoảng lift/hold); evidence mất phần cuối vẫn pass (manifest khóa `window` và `lastSequence`, thiếu → `EVIDENCE_TRUNCATED`); digest tùy ý nâng lên `verified` (cần bản ghi calibration thật: hash khớp, pass, đúng `configDigest`, chưa bị invalidated, đúng capability và miền quan sát); calibration đếm trial không có dữ liệu (`TRIAL_WITHOUT_DATA`); save race ghi bytes sai (snapshot đồng bộ trước validate); projection chọn sai root link; catalog không kiểm provenance (`PROVENANCE_UNRESOLVED`); archive không kiểm assets/recipes và trường quyền/secret; renderer không truyền transform qua cây frame; estimates ném exception với model blob sai; estimate khi thiếu component. Cùng đợt: process vượt deadline không còn xả cả `dt`, mọi cleanup đều chạy, queue từ chối mẫu sau overflow kể cả sau `drain`.
+
+Số liệu sau đợt này: source vitest (lab-*/engineering*/contracts) 64 file, 555 pass, 2 skip có sẵn; pytest 360 pass, 1 skip; Lab 223 pass, 1 skip.
+
+## Minor chưa sửa (ghi nhận từ review đầu)
+
+Hai compile song song cùng project có thể va `rename` (500 thay vì trả bundle sẵn có); reclaim/resume không kiểm lại closure; instance chưa bind bị compiler Python từ chối với `COMPILER_FAILED` thay vì mã resolver; URDF 9 chữ số có nghĩa so với `scene.json` đầy đủ.
