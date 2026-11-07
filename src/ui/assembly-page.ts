@@ -4,7 +4,7 @@ import type {BundleReceipt,Bom,CompiledScene,EngineeringProject} from '../shared
 import {EngineeringProjectStore} from '../project/engineering-store';
 import {EngineeringProjectRepository} from '../project/engineering-repository';
 import {checkArchive} from '../project/engineering-archive';
-import {addInstance,archiveFor,catalogFromArchive,connect,disconnect,mergeCatalog,parseArchive,previewProblems,referenceCatalog,referenceProject,removeInstance,serializeArchive,uniqueInstanceId,type AssemblyCatalog} from '../design/assembly';
+import {addInstance,archiveFor,archiveMetadata,catalogFromArchive,connect,disconnect,mergeCatalog,parseArchive,previewProblems,referenceCatalog,referenceProject,removeInstance,serializeArchive,uniqueInstanceId,type AssemblyCatalog} from '../design/assembly';
 import {estimateSummary} from '../design/engineering-estimates';
 import {buildEngineeringCandidate} from '../deployment/engineering-bundle';
 import {httpTwinRuntime,type TwinRuntime} from '../scenarios/controls';
@@ -27,14 +27,16 @@ export class AssemblyWorkspace {
   private message='';
   private busy=false;
   private restored=false;
+  private designChanges=0;
   private disposeScene:(()=>void)|null=null;
   constructor(private readonly rerender:()=>void,private readonly rt:TwinRuntime=httpTwinRuntime(),private readonly download:(name:string,data:string)=>void=()=>{}) {
     // a new draft: the reference world and entities, no parts chosen yet, so every blocker is visible from the start
     const base=referenceProject();
     this.store=new EngineeringProjectStore({...base,assembly:{instances:[],connections:[]},entityBindings:base.runtimeProject.entities.map(e=>({entityId:e.id,instanceIds:[]}))});
-    this.store.subscribe(()=>{this.scheduleSave();});
+    this.store.subscribe(()=>{this.designChanges++;this.scheduleSave();});
   }
   private design():EngineeringProject {return this.store.snapshot();}
+  private archive():ReturnType<typeof archiveFor> {return archiveFor(this.design(),this.catalog,this.store.archiveMetadata());}
   /** Digest of the design as it is now; the same value a compile receipt and a run's engineering reference carry. */
   projectDigest():string {return hashJson(this.design());}
   private stale():boolean {return !!this.receipt&&this.receipt.projectDigest!==hashJson(this.design());}
@@ -47,16 +49,17 @@ export class AssemblyWorkspace {
   }
   /** Storage trouble never loses the draft: it stays in memory, the state says so, and export still works. */
   private async save():Promise<void> {
-    try {await this.repository.save(archiveFor(this.design(),this.catalog));this.saveState='saved';}
+    try {await this.repository.save(this.archive());this.saveState='saved';}
     catch (e) {this.saveState='error';this.message=e instanceof Error?e.message:String(e);}
     this.rerender();
   }
   private async restore():Promise<void> {
     if (this.restored) return;
     this.restored=true;
+    const changesAtStart=this.designChanges;
     try {
       const saved=await this.repository.loadActive();
-      if (saved&&checkArchive(saved).ok) this.open(saved,'reset');
+      if (saved&&this.designChanges===changesAtStart&&checkArchive(saved).ok) this.open(saved,'reset');
     } catch {/* no stored draft, or storage unavailable: start fresh */}
     try {this.canCompile=!!(await this.rt.health()).capabilities?.includes('engineering_bundle_v1');} catch {this.canCompile=false;}
     this.rerender();
@@ -64,11 +67,12 @@ export class AssemblyWorkspace {
   /** Takes everything the archive holds into the catalog (nothing is dropped) and opens its project with the identity it was saved with. */
   private open(archive:ReturnType<typeof archiveFor>,how:'load'|'reset'):void {
     mergeCatalog(this.catalog,catalogFromArchive(archive));
-    if (how==='reset') this.store.reset(archive.manifest.project); else this.store.load(archive.manifest.project);
+    const metadata=archiveMetadata(archive);
+    if (how==='reset') this.store.reset(archive.manifest.project,metadata); else this.store.load(archive.manifest.project,metadata);
     this.receipt=null;this.bom=null;this.scene=null;
   }
   html():string {
-    const p=this.design(),problems=previewProblems(p,this.catalog),archive=archiveFor(p,this.catalog);
+    const p=this.design(),problems=previewProblems(p,this.catalog),archive=this.archive();
     const owner=(id:string)=>p.entityBindings.find(b=>b.instanceIds.includes(id))?.entityId??'—';
     const ports=p.assembly.instances.flatMap(i=>(this.catalog.components[i.componentDigest]?.ports??[]).map(x=>({value:`${i.id}/${x.id}`,label:`${i.id}/${x.id} · ${x.kind} · ${x.mate}`,kind:x.kind})));
     const option=(o:{value:string;label:string})=>`<option value="${esc(o.value)}">${esc(o.label)}</option>`;
@@ -144,10 +148,11 @@ ${compile}
   }
   private exportDesign():void {
     // from memory, not storage: a failed save must never take the export with it
-    const text=serializeArchive(archiveFor(this.design(),this.catalog));
+    const text=serializeArchive(this.archive());
     this.download(`${this.design().id}.engineering.json`,text);
   }
   private async importFile(file:File):Promise<void> {
+    this.designChanges++; // choosing a file takes precedence over a pending startup read, including while file.text() awaits
     try {
       if (file.size>10*1024*1024) throw new Error('ARCHIVE_TOO_LARGE');
       const archive=parseArchive(await file.text()),checked=checkArchive(archive);

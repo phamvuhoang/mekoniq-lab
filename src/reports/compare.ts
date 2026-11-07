@@ -84,8 +84,8 @@ export function compareRuns(a:RunReport,b:RunReport){
  if(!ma.engineering!==!mb.engineering)reasons.push('ENGINEERING_DIFFERS');
  // a modeled and a verified actuator are different evidence scales even when every KPI looks alike; judged by capability name and value, never by key order
  else if(CAPABILITY_IDS.some(id=>a.engineeringEvidence?.capabilities?.[id]!==b.engineeringEvidence?.capabilities?.[id]))reasons.push('CAPABILITY_DIFFERS');
- // only a passed engineering run has numbers worth comparing; not_run and fail show their blockers instead
- const unproven=(r:RunReport)=>!!r.engineeringEvidence&&r.engineeringEvidence.status!=='pass';
+ // only an explicit pass unlocks engineering numbers; missing assessments, not_run and fail show blockers
+ const unproven=(r:RunReport)=>(!!r.manifest.engineering||!!r.engineeringEvidence)&&r.engineeringEvidence?.status!=='pass';
  if(unproven(a)||unproven(b))reasons.push('ENGINEERING_EVIDENCE_NOT_PASSED');
  const comparable=!reasons.length;
  // changed inputs are shown, not judged: a layout or seed change is what an A/B compare is for

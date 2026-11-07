@@ -91,3 +91,20 @@ test('compare judges capability by name and value, and never ranks runs whose en
   expect(compareRuns(a,failed).reasons).toContain('ENGINEERING_EVIDENCE_NOT_PASSED');
   expect(compareRuns(a,failed).kpis.every(k=>k.delta===null)).toBe(true);
 });
+test('engineering identity without an assessment blocks ranking and hides that side’s KPI values',()=>{
+  const missing=engineered(assessment('pass'));delete missing.engineeringEvidence;
+  for(const [a,b] of [[missing,missing],[missing,engineered(assessment('pass'))],[engineered(assessment('pass')),missing]]){
+    const c=compareRuns(a!,b!);
+    expect(c.comparable).toBe(false);
+    expect(c.reasons).toContain('ENGINEERING_EVIDENCE_NOT_PASSED');
+    for(const k of c.kpis){
+      expect(k).toMatchObject({available:false,delta:null});
+      expect(k.reasons).toContain('ENGINEERING_EVIDENCE_NOT_PASSED');
+      if(a===missing)expect(k.a).toBeNull();
+      if(b===missing)expect(k.b).toBeNull();
+    }
+  }
+  const legacy=compareRuns(coffeeReplay().report,coffeeReplay().report);
+  expect(legacy).toMatchObject({comparable:true,reasons:[]});
+  expect(legacy.kpis.find(k=>k.id==='served')).toMatchObject({available:true,a:1,b:1,delta:0});
+});

@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { evidenceScreenshotPath } from "../support/evidence-screenshot";
 
 test("shell preserves identity, defaults to Vietnamese and offers all screens", async ({
   page,
@@ -107,7 +108,7 @@ test("mobile and reduced-motion fallback remain accessible without horizontal ov
   ).toBeDisabled();
   await expect(page.locator("#pair-token")).toBeVisible();
   await page.screenshot({
-    path: "/tmp/mekoniq-lab-mobile.png",
+    path: evidenceScreenshotPath("/tmp/mekoniq-lab-mobile.png"),
     fullPage: true,
   });
 });
@@ -152,7 +153,7 @@ test("desktop workshop screenshot and WebGL context loss retain configuration", 
     await page.evaluate(() => Reflect.get(window, "labDetachedCanvases")),
   ).toBe(0);
   await page.screenshot({
-    path: "/tmp/mekoniq-lab-desktop.png",
+    path: evidenceScreenshotPath("/tmp/mekoniq-lab-desktop.png"),
     fullPage: true,
   });
   await page
@@ -180,7 +181,7 @@ test("all three locales fit tablet and desktop, with explicit unmeasured Valetud
       ),
     ).toBe(true);
     await page.screenshot({
-      path: `/tmp/mekoniq-lab-${language.toLowerCase()}.png`,
+      path: evidenceScreenshotPath(`/tmp/mekoniq-lab-${language.toLowerCase()}.png`),
       fullPage: true,
     });
   }

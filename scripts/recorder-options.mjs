@@ -4,6 +4,7 @@ import {existsSync,readdirSync,readFileSync,statSync} from 'node:fs';
 import {join,resolve} from 'node:path';
 export const LEGACY_ROOT='docs/implementation/evidence/digital-twin-v2/regression';
 export const SUITES=['legacy','physical-robot-lab'];
+export const PHYSICAL_BROWSER_RUNS=['lab-e2e-browser','lab-mock-e2e','lab-offline-e2e'];
 export function parseRecorderArgs(argv,lab,{exists=existsSync}={}){
  const o={ci:false,suite:'legacy',out:resolve(lab,LEGACY_ROOT),explicitOut:false};
  for(let i=0;i<argv.length;i++){
@@ -22,23 +23,33 @@ export function parseRecorderArgs(argv,lab,{exists=existsSync}={}){
  return o;
 }
 
-/** What the physical-robot-lab recording writes and runs besides the shared steps: all screenshot directories live inside the new recording. */
-export function physicalPlan(out){
- const brand=`${out}/brand-ui`,screens=`${out}/screens`,offlineSpecs=['twin-recovery.spec.ts','coffee-journey.spec.ts','offline-bv01.spec.ts'];
+/** Each browser command has its own screenshot directory inside the fresh recording, even when specs reuse filenames. */
+export function physicalPlan(out,commandId='lab-e2e-browser'){
+ const brand=`${out}/brand-ui`,screens=`${out}/screens/${commandId}`,offlineSpecs=['twin-recovery.spec.ts','coffee-journey.spec.ts','offline-bv01.spec.ts'];
  return {
   dirs:[brand,screens],
-  browserEnv:{LAB_BRAND_EVIDENCE_DIR:brand,LAB_EVIDENCE_DIR:screens},
+  browserEnv:{LAB_BRAND_EVIDENCE_DIR:brand,LAB_EVIDENCE_DIR:screens,LAB_PW_OUTPUT_DIR:`${out}/playwright/${commandId}`},
   offlineSpecs,
   offlineFiles:offlineSpecs.map(x=>`lab-pw-offline-${x.replace(/\.ts$/,'').replace(/\.spec$/,'')}.json`),
  };
 }
-/** Every file under `root/dir`, as `dir/relative` with its sha256, in a stable order; a missing directory has none. */
-export function listArtifacts(root,dir){
+/** Every file under root, as `dir/relative` with its sha256 and optional producing command, in a stable order; a missing directory has none. */
+export function listArtifacts(root,dir,commandId){
  const walk=rel=>{
   const full=join(root,rel);if(!existsSync(full))return [];
   return readdirSync(full).sort().flatMap(name=>{const r=join(rel,name);return statSync(join(root,r)).isDirectory()?walk(r):[r];});
  };
- return walk('').map(f=>({file:`${dir}/${f}`,sha256:createHash('sha256').update(readFileSync(join(root,f))).digest('hex')}));
+ return walk('').map(f=>({file:`${dir}/${f}`,sha256:createHash('sha256').update(readFileSync(join(root,f))).digest('hex'),...commandId?{commandId}:{}}));
+}
+/** Per-spec result naming for launchers that start a separate Playwright process for each spec. */
+export function playwrightSpecEnv(env,spec){
+ return {...env,...env.LAB_PW_JSON?{LAB_PW_JSON:env.LAB_PW_JSON.replace(/\.json$/,`-${spec.replace(/\.spec\.ts$/,'')}.json`)}:{},
+  ...env.LAB_PW_OUTPUT_DIR?{LAB_PW_OUTPUT_DIR:join(env.LAB_PW_OUTPUT_DIR,spec.replace(/\.spec\.ts$/,''))}:{}};
+}
+export function physicalArtifacts(out){
+ return [...listArtifacts(`${out}/brand-ui`,'brand-ui','lab-e2e-browser'),
+  ...PHYSICAL_BROWSER_RUNS.flatMap(id=>listArtifacts(physicalPlan(out,id).browserEnv.LAB_EVIDENCE_DIR,`screens/${id}`,id)),
+  ...[...PHYSICAL_BROWSER_RUNS,'lab-runtime-e2e'].flatMap(id=>listArtifacts(`${out}/playwright/${id}`,`playwright/${id}`,id))];
 }
 /** Why a Playwright summary does not count as the gate having run (null when it did): a skipped spec is not a pass. */
 export function notExecuted(summary){

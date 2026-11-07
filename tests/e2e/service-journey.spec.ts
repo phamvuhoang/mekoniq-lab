@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { evidenceScreenshotPath } from "../support/evidence-screenshot";
 import { readFile } from "node:fs/promises";
 import { summarizeReport, openReplay } from "../../src/reports/metrics";
 test("paired source runtime drives arrival then human load and handoff", async ({
@@ -133,7 +134,7 @@ test("paired source runtime drives arrival then human load and handoff", async (
   await page.getByRole('button',{name:'Export report',exact:true}).click();
   expect(JSON.parse(await readFile((await (await reportDownload).path())!,'utf8'))).toEqual(evidence);
   await page.screenshot({
-    path: "/tmp/mekoniq-lab-source-run.png",
+    path: evidenceScreenshotPath("/tmp/mekoniq-lab-source-run.png"),
     fullPage: true,
   });
   await page.getByRole("link", { name: "Deployment", exact: true }).click();

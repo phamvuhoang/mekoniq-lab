@@ -3,19 +3,33 @@ import type {ComponentRevision,EngineeringProject,Problem} from '../shared/engin
 import {componentDigest,requiredDigests,type EngineeringArchiveFiles} from '../project/engineering-archive';
 import {canonicalJson,sha256Hex} from '../twin/hash';
 
-/** A stored file with the metadata its archive declared for it; content-addressed, so the same digest is always the same bytes. */
+/** Shared bytes plus default metadata for designs assembled from the catalog. Imported snapshots own their declarations separately. */
 export interface BlobEntry {bytes:Uint8Array;mediaType:string;license:string}
-type Extras={assets:EngineeringArchiveFiles['manifest']['assets'];recipes:EngineeringArchiveFiles['manifest']['recipes']};
+export type AssemblyArchiveMetadata=Pick<EngineeringArchiveFiles['manifest'],'assets'|'recipes'|'blobs'|'missingDigests'|'migration'>;
+type CatalogExtras=Pick<AssemblyArchiveMetadata,'assets'|'recipes'>&Partial<Omit<AssemblyArchiveMetadata,'assets'|'recipes'>>;
+/** Metadata is owned by a design/history snapshot, never inferred from a project ID, revision or byte digest. */
+export const archiveMetadata=(archive:EngineeringArchiveFiles):AssemblyArchiveMetadata=>{
+  const {assets,recipes,blobs,missingDigests,migration}=archive.manifest;
+  return structuredClone({assets,recipes,blobs,missingDigests,...(migration?{migration}:{})});
+};
 /**
  * Catalog content the page edits against: component revisions by digest, the model JSON their ModelRefs name, every blob a loaded archive carried
- * (documents, meshes, models) and the assets/recipes that belong to a project, keyed by project id. Loading more content only ever adds to it, so undo can
- * return to a project whose components arrived earlier.
+ * (documents, meshes, models). Loading more content only adds to it, so Undo can return to an earlier design. `extras` is a compatibility default for
+ * callers editing one archive; a workspace with history passes the store's explicit snapshot metadata to archiveFor instead.
  */
-export interface AssemblyCatalog {components:Record<string,ComponentRevision>;models:Record<string,unknown>;blobs:Record<string,BlobEntry>;extras:Record<string,Extras>}
-export const referenceCatalog=():AssemblyCatalog=>({...structuredClone({components:reference.components,models:reference.models}),blobs:{},extras:{}}) as unknown as AssemblyCatalog;
+export interface AssemblyCatalog {components:Record<string,ComponentRevision>;models:Record<string,unknown>;blobs:Record<string,BlobEntry>;extras:Record<string,CatalogExtras>}
+export const referenceCatalog=():AssemblyCatalog=>{
+  const catalog={...structuredClone({components:reference.components,models:reference.models}),blobs:{},extras:{}} as unknown as AssemblyCatalog;
+  // Seed the reference's own bytes and provenance before imports add content with potentially different declarations for the same digest.
+  for (const [digest,model] of Object.entries(catalog.models)) {
+    const bytes=new TextEncoder().encode(canonicalJson(model));
+    if (sha256Hex(bytes)===digest) catalog.blobs[digest]={bytes,mediaType:'application/json',license:'internal'};
+  }
+  return catalog;
+};
 /** Everything a validated archive holds, ready to edit against and to export again without loss. */
 export function catalogFromArchive(archive:EngineeringArchiveFiles):AssemblyCatalog {
-  const catalog:AssemblyCatalog={components:{},models:{},blobs:{},extras:{[archive.manifest.project.id]:{assets:structuredClone(archive.manifest.assets),recipes:structuredClone(archive.manifest.recipes)}}};
+  const catalog:AssemblyCatalog={components:{},models:{},blobs:{},extras:{[archive.manifest.project.id]:archiveMetadata(archive)}};
   for (const c of archive.manifest.components) catalog.components[componentDigest(c)]=structuredClone(c);
   for (const b of archive.manifest.blobs) {
     const bytes=archive.files[b.file];if (!bytes) continue;
@@ -91,24 +105,31 @@ export function previewProblems(project:EngineeringProject,catalog:AssemblyCatal
 }
 
 /** The archive the repository stores/exports for this design: only the components it uses, their model JSON as content-addressed blobs; documents we do not hold are listed as missing. */
-export function archiveFor(project:EngineeringProject,catalog:AssemblyCatalog):EngineeringArchiveFiles {
+export function archiveFor(project:EngineeringProject,catalog:AssemblyCatalog,metadata:CatalogExtras|null|undefined=catalog.extras[project.id]):EngineeringArchiveFiles {
   const used=new Map<string,ComponentRevision>();
   for (const i of project.assembly.instances) {const c=catalog.components[i.componentDigest];if (c) used.set(componentDigest(c),c);}
   const files:Record<string,Uint8Array>={},blobs:EngineeringArchiveFiles['manifest']['blobs']=[],needed=requiredDigests([...used.values()]);
-  for (const digest of needed) {
+  const declarations=new Map(metadata?.blobs?.map(b=>[b.digest,b]));
+  // Keep supplemental imported files too: an edit must not silently discard documents outside the component closure.
+  for (const digest of new Set([...needed,...declarations.keys()])) {
+    if (metadata?.missingDigests?.includes(digest)) continue;
     const held=catalog.blobs[digest];
-    if (held&&sha256Hex(held.bytes)===digest) {files[`blobs/${digest}`]=held.bytes;blobs.push({digest,file:`blobs/${digest}`,mediaType:held.mediaType,license:held.license,sizeBytes:held.bytes.length});continue;}
+    if (held&&sha256Hex(held.bytes)===digest) {files[`blobs/${digest}`]=held.bytes;blobs.push({...declarations.get(digest)??{digest,file:`blobs/${digest}`,mediaType:held.mediaType,license:held.license,sizeBytes:held.bytes.length}});continue;}
     const model=catalog.models[digest];if (!model) continue;
     const bytes=new TextEncoder().encode(canonicalJson(model));
     if (sha256Hex(bytes)!==digest) continue;                        // never store a model under a digest it does not have
     files[`blobs/${digest}`]=bytes;blobs.push({digest,file:`blobs/${digest}`,mediaType:'application/json',license:'internal',sizeBytes:bytes.length});
   }
-  const have=new Set(blobs.map(b=>b.digest)),extras=catalog.extras[project.id];
-  return {manifest:{documentType:'engineering-project-archive',schemaVersion:1,project:structuredClone(project),components:[...used.values()],assets:structuredClone(extras?.assets??[]),recipes:structuredClone(extras?.recipes??[]),blobs,missingDigests:needed.filter(d=>!have.has(d))},files};
+  const have=new Set(blobs.map(b=>b.digest));
+  return {manifest:{documentType:'engineering-project-archive',schemaVersion:1,project:structuredClone(project),components:[...used.values()],assets:structuredClone(metadata?.assets??[]),recipes:structuredClone(metadata?.recipes??[]),...(metadata?.migration?{migration:structuredClone(metadata.migration)}:{}),blobs,missingDigests:needed.filter(d=>!have.has(d))},files};
 }
 /** Wire form of an archive for download: JSON with the blob bytes as base64. */
 export function serializeArchive(a:EngineeringArchiveFiles):string {
-  return JSON.stringify({manifest:a.manifest,files:Object.fromEntries(Object.entries(a.files).map(([k,v])=>[k,btoa(String.fromCharCode(...v))]))});
+  return JSON.stringify({manifest:a.manifest,files:Object.fromEntries(Object.entries(a.files).map(([k,v])=>{
+    const chunks:string[]=[];
+    for (let offset=0;offset<v.length;offset+=8192) chunks.push(String.fromCharCode(...v.subarray(offset,offset+8192)));
+    return [k,btoa(chunks.join(''))];
+  }))});
 }
 export function parseArchive(text:string):EngineeringArchiveFiles {
   const raw=JSON.parse(text) as {manifest?:unknown;files?:Record<string,string>};
