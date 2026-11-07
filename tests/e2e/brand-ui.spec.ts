@@ -15,7 +15,7 @@ test('canonical theme, original artwork and keyboard focus', async ({ page }) =>
   await expect(brand).toHaveCSS('outline-color', 'rgb(99, 220, 197)');
 });
 
-for (const width of [390, 1024, 1512]) test(`six workspaces and three locales at ${width}px`, async ({ page }) => {
+for (const width of [390, 1024, 1512]) test(`six workspaces and three locales at ${width}px`, async ({ page }, testInfo) => {
   await page.setViewportSize({ width, height: 1000 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const failures: string[] = [];
@@ -31,7 +31,7 @@ for (const width of [390, 1024, 1512]) test(`six workspaces and three locales at
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await expect(page.locator('main')).toBeVisible();
       await expect(page.locator(width < 768 ? '.brand-compact' : '.brand-horizontal')).toBeVisible();
-      if (language === 'EN') await page.screenshot({ path: `docs/implementation/evidence/brand-ui-v1/lab-${route}-${width}.png`, fullPage: true });
+      if (language === 'EN') await page.screenshot({ path: `${process.env.LAB_BRAND_EVIDENCE_DIR ?? testInfo.outputDir}/lab-${route}-${width}.png`, fullPage: true });
     }
   }
   expect(await page.evaluate(() => document.fonts.check('14px "Be Vietnam Pro"'))).toBe(true);

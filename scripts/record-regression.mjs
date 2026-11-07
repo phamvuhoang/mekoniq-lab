@@ -13,7 +13,7 @@ import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 import os from 'node:os';
-import {parseRecorderArgs} from './recorder-options.mjs';
+import {parseRecorderArgs,physicalPlan,listArtifacts,notExecuted} from './recorder-options.mjs';
 import {captureRegressionIdentity,assertRecordableIdentity,assertStableRecording,LAB_EVIDENCE_MUTABLE_PATHS} from '../../source/tests/support/regression-identity.ts';
 const LAB=resolve(fileURLToPath(new URL('..',import.meta.url))),W=resolve(LAB,'..'),SRC=resolve(W,'source');
 // --suite physical-robot-lab --out <new dir>: a fresh evidence root (never replaced, never the historical one). Without options the legacy behaviour is unchanged.
@@ -86,8 +86,9 @@ run('lab-ui-performance','lab',process.execPath,['scripts/measure-twin-ui.mjs','
 }else{
  // physical-robot-lab: every browser suite, none of them through the launcher's --evidence flag (that writes into the historical digital-twin-v2 evidence)
  const MOCK_SPECS=['twin-workspace','coffee-journey','twin-recovery','twin-inputs','fault-schedule','arm-simulation','twin-plan01','legacy-campaign'];
- const screens={LAB_EVIDENCE_DIR:`${OUT}/screens`};mkdirSync(screens.LAB_EVIDENCE_DIR,{recursive:true});
- run('lab-e2e-browser','lab','pnpm',['exec','playwright','test'],{kind:'playwright',files:['lab-pw-browser.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-browser.json`}});
+ const plan=physicalPlan(OUT),screens={LAB_EVIDENCE_DIR:plan.browserEnv.LAB_EVIDENCE_DIR};for(const d of plan.dirs)mkdirSync(d,{recursive:true});
+ // the brand screenshots land inside this recording too (LAB_BRAND_EVIDENCE_DIR), so the committed brand-ui-v1 evidence is never rewritten
+ run('lab-e2e-browser','lab','pnpm',['exec','playwright','test'],{kind:'playwright',files:['lab-pw-browser.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-browser.json`,...plan.browserEnv}});
  run('lab-mock-e2e','lab',process.execPath,['scripts/test-mock-e2e.mjs',...MOCK_SPECS.map(x=>`${x}.spec.ts`)],{kind:'playwright',files:MOCK_SPECS.map(x=>`lab-pw-mock-${x}.json`),extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-mock.json`,...screens}});
  run('lab-runtime-e2e','lab','pnpm',['-s','test:runtime-e2e'],{kind:'playwright',files:['lab-pw-runtime.json'],extraEnv:{LAB_PW_JSON:`${OUT}/lab-pw-runtime.json`}});
  run('lab-ui-performance','lab',process.execPath,['scripts/measure-twin-ui.mjs','--duration-ms','60000','--output',`${OUT}/lab-ui-performance.json`],{kind:'measurement',files:['lab-ui-performance.json']});
@@ -95,7 +96,14 @@ run('lab-ui-performance','lab',process.execPath,['scripts/measure-twin-ui.mjs','
 const offline=mkdtempSync(resolve(os.tmpdir(),'mekoniq-offline-regression-')),bundle=resolve(offline,'bundle');
 try{
  run('lab-offline-build','lab',process.execPath,['scripts/build-offline.mjs','--out',bundle]);
- run('lab-offline-e2e','lab',process.execPath,['scripts/test-mock-e2e.mjs','twin-recovery.spec.ts','coffee-journey.spec.ts'],{kind:'playwright',files:['lab-pw-offline-twin-recovery.json','lab-pw-offline-coffee-journey.json'],extraEnv:{LAB_TEST_OFFLINE_ROOT:bundle,LAB_PW_JSON:`${OUT}/lab-pw-offline.json`}});
+ if(suite==='physical-robot-lab'){
+  // the dedicated offline BV01 gate (loopback-only requests, exported pin) runs here too; it is skipped, not passed, anywhere without the offline package
+  const plan=physicalPlan(OUT);
+  run('lab-offline-e2e','lab',process.execPath,['scripts/test-mock-e2e.mjs',...plan.offlineSpecs],{kind:'playwright',files:plan.offlineFiles,extraEnv:{LAB_TEST_OFFLINE_ROOT:bundle,LAB_PW_JSON:`${OUT}/lab-pw-offline.json`,LAB_EVIDENCE_DIR:plan.browserEnv.LAB_EVIDENCE_DIR}});
+  const bv01=notExecuted(runs.find(r=>r.id==='lab-offline-e2e:lab-pw-offline-offline-bv01.json')?.summary);if(bv01)notRun.push({id:'lab-offline-bv01',reason:bv01});
+ }else{
+  run('lab-offline-e2e','lab',process.execPath,['scripts/test-mock-e2e.mjs','twin-recovery.spec.ts','coffee-journey.spec.ts'],{kind:'playwright',files:['lab-pw-offline-twin-recovery.json','lab-pw-offline-coffee-journey.json'],extraEnv:{LAB_TEST_OFFLINE_ROOT:bundle,LAB_PW_JSON:`${OUT}/lab-pw-offline.json`}});
+ }
 }finally{rmSync(offline,{recursive:true,force:true});}
 const endIdentity=captureRegressionIdentity(SRC,LAB);assertStableRecording(startIdentity,endIdentity);
 writeFileSync(`${OUT}/manifest.json`,JSON.stringify({schema:'lab-v2-regression/1',recorder:'lab/scripts/record-regression.mjs'+(ci?' --ci':'')+(suite==='legacy'?'':` --suite ${suite}`),suite,
@@ -104,7 +112,7 @@ writeFileSync(`${OUT}/manifest.json`,JSON.stringify({schema:'lab-v2-regression/1
  revisions:{source:startIdentity.source.commit,sourceDirty:false,lab:startIdentity.lab.commit,labDirty:false},
  identity:{schema:'regression-identity/1',mutableLabPaths:LAB_EVIDENCE_MUTABLE_PATHS,start:startIdentity,end:endIdentity,checkpoints:identityCheckpoints,
   observation:'Identity is sampled at start, before and after every command, and at end; this is not continuous filesystem monitoring.'},
- runs,commands,notRun},null,1)+'\n');
+ runs,commands,notRun,artifacts:suite==='physical-robot-lab'?[...listArtifacts(`${OUT}/brand-ui`,'brand-ui'),...listArtifacts(`${OUT}/screens`,'screens')]:undefined},null,1)+'\n');
 const failed=commands.filter(c=>c.exitCode!==0);
 console.log(JSON.stringify({results:runs.map(r=>[r.id,r.summary]),failed:failed.map(c=>c.id),notRun}));
 process.exitCode=failed.length||notRun.length?1:0;

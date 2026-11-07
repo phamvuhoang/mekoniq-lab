@@ -2,6 +2,7 @@
 // Runs on different evidence scales (mode/access/backends/fidelity) or scenarios are not ranked: their deltas are null.
 // TODO(interim-copy): same logic as source packages/lab-runtime/src/v2/comparison.ts (tests/unit/report-replay.test.ts covers it here); import from the pinned artifact (F07).
 import type {RunReport} from '../scenarios/controls';
+import {CAPABILITY_IDS} from './engineering-view';
 export interface Kpi {id:string;unit:string;definition:string;value:number|null;available:boolean;reason?:string;samples:number}
 const ms=(iso:string)=>Date.parse(iso);
 /** KPIs read from one report. Missing data is unavailable with a reason, never 0. */
@@ -81,14 +82,17 @@ export function compareRuns(a:RunReport,b:RunReport){
  if(ma.clock.tickMs!==mb.clock.tickMs)reasons.push('CLOCK_DIFFERS');
  if(FIDELITY.some(f=>!!a.coverage[f]!==!!b.coverage[f]))reasons.push('FIDELITY_DIFFERS');
  if(!ma.engineering!==!mb.engineering)reasons.push('ENGINEERING_DIFFERS');
- // a modeled and a verified actuator are different evidence scales even when every KPI looks alike
- else if(JSON.stringify(a.engineeringEvidence?.capabilities??null)!==JSON.stringify(b.engineeringEvidence?.capabilities??null))reasons.push('CAPABILITY_DIFFERS');
+ // a modeled and a verified actuator are different evidence scales even when every KPI looks alike; judged by capability name and value, never by key order
+ else if(CAPABILITY_IDS.some(id=>a.engineeringEvidence?.capabilities?.[id]!==b.engineeringEvidence?.capabilities?.[id]))reasons.push('CAPABILITY_DIFFERS');
+ // only a passed engineering run has numbers worth comparing; not_run and fail show their blockers instead
+ const unproven=(r:RunReport)=>!!r.engineeringEvidence&&r.engineeringEvidence.status!=='pass';
+ if(unproven(a)||unproven(b))reasons.push('ENGINEERING_EVIDENCE_NOT_PASSED');
  const comparable=!reasons.length;
  // changed inputs are shown, not judged: a layout or seed change is what an A/B compare is for
  const inputs=[['seed',ma.seed,mb.seed],['project.hash',ma.project.hash,mb.project.hash],['world.hash',ma.world.hash,mb.world.hash],['scenario',`${ma.scenario.id} r${ma.scenario.revision}`,`${mb.scenario.id} r${mb.scenario.revision}`],
   ['backendSetId',ma.backendSetId,mb.backendSetId],['engineering.bundleDigest',ma.engineering?.bundleDigest??'',mb.engineering?.bundleDigest??''],['sourceCommit',ma.sourceCommit,mb.sourceCommit],['assets',JSON.stringify(ma.assets),JSON.stringify(mb.assets)]]
   .filter(([,x,y])=>x!==y).map(([field,x,y])=>({field:field as string,a:x as string|number,b:y as string|number}));
- const ka=reportKpis(a),kb=reportKpis(b);
+ const ka=reportKpis(a).map(k=>unproven(a)?{...k,value:null,available:false,reason:'ENGINEERING_EVIDENCE_NOT_PASSED'}:k),kb=reportKpis(b).map(k=>unproven(b)?{...k,value:null,available:false,reason:'ENGINEERING_EVIDENCE_NOT_PASSED'}:k);
  const kpis=ka.map((x,i)=>{const y=kb[i]!,available=x.available&&y.available;
   return {id:x.id,unit:x.unit,definition:x.definition,a:x.value,b:y.value,available,reasons:[x.reason,y.reason].filter(Boolean) as string[],
    delta:comparable&&available?y.value!-x.value!:null,population:{runs:1,samplesA:x.samples,samplesB:y.samples},percentiles:null as null};});

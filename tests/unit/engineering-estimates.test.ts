@@ -80,3 +80,15 @@ test('a battery rating on a port that is not the supplying one is not used',()=>
   expect(r.energy).toEqual({volts:25.5});
   expect(r.problems.map(p=>p.code)).toContain('ENERGY_CAPACITY_UNAVAILABLE');
 });
+
+test('the estimate summary shows mass and nominal usable energy when the design states them, and the missing inputs when it does not',async()=>{
+  const {estimateSummary}=await import('../../src/design/engineering-estimates');
+  const rated=withBattery({portId:'out',capacityAh:{value:20,unit:'Ah',source:assumedSource},usableFraction:{value:0.8,unit:'1',source:assumedSource}});
+  const s=estimateSummary(rated.manifest.project,rated);
+  expect(s.massKg).toBeCloseTo(20+2*(0.2+1.5)+6+1.2,9);
+  expect(s.nominalUsableWh).toBeCloseTo(25.5*20*0.8,9);
+  expect(s.missing.map(m=>m.code)).not.toContain('ENERGY_CAPACITY_UNAVAILABLE');
+  const bare=makeEngineeringArchive(),b=estimateSummary(bare.manifest.project,bare);
+  expect(b.nominalUsableWh).toBeNull();                       // never a number the design did not state
+  expect(b.missing.map(m=>m.code)).toContain('ENERGY_CAPACITY_UNAVAILABLE');
+});

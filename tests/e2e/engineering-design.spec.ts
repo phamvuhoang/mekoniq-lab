@@ -127,3 +127,10 @@ test('an imported archive keeps its blobs, licenses, assets and recipes through 
   expect(Object.keys(again.files).sort()).toEqual(Object.keys(first.files).sort());
   expect(again.manifest.components).toHaveLength(first.manifest.components.length);
 });
+test('the page shows the AMR mass the design implies and says what is missing for energy, instead of inventing it',async({page})=>{
+  await open(page);
+  await page.getByRole('button',{name:'Open FD01 reference AMR'}).click();
+  await expect(page.getByTestId('asm-est-mass')).toContainText('kg');
+  await expect(page.getByTestId('asm-est-energy')).toContainText('unknown');
+  await expect(page.getByTestId('asm-est-missing')).toContainText('ENERGY_CAPACITY_UNAVAILABLE');
+});

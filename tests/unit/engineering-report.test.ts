@@ -61,3 +61,33 @@ test('report panel lists blockers and capability levels for an engineering run, 
  expect(html).toContain('data-capability="actuator" data-level="modeled"');expect(html).toContain('data-capability="sensor" data-level="unsupported"');
  const hostile=reportPanel(engineered(assessment('fail',['<img src=x onerror=alert(1)>'])),o);expect(hostile).not.toContain('<img src=x');
 });
+test('an unknown capability or a hostile capability value is neither accepted at import nor rendered as markup',async()=>{
+  const {reportPanel}=await import('../../src/ui/report-panel');
+  const hostile=engineered(assessment('pass'));
+  (hostile.engineeringEvidence!.capabilities as unknown as Record<string,string>).extra='x" onmouseover="alert(1)';
+  expect(validReportShape(hostile)).toBe(false);                       // closed set of capabilities at the import boundary
+  const levelInjection=engineered(assessment('pass'));
+  (levelInjection.engineeringEvidence!.capabilities as unknown as Record<string,string>).actuator='modeled" onmouseover="alert(1)';
+  expect(validReportShape(levelInjection)).toBe(false);                 // and a closed set of levels
+  // defence in depth: even a report that skipped validation cannot put a value into an attribute
+  const html=reportPanel(levelInjection,{replay:null,previous:null,selected:null,business:0});
+  expect(html).not.toContain('onmouseover');
+  expect(html).toContain('data-capability="actuator" data-level="unsupported"');
+  const extra=reportPanel(hostile,{replay:null,previous:null,selected:null,business:0});
+  expect(extra).not.toContain('onmouseover');
+  const badStatus=engineered(assessment('pass'));(badStatus.engineeringEvidence as unknown as {status:string}).status='pass" onclick="x';
+  expect(reportPanel(badStatus,{replay:null,previous:null,selected:null,business:0})).not.toContain('onclick');
+});
+test('compare judges capability by name and value, and never ranks runs whose engineering evidence did not pass',()=>{
+  const a=engineered(assessment('pass')),reordered=engineered(assessment('pass'));
+  reordered.engineeringEvidence!.capabilities=Object.fromEntries(Object.entries(reordered.engineeringEvidence!.capabilities).reverse()) as never;
+  expect(compareRuns(a,reordered).reasons).not.toContain('CAPABILITY_DIFFERS');       // key order is not a difference
+  expect(compareRuns(a,reordered).comparable).toBe(true);
+  const empty1=engineered(assessment('not_run',['PHYSICS_BACKEND_UNAVAILABLE'])),empty2=engineered(assessment('not_run',['PHYSICS_BACKEND_UNAVAILABLE']));
+  const c=compareRuns(empty1,empty2);
+  expect(c.comparable).toBe(false);expect(c.reasons).toContain('ENGINEERING_EVIDENCE_NOT_PASSED');
+  expect(c.kpis.every(k=>k.delta===null&&k.a===null&&k.b===null&&!k.available)).toBe(true);   // no green zeroes from a run that never ran
+  const failed=engineered(assessment('fail',['EVIDENCE_GAP']));
+  expect(compareRuns(a,failed).reasons).toContain('ENGINEERING_EVIDENCE_NOT_PASSED');
+  expect(compareRuns(a,failed).kpis.every(k=>k.delta===null)).toBe(true);
+});

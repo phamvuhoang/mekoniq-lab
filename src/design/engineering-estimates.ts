@@ -57,3 +57,13 @@ export function engineeringEstimateInputs(project:EngineeringProject,content:Eng
   problems.push(miss('STABILITY_UNAVAILABLE','/components','support points are catalog data, but world positions come from the compiled assembly; stability stays unavailable until a bundle supplies placements'));
   return {energy,drive,stability:null,problems};
 }
+
+export interface EstimateSummary {massKg:number|null;nominalUsableWh:number|null;missing:{code:string;detail:string}[]}
+/**
+ * What the design itself supports saying: AMR mass, and usable battery energy before any duty or derating (those are scenario choices). Anything the design
+ * does not state is listed as missing, never filled from a preset.
+ */
+export function estimateSummary(project:EngineeringProject,content:EngineeringArchiveFiles):EstimateSummary {
+  const r=engineeringEstimateInputs(project,content),e=r.energy;
+  return {massKg:r.drive?.massKg??null,nominalUsableWh:e?.volts&&e.ampHours&&e.usable?e.volts*e.ampHours*e.usable:null,missing:r.problems.map(p=>({code:p.code,detail:p.detail}))};
+}
