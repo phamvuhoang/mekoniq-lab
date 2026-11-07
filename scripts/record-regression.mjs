@@ -14,6 +14,7 @@ import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 import os from 'node:os';
 import {parseRecorderArgs,physicalPlan,physicalArtifacts,notExecuted,PHYSICAL_BROWSER_RUNS} from './recorder-options.mjs';
+import {scrubEvidence} from './recorder-scrub.mjs';
 import {captureRegressionIdentity,assertRecordableIdentity,assertStableRecording,LAB_EVIDENCE_MUTABLE_PATHS} from '../../source/tests/support/regression-identity.ts';
 const LAB=resolve(fileURLToPath(new URL('..',import.meta.url))),W=resolve(LAB,'..'),SRC=resolve(W,'source');
 // --suite physical-robot-lab --out <new dir>: a fresh evidence root (never replaced, never the historical one). Without options the legacy behaviour is unchanged.
@@ -27,9 +28,7 @@ if(!explicitOut)rmSync(OUT,{recursive:true,force:true});mkdirSync(OUT,{recursive
 const env={...process.env,LAB_V2_REQUIRE_LAB_FIXTURES:'1'};
 const sha=f=>createHash('sha256').update(readFileSync(f)).digest('hex');
 // paths and anything shaped like a key/token are removed before a file is stored or hashed
-const scrub=t=>t.replaceAll(process.execPath,'node').replaceAll(W,'<workspace>').replaceAll(os.homedir(),'<home>')
- .replace(/\/(private\/)?var\/folders\/[^"\s)]*/g,'<tmp>').replace(/\/private\/tmp\/[^"\s)]*/g,'<tmp>').replace(/(?<![\w<])\/tmp\/[^"\s)]*/g,'<tmp>')
- .replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,'<jwt>').replace(/sb_(secret|publishable)_[A-Za-z0-9_-]+/g,'<supabase-key>');
+const scrub=(text,kind)=>scrubEvidence(text,{node:process.execPath,workspace:W,home:os.homedir()},kind);
 const runs=[],commands=[],notRun=[];
 function summarize(kind,text){
  if(kind==='junit'){const m=/<testsuite[^>]*\btests="(\d+)"[^>]*\bfailures="(\d+)"|<testsuite[^>]*\bfailures="(\d+)"[^>]*\btests="(\d+)"/.exec(text),e=/\berrors="(\d+)"/.exec(text),s=/\bskipped="(\d+)"/.exec(text);
@@ -46,7 +45,7 @@ function run(id,repo,cmd,args,{kind=null,files=[],extraEnv={}}={}){
  commands.push({id,repo,command,startedAt,finishedAt,exitCode:r.status,log,logSha256:sha(`${OUT}/${log}`)});
  for(const f of files){
   if(!existsSync(`${OUT}/${f}`)){notRun.push({id:`${id}:${f}`,reason:`result file not produced (exit ${r.status})`});continue;}
-  const text=scrub(readFileSync(`${OUT}/${f}`,'utf8'));writeFileSync(`${OUT}/${f}`,text);
+  const text=scrub(readFileSync(`${OUT}/${f}`,'utf8'),kind);writeFileSync(`${OUT}/${f}`,text);
   runs.push({id:`${id}:${f}`,repo,kind,command,startedAt,finishedAt,exitCode:r.status,file:f,sha256:sha(`${OUT}/${f}`),summary:summarize(kind,text)});
  }
  identityCheckpoint(`${id}:after`);console.log(id,'exit',r.status);
