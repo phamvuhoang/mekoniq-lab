@@ -16,8 +16,8 @@ const dirty=execFileSync('git',['status','--porcelain','--','packages/contracts'
 if(dirty)throw new Error('SOURCE_CONTRACTS_DIRTY: commit source before syncing');
 const header=`// Synced from source packages/contracts/generated/engineering.ts @ ${commit} (sha256 ${createHash('sha256').update(generated).digest('hex')}). Run node scripts/sync-engineering-contracts.mjs; do not edit.\n`;
 const output=header+body;
-// Schemas the browser validates archives with (lab-project-v2/asset/recipe stay Lab's own validators).
-const SCHEMAS=['engineering-component','engineering-project','engineering-bundle','engineering-project-archive','engineering-candidate'];
+// Schemas the browser validates archives with (runtimeProject stays Lab's own validator; assets and recipes are validated against their full source schemas).
+const SCHEMAS=['engineering-component','engineering-project','engineering-bundle','engineering-project-archive','engineering-candidate','asset-revision','coffee-recipe'];
 const schemaDir=here('../src/shared/engineering-schemas/');
 const schemaFiles=await Promise.all(SCHEMAS.map(async(n)=>[n,await readFile(here(`../../source/packages/contracts/schemas/${n}.schema.json`),'utf8')]));
 if(process.argv.includes('--check')){

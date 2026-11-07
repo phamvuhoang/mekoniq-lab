@@ -48,6 +48,10 @@ Sáu lỗi Critical/Important đã sửa, mỗi lỗi có test đỏ trước: `
 
 Số liệu sau đợt này: source vitest (lab-*/engineering*/contracts) 64 file, 555 pass, 2 skip có sẵn; pytest 360 pass, 1 skip; Lab 223 pass, 1 skip.
 
+## Đợt sửa thứ ba (2 P1, 2 P2)
+
+`verified` nay so miền calibration với **toàn bộ** quan sát của run (mọi entity, mọi giá trị theo tên), không phụ thuộc danh sách checks hay thứ tự của chúng; calibration không nêu miền, hoặc kênh mà run không tạo ra, không xác minh gì. Calibration với policy không có channel hoặc trial không có mẫu luôn fail (`NO_MEASURED_SAMPLES`/`TRIAL_WITHOUT_DATA`). Archive validate asset/recipe theo đúng schema nguồn đầy đủ (đồng bộ `asset-revision`, `coffee-recipe`) rồi mới kiểm hash; recipe hash là hash canonical của recipe bỏ trường `hash`.
+
 ## Minor chưa sửa (ghi nhận từ review đầu)
 
 Hai compile song song cùng project có thể va `rename` (500 thay vì trả bundle sẵn có); reclaim/resume không kiểm lại closure; instance chưa bind bị compiler Python từ chối với `COMPILER_FAILED` thay vì mã resolver; URDF 9 chữ số có nghĩa so với `scene.json` đầy đủ.

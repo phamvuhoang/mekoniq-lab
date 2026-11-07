@@ -3,9 +3,12 @@ import type {ErrorObject} from 'ajv';
 import componentSchema from '../shared/engineering-schemas/engineering-component.schema.json';
 import projectSchema from '../shared/engineering-schemas/engineering-project.schema.json';
 import archiveSchema from '../shared/engineering-schemas/engineering-project-archive.schema.json';
+import assetSchema from '../shared/engineering-schemas/asset-revision.schema.json';
+import recipeSchema from '../shared/engineering-schemas/coffee-recipe.schema.json';
+import addFormats from 'ajv-formats';
 import type {ComponentRevision,EngineeringArchive,EngineeringProject} from '../shared/engineering';
 import {validateProjectV2} from './schema';
-import {canonicalJson,sha256Hex} from '../twin/hash';
+import {canonicalJson,hashJson,sha256Hex} from '../twin/hash';
 import {verifyAssetHash} from '../twin/model';
 import type {AssetRevision} from '../shared/types';
 
@@ -18,7 +21,10 @@ export type ArchiveCheck={ok:true;value:EngineeringArchiveFiles;missing:string[]
 const clone=<T>(v:T):T=>JSON.parse(JSON.stringify(v));
 // The runtime project, assets and recipes keep Lab's own validators; the engineering schemas guard everything that is new.
 const patched=(schema:object,edit:(s:any)=>void)=>{const s=clone(schema);edit(s);return s;};
-const ajv=new Ajv({allErrors:true,strict:true});
+const ajv=new Ajv({allErrors:true,strict:true,discriminator:true});
+addFormats(ajv);
+ajv.addSchema(assetSchema,'asset-revision.schema.json');
+ajv.addSchema(recipeSchema,'coffee-recipe.schema.json');
 ajv.addSchema(componentSchema,'engineering-component.schema.json');
 ajv.addSchema(patched(projectSchema,s=>{s.properties.runtimeProject={type:'object'};}),'engineering-project.schema.json');
 ajv.addSchema(patched(archiveSchema,s=>{s.properties.assets.items={type:'object'};s.properties.recipes.items={type:'object'};}),'engineering-project-archive.schema.json');
@@ -39,8 +45,14 @@ function forbiddenKeys(value:unknown,path='',depth=0):string[] {
   if (Array.isArray(value)) return value.flatMap((v,i)=>forbiddenKeys(v,`${path}/${i}`,depth+1));
   return Object.entries(value).flatMap(([k,v])=>(FORBIDDEN.has(k.toLowerCase().replace(/[_-]/g,''))?[`FORBIDDEN_FIELD:${path}/${k}`]:[]).concat(forbiddenKeys(v,`${path}/${k}`,depth+1)));
 }
-const isAsset=(a:unknown):boolean=>{try {return !!a&&typeof a==='object'&&(a as {schemaVersion?:unknown}).schemaVersion===2&&typeof (a as {id?:unknown}).id==='string'&&verifyAssetHash(a as AssetRevision);} catch {return false;}};
-const isRecipe=(r:unknown):boolean=>!!r&&typeof r==='object'&&typeof (r as {id?:unknown}).id==='string'&&Number.isSafeInteger((r as {revision?:unknown}).revision)&&/^[0-9a-f]{64}$/.test(String((r as {hash?:unknown}).hash));
+// full source schema first, then the hash: a self-consistent hash over a malformed document proves nothing
+const fits=(key:string,value:unknown)=>ajv.getSchema(key)!(value) as boolean;
+const isAsset=(a:unknown):boolean=>{try {return fits('asset-revision.schema.json',a)&&verifyAssetHash(a as AssetRevision);} catch {return false;}};
+const isRecipe=(r:unknown):boolean=>{
+  if (!fits('coffee-recipe.schema.json',r)) return false;
+  const {hash,...rest}=r as {hash:string}&Record<string,unknown>;
+  return hash===hashJson(rest);
+};
 export const validateComponentShape=(component:unknown):string[]=>run('engineering-component.schema.json',component,'COMPONENT_INVALID');
 /** Content digest of a component revision, the key instances use to refer to it. */
 export const componentDigest=(c:ComponentRevision):string=>sha256Hex(new TextEncoder().encode(canonicalJson(c)));

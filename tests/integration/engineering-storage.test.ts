@@ -3,6 +3,10 @@ import {afterEach,expect,test,vi} from 'vitest';
 import {EngineeringProjectRepository} from '../../src/project/engineering-repository';
 import {checkArchive} from '../../src/project/engineering-archive';
 import {makeEngineeringArchive} from '../support/engineering';
+import {readFileSync} from 'node:fs';
+import {sealAsset} from '../../src/twin/model';
+import {hashJson} from '../../src/twin/hash';
+import type {AssetRevision} from '../../src/shared/types';
 
 const repos:EngineeringProjectRepository[]=[];
 const fresh=()=>{const r=new EngineeringProjectRepository(`eng-${crypto.randomUUID()}`);repos.push(r);return r;};
@@ -103,4 +107,21 @@ test('assets and recipes are validated, and anything that looks like authority o
   expect((checkArchive(notAnAsset) as {problems:string[]}).problems.join()).toContain('ASSET_INVALID');
   const notARecipe=makeEngineeringArchive();notARecipe.manifest.recipes=[{id:'espresso'} as never];
   expect((checkArchive(notARecipe) as {problems:string[]}).problems.join()).toContain('RECIPE_INVALID');
+});
+
+const fixture=(path:string)=>JSON.parse(readFileSync(new URL(`../../fixtures/${path}`,import.meta.url),'utf8'));
+test('real assets and recipes are accepted; contract violations are refused even when the hash is self-consistent',()=>{
+  const asset=fixture('twins/restaurant-v2.json').assets[0] as AssetRevision,recipe=fixture('recipes/espresso.json');
+  const ok=makeEngineeringArchive();ok.manifest.assets=[asset as never];ok.manifest.recipes=[recipe];
+  expect(checkArchive(ok)).toMatchObject({ok:true});
+  const sealedButEmpty=makeEngineeringArchive();sealedButEmpty.manifest.assets=[sealAsset({schemaVersion:2,id:'x'} as unknown as AssetRevision) as never];
+  expect((checkArchive(sealedButEmpty) as {problems:string[]}).problems.join()).toContain('ASSET_INVALID');
+  const badRevision=makeEngineeringArchive();badRevision.manifest.recipes=[{...recipe,revision:-1,hash:hashJson({...recipe,revision:-1,hash:undefined})}];
+  expect((checkArchive(badRevision) as {problems:string[]}).problems.join()).toContain('RECIPE_INVALID');
+  const wrongHash=makeEngineeringArchive();wrongHash.manifest.recipes=[{...recipe,hash:'a'.repeat(64)}];
+  expect((checkArchive(wrongHash) as {problems:string[]}).problems.join()).toContain('RECIPE_INVALID');
+  const stub=makeEngineeringArchive();stub.manifest.recipes=[{id:'espresso',revision:1,hash:'b'.repeat(64)} as never];
+  expect((checkArchive(stub) as {problems:string[]}).problems.join()).toContain('RECIPE_INVALID');
+  const tamperedAsset=makeEngineeringArchive();tamperedAsset.manifest.assets=[{...asset,kind:'tool'} as never];
+  expect((checkArchive(tamperedAsset) as {problems:string[]}).problems.join()).toContain('ASSET_INVALID');
 });
