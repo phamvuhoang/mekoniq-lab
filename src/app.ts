@@ -13,6 +13,7 @@ import type { Viewer } from "./viewer/robot";
 import { robotSvg } from "./viewer/fallback";
 import { TwinWorkspace } from "./ui/workspace";
 import { AssemblyWorkspace } from "./ui/assembly-page";
+import { httpTwinRuntime } from "./scenarios/controls";
 
 type Page = "design" | "assembly" | "restaurant" | "scenarios" | "twin" | "results" | "deployment";
 const PAGES: Page[] = ["design", "assembly", "restaurant", "scenarios", "twin", "results", "deployment"];
@@ -91,8 +92,10 @@ export class LabApp {
   private runSeed = 42;
   private backendCompatible = false;
   private faultKind = "blocked";
-  private twin = new TwinWorkspace(() => this.render());
-  private assembly = new AssemblyWorkspace(() => this.render(), undefined, (name, data) => this.download(name, data));
+  // one runtime client for every page: the pairing (CSRF token, ownership proofs) lives in it, so a session made on the Twin page also serves Assembly
+  private runtime = httpTwinRuntime();
+  private assembly = new AssemblyWorkspace(() => this.render(), this.runtime, (name, data) => this.download(name, data));
+  private twin = new TwinWorkspace(() => this.render(), this.runtime, () => this.assembly.projectDigest());
   constructor(host: HTMLElement) {
     this.host = host;
     this.bind();

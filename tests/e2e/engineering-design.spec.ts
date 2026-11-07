@@ -93,3 +93,37 @@ test('a candidate draft downloads with null digests and the blocker when nothing
   expect(c).toMatchObject({documentType:'engineering-candidate',status:'draft',hardwareValidated:false,controlAuthority:false,bundleDigest:null,assemblyDigest:null});
   expect(c.problems.map((p:{code:string})=>p.code)).toContain('BUNDLE_NOT_COMPILED');
 });
+test('after several edits a reload restores the very same design id, and saves nothing new',async({page})=>{
+  await open(page);
+  await page.getByRole('button',{name:'Open FD01 reference AMR'}).click();
+  await page.getByTestId('asm-instances').getByRole('button',{name:'Remove'}).last().click();
+  await page.getByTestId('assembly-page').getByRole('button',{name:'Undo'}).click();
+  await expect(page.getByTestId('asm-save-state')).toHaveAttribute('data-state','saved');
+  const saved=await digest(page);
+  await page.reload();
+  await page.getByRole('button',{name:'EN',exact:true}).click();
+  await expect(rows(page)).toHaveCount(7);
+  expect(await digest(page)).toBe(saved);
+  await page.reload();
+  await page.getByRole('button',{name:'EN',exact:true}).click();
+  expect(await digest(page)).toBe(saved);          // a second reload does not drift either
+});
+test('an imported archive keeps its blobs, licenses, assets and recipes through export, and survives opening the reference and undoing',async({page})=>{
+  const wire=readFileSync(new URL('../../fixtures/engineering/rich-archive.json',import.meta.url),'utf8'),archive=JSON.parse(wire) as {manifest:{blobs:{mediaType:string;license:string}[]}};
+  await open(page);
+  await page.locator('#asm-import').setInputFiles({name:'rich.json',mimeType:'application/json',buffer:Buffer.from(wire)});
+  await expect(rows(page)).toHaveCount(5);
+  const exportOnce=async()=>{const [d]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Export engineering project'}).click()]);return JSON.parse(readFileSync((await d.path())!,'utf8'));};
+  const first=await exportOnce();
+  expect(Object.keys(first.files).sort()).toEqual(Object.keys(JSON.parse(wire).files).sort());
+  expect(first.manifest.blobs.map((b:{mediaType:string;license:string})=>`${b.mediaType}/${b.license}`).sort()).toEqual(archive.manifest.blobs.map(b=>`${b.mediaType}/${b.license}`).sort());
+  expect(first.manifest.assets).toHaveLength(1);expect(first.manifest.recipes).toHaveLength(1);
+  expect(first.manifest.missingDigests).toEqual([]);
+  await page.getByRole('button',{name:'Open FD01 reference AMR'}).click();
+  await page.getByTestId('assembly-page').getByRole('button',{name:'Undo'}).click();
+  await expect(rows(page)).toHaveCount(5);
+  await expect(page.getByTestId('asm-problems')).not.toContainText('COMPONENT_UNAVAILABLE');
+  const again=await exportOnce();
+  expect(Object.keys(again.files).sort()).toEqual(Object.keys(first.files).sort());
+  expect(again.manifest.components).toHaveLength(first.manifest.components.length);
+});

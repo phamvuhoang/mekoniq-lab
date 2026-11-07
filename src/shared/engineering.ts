@@ -1,4 +1,4 @@
-// Synced from source packages/contracts/generated/engineering.ts @ db88098cff33c02548acdaff7b47b57f3450e06c (sha256 d2151fafab9e43f033e51603c21bb12994f58dee937f6b87ffc8490333e49269). Run node scripts/sync-engineering-contracts.mjs; do not edit.
+// Synced from source packages/contracts/generated/engineering.ts @ 28b98bf07f2ca93faba97272755cdff5c17fd17b (sha256 7934178d0a9e9f41334dbbebe8659e4a55cb2f4590a304a3b2ff8021486c6416). Run node scripts/sync-engineering-contracts.mjs; do not edit.
 /* Generated from the engineering schemas. Run pnpm contracts:generate; do not edit. */
 import type {LabProjectV2,AssetRevision} from './types';
 export type CoffeeRecipe=Record<string,unknown>;
@@ -632,7 +632,7 @@ export interface ComponentRevision {
  * via the `definition` "Instance".
  */
 export interface Instance {
-  id: EngineeringId;
+  id: string;
   componentDigest: Digest;
   pose: Pose;
 }

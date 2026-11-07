@@ -25,6 +25,18 @@ export class EngineeringProjectStore {
     this.past.push(this.project);this.future=[];
     this.commit(project);
   }
+  /** Opens a stored or imported project exactly as it is: same revision, same digest. The previous design stays one undo away. */
+  load(project:EngineeringProject):void {
+    this.past.push(this.project);this.future=[];
+    this.project=structuredClone(project);
+    for (const listener of [...this.listeners]) listener();
+  }
+  /** Start-up restore: the stored project becomes the baseline with no earlier history. */
+  reset(project:EngineeringProject):void {
+    this.past.length=0;this.future=[];
+    this.project=structuredClone(project);
+    for (const listener of [...this.listeners]) listener();
+  }
   undo():boolean {
     const previous=this.past.pop();
     if (!previous) return false;

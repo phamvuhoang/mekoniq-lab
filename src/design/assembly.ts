@@ -1,11 +1,36 @@
 import reference from '../../fixtures/engineering/reference-catalog.json' with {type:'json'};
 import type {ComponentRevision,EngineeringProject,Problem} from '../shared/engineering';
-import {componentDigest,type EngineeringArchiveFiles} from '../project/engineering-archive';
+import {componentDigest,requiredDigests,type EngineeringArchiveFiles} from '../project/engineering-archive';
 import {canonicalJson,sha256Hex} from '../twin/hash';
 
-/** Catalog content the page edits against: component revisions by digest and the model JSON their ModelRefs name. */
-export interface AssemblyCatalog {components:Record<string,ComponentRevision>;models:Record<string,unknown>}
-export const referenceCatalog=():AssemblyCatalog=>structuredClone({components:reference.components,models:reference.models}) as unknown as AssemblyCatalog;
+/** A stored file with the metadata its archive declared for it; content-addressed, so the same digest is always the same bytes. */
+export interface BlobEntry {bytes:Uint8Array;mediaType:string;license:string}
+type Extras={assets:EngineeringArchiveFiles['manifest']['assets'];recipes:EngineeringArchiveFiles['manifest']['recipes']};
+/**
+ * Catalog content the page edits against: component revisions by digest, the model JSON their ModelRefs name, every blob a loaded archive carried
+ * (documents, meshes, models) and the assets/recipes that belong to a project, keyed by project id. Loading more content only ever adds to it, so undo can
+ * return to a project whose components arrived earlier.
+ */
+export interface AssemblyCatalog {components:Record<string,ComponentRevision>;models:Record<string,unknown>;blobs:Record<string,BlobEntry>;extras:Record<string,Extras>}
+export const referenceCatalog=():AssemblyCatalog=>({...structuredClone({components:reference.components,models:reference.models}),blobs:{},extras:{}}) as unknown as AssemblyCatalog;
+/** Everything a validated archive holds, ready to edit against and to export again without loss. */
+export function catalogFromArchive(archive:EngineeringArchiveFiles):AssemblyCatalog {
+  const catalog:AssemblyCatalog={components:{},models:{},blobs:{},extras:{[archive.manifest.project.id]:{assets:structuredClone(archive.manifest.assets),recipes:structuredClone(archive.manifest.recipes)}}};
+  for (const c of archive.manifest.components) catalog.components[componentDigest(c)]=structuredClone(c);
+  for (const b of archive.manifest.blobs) {
+    const bytes=archive.files[b.file];if (!bytes) continue;
+    catalog.blobs[b.digest]={bytes:bytes.slice(),mediaType:b.mediaType,license:b.license};
+    try {catalog.models[b.digest]=JSON.parse(new TextDecoder().decode(bytes));} catch {/* a non-JSON blob is not a model, but it is still kept */}
+  }
+  return catalog;
+}
+/** Adds what `from` holds to `into`. Digests name their content, so an existing entry is never replaced. */
+export function mergeCatalog(into:AssemblyCatalog,from:AssemblyCatalog):void {
+  for (const [k,v] of Object.entries(from.components)) into.components[k]??=v;
+  for (const [k,v] of Object.entries(from.models)) into.models[k]??=v;
+  for (const [k,v] of Object.entries(from.blobs)) into.blobs[k]??=v;
+  for (const [k,v] of Object.entries(from.extras)) into.extras[k]??=v;
+}
 export const referenceProject=():EngineeringProject=>structuredClone(reference.project) as unknown as EngineeringProject;
 const IDENTITY={xyzM:[0,0,0] as [number,number,number],quaternionXyzw:[0,0,0,1] as [number,number,number,number]};
 const problem=(code:string,path:string,detail:string):Problem=>({code,path,blocking:true,detail});
@@ -69,15 +94,17 @@ export function previewProblems(project:EngineeringProject,catalog:AssemblyCatal
 export function archiveFor(project:EngineeringProject,catalog:AssemblyCatalog):EngineeringArchiveFiles {
   const used=new Map<string,ComponentRevision>();
   for (const i of project.assembly.instances) {const c=catalog.components[i.componentDigest];if (c) used.set(componentDigest(c),c);}
-  const files:Record<string,Uint8Array>={},blobs:EngineeringArchiveFiles['manifest']['blobs']=[];
-  for (const c of used.values()) for (const m of c.models) {
-    const model=catalog.models[m.digest];if (!model||files[`blobs/${m.digest}`]) continue;
+  const files:Record<string,Uint8Array>={},blobs:EngineeringArchiveFiles['manifest']['blobs']=[],needed=requiredDigests([...used.values()]);
+  for (const digest of needed) {
+    const held=catalog.blobs[digest];
+    if (held&&sha256Hex(held.bytes)===digest) {files[`blobs/${digest}`]=held.bytes;blobs.push({digest,file:`blobs/${digest}`,mediaType:held.mediaType,license:held.license,sizeBytes:held.bytes.length});continue;}
+    const model=catalog.models[digest];if (!model) continue;
     const bytes=new TextEncoder().encode(canonicalJson(model));
-    if (sha256Hex(bytes)!==m.digest) continue;                      // never store a model under a digest it does not have
-    files[`blobs/${m.digest}`]=bytes;blobs.push({digest:m.digest,file:`blobs/${m.digest}`,mediaType:'application/json',license:'internal',sizeBytes:bytes.length});
+    if (sha256Hex(bytes)!==digest) continue;                        // never store a model under a digest it does not have
+    files[`blobs/${digest}`]=bytes;blobs.push({digest,file:`blobs/${digest}`,mediaType:'application/json',license:'internal',sizeBytes:bytes.length});
   }
-  const have=new Set(blobs.map(b=>b.digest)),needed=[...new Set([...used.values()].flatMap(c=>[...c.documents.map(d=>d.digest),...c.models.map(m=>m.digest)]))].sort();
-  return {manifest:{documentType:'engineering-project-archive',schemaVersion:1,project:structuredClone(project),components:[...used.values()],assets:[],recipes:[],blobs,missingDigests:needed.filter(d=>!have.has(d))},files};
+  const have=new Set(blobs.map(b=>b.digest)),extras=catalog.extras[project.id];
+  return {manifest:{documentType:'engineering-project-archive',schemaVersion:1,project:structuredClone(project),components:[...used.values()],assets:structuredClone(extras?.assets??[]),recipes:structuredClone(extras?.recipes??[]),blobs,missingDigests:needed.filter(d=>!have.has(d))},files};
 }
 /** Wire form of an archive for download: JSON with the blob bytes as base64. */
 export function serializeArchive(a:EngineeringArchiveFiles):string {

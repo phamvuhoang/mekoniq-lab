@@ -3,8 +3,8 @@
 import type {BundleReceipt,Bom,CompiledScene,EngineeringProject} from '../shared/engineering';
 import {EngineeringProjectStore} from '../project/engineering-store';
 import {EngineeringProjectRepository} from '../project/engineering-repository';
-import {checkArchive,componentDigest} from '../project/engineering-archive';
-import {addInstance,archiveFor,connect,disconnect,parseArchive,previewProblems,referenceCatalog,referenceProject,removeInstance,serializeArchive,uniqueInstanceId,type AssemblyCatalog} from '../design/assembly';
+import {checkArchive} from '../project/engineering-archive';
+import {addInstance,archiveFor,catalogFromArchive,connect,disconnect,mergeCatalog,parseArchive,previewProblems,referenceCatalog,referenceProject,removeInstance,serializeArchive,uniqueInstanceId,type AssemblyCatalog} from '../design/assembly';
 import {buildEngineeringCandidate} from '../deployment/engineering-bundle';
 import {httpTwinRuntime,type TwinRuntime} from '../scenarios/controls';
 import {loadBom,loadCompiledScene} from '../scenarios/engineering';
@@ -34,6 +34,8 @@ export class AssemblyWorkspace {
     this.store.subscribe(()=>{this.scheduleSave();});
   }
   private design():EngineeringProject {return this.store.snapshot();}
+  /** Digest of the design as it is now; the same value a compile receipt and a run's engineering reference carry. */
+  projectDigest():string {return hashJson(this.design());}
   private stale():boolean {return !!this.receipt&&this.receipt.projectDigest!==hashJson(this.design());}
   private edit(change:(p:EngineeringProject)=>EngineeringProject):void {this.store.replaceDraft(change(this.store.getDraft()));this.rerender();}
   private saveTimer:ReturnType<typeof setTimeout>|null=null;
@@ -53,15 +55,15 @@ export class AssemblyWorkspace {
     this.restored=true;
     try {
       const saved=await this.repository.loadActive();
-      if (saved&&checkArchive(saved).ok) this.open(saved.manifest.project,saved);
+      if (saved&&checkArchive(saved).ok) this.open(saved,'reset');
     } catch {/* no stored draft, or storage unavailable: start fresh */}
     try {this.canCompile=!!(await this.rt.health()).capabilities?.includes('engineering_bundle_v1');} catch {this.canCompile=false;}
     this.rerender();
   }
-  private open(project:EngineeringProject,archive:ReturnType<typeof archiveFor>):void {
-    for (const c of archive.manifest.components) this.catalog.components[componentDigest(c)]=c;
-    for (const [file,bytes] of Object.entries(archive.files)) {try {this.catalog.models[file.slice('blobs/'.length)]=JSON.parse(new TextDecoder().decode(bytes));} catch {/* a non-JSON blob is not a model */}}
-    this.store.replaceDraft(project);
+  /** Takes everything the archive holds into the catalog (nothing is dropped) and opens its project with the identity it was saved with. */
+  private open(archive:ReturnType<typeof archiveFor>,how:'load'|'reset'):void {
+    mergeCatalog(this.catalog,catalogFromArchive(archive));
+    if (how==='reset') this.store.reset(archive.manifest.project); else this.store.load(archive.manifest.project);
     this.receipt=null;this.bom=null;this.scene=null;
   }
   html():string {
@@ -130,9 +132,9 @@ ${compile}
     return true;
   }
   private openReference():void {
-    const project=referenceProject();
-    this.catalog=referenceCatalog();
-    this.store.replaceDraft(project);
+    // additive: components of a design opened earlier stay available, so undo can come back to it
+    mergeCatalog(this.catalog,referenceCatalog());
+    this.store.load(referenceProject());
     this.receipt=null;this.bom=null;this.scene=null;this.message='';
     this.rerender();
   }
@@ -146,7 +148,7 @@ ${compile}
       if (file.size>10*1024*1024) throw new Error('ARCHIVE_TOO_LARGE');
       const archive=parseArchive(await file.text()),checked=checkArchive(archive);
       if (!checked.ok) throw new Error(checked.problems.slice(0,3).join('; '));
-      this.open(archive.manifest.project,archive);
+      this.open(archive,'load');
       this.message=checked.missing.length?tr('Đã mở bản nháp thiếu tệp; chưa thể chạy.','ファイル不足のドラフトを開きました。実行できません。','Opened a draft with missing files; it cannot run.'):'';
     } catch (e) {this.message=tr('Không nhập được: ','読み込めません: ','Could not import: ')+(e instanceof Error?e.message:String(e));}
     this.rerender();

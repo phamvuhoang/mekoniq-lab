@@ -1,7 +1,9 @@
 import fixture from '../../fixtures/engineering/valid.json';
 import type {BundleReceipt,ComponentRevision,EngineeringArchive,EngineeringProject} from '../../src/shared/engineering';
 import type {EngineeringArchiveFiles} from '../../src/project/engineering-archive';
-import {componentDigest} from '../../src/project/engineering-archive';
+import {checkArchive,componentDigest} from '../../src/project/engineering-archive';
+import {readFileSync} from 'node:fs';
+import type {AssetRevision} from '../../src/shared/types';
 import {canonicalJson,hashJson,sha256Hex} from '../../src/twin/hash';
 
 const clone=<T>(v:T):T=>JSON.parse(JSON.stringify(v));
@@ -28,3 +30,20 @@ export function makeEngineeringReceipt(project:EngineeringProject):Extract<Bundl
   const projectDigest=hashJson(project);
   return {projectDigest,profile:project.requestedProfile,problems:[],state:'compiled',bundleDigest:hashJson({bundleOf:projectDigest}),assemblyDigest:hashJson({assemblyOf:projectDigest}),sceneDigest:hashJson({sceneOf:projectDigest}),runnable:false};
 }
+
+const fixtureFile=(path:string)=>JSON.parse(readFileSync(new URL(`../../fixtures/${path}`,import.meta.url),'utf8'));
+/** An archive that exercises everything a naive rebuild loses: a mesh blob, a non-JSON datasheet with its own license, an asset and a recipe. */
+export function richArchive() {
+  const a=makeEngineeringArchive(),chassis=a.manifest.components.find(c=>c.id==='amr-chassis')!,oldDigest=componentDigest(chassis);
+  const mesh=new TextEncoder().encode('solid fixture mesh'),meshDigest=sha256Hex(mesh);
+  const shape=chassis.links[0]!.visual[0]!;
+  chassis.links[0]!.visual.push({...shape,geometry:{kind:'mesh',blobSha256:meshDigest,scale:[1,1,1]}} as never);
+  for (const i of a.manifest.project.assembly.instances) if (i.componentDigest===oldDigest) i.componentDigest=componentDigest(chassis);
+  a.manifest.blobs.push({digest:meshDigest,file:`blobs/${meshDigest}`,mediaType:'model/stl',license:'CC-BY-4.0',sizeBytes:mesh.length});
+  a.files[`blobs/${meshDigest}`]=mesh;
+  a.manifest.assets=[fixtureFile('twins/restaurant-v2.json').assets[0] as AssetRevision as never];
+  a.manifest.recipes=[fixtureFile('recipes/espresso.json')];
+  if (!checkArchive(a).ok) throw new Error('richArchive fixture is not a valid archive');
+  return a;
+}
+
