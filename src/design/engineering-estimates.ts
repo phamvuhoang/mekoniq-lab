@@ -49,10 +49,11 @@ export function engineeringEstimateInputs(project:EngineeringProject,content:Eng
     drive={massKg,wheelRadiusM:driveModel.drive!.wheelRadiusM.value,drivenWheels:2,gearRatio:ratio,gearEfficiency:eff,peakMotorTorqueNm:stall/(ratio*eff)};
     // no continuous rating is stated by the model, so the calculator reports it as missing rather than assuming one
   }
-  // energy: voltage comes from the battery's power port; capacity is not a catalog field yet
-  const battery=mine.map(p=>p.component!).flatMap(c=>c.ports).find(p=>p.kind==='power'&&p.direction==='out'&&p.voltageRangeV);
-  const energy:EnergyInput|null=battery?{volts:(battery.voltageRangeV![0]+battery.voltageRangeV![1])/2}:null;
-  problems.push(miss('ENERGY_CAPACITY_UNAVAILABLE','/components','the catalog has no battery capacity (Ah); the runtime estimate stays unavailable'));
-  problems.push(miss('STABILITY_UNAVAILABLE','/components','the catalog defines no support polygon; stability needs the resolved assembly and contact points'));
+  // energy: voltage comes from the battery's supplying power port; capacity and usable fraction only from a catalog rating that names that same port
+  const supplier=mine.map(p=>p.component!).flatMap(c=>c.ports.filter(p=>p.kind==='power'&&p.direction==='out'&&p.voltageRangeV).map(port=>({component:c,port})))[0];
+  const rating=supplier&&supplier.component.battery?.portId===supplier.port.id?supplier.component.battery:undefined;
+  const energy:EnergyInput|null=supplier?{volts:(supplier.port.voltageRangeV![0]+supplier.port.voltageRangeV![1])/2,...rating?{ampHours:rating.capacityAh.value,usable:rating.usableFraction.value}:{}}:null;
+  if(!rating)problems.push(miss('ENERGY_CAPACITY_UNAVAILABLE','/components','no battery rating (capacity in Ah and usable fraction) names the supplying power port; the runtime estimate stays unavailable'));
+  problems.push(miss('STABILITY_UNAVAILABLE','/components','support points are catalog data, but world positions come from the compiled assembly; stability stays unavailable until a bundle supplies placements'));
   return {energy,drive,stability:null,problems};
 }

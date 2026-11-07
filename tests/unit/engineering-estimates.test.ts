@@ -58,3 +58,25 @@ test('without every bound component the AMR mass is unknown, so there is no driv
   expect(r.drive).toBeNull();
   expect(r.problems.map(p=>p.code)).toEqual(expect.arrayContaining(['COMPONENT_MISSING','DRIVE_MASS_INCOMPLETE']));
 });
+
+function withBattery(battery:unknown) {
+  const archive=makeEngineeringArchive(),old=archive.manifest.components.find(c=>c.id==='battery-24v')!,oldDigest=componentDigest(old);
+  const rated={...old,battery} as typeof old;
+  archive.manifest.components[archive.manifest.components.indexOf(old)]=rated;
+  for (const i of archive.manifest.project.assembly.instances) if (i.componentDigest===oldDigest) i.componentDigest=componentDigest(rated);
+  return archive;
+}
+const assumedSource={kind:'assumed',documentId:'fixture',revision:'1',locator:'x',contentSha256:'a'.repeat(64)};
+test('a catalog battery rating supplies capacity and usable fraction, and the capacity warning goes away',()=>{
+  const archive=withBattery({portId:'out',capacityAh:{value:20,unit:'Ah',source:assumedSource},usableFraction:{value:0.8,unit:'1',source:assumedSource}});
+  const r=engineeringEstimateInputs(archive.manifest.project,archive);
+  expect(r.energy).toEqual({volts:25.5,ampHours:20,usable:0.8});
+  expect(r.problems.map(p=>p.code)).not.toContain('ENERGY_CAPACITY_UNAVAILABLE');
+  expect(r.problems.map(p=>p.code)).toContain('STABILITY_UNAVAILABLE'); // placement still needs the compiled bundle
+});
+test('a battery rating on a port that is not the supplying one is not used',()=>{
+  const archive=withBattery({portId:'mount',capacityAh:{value:20,unit:'Ah',source:assumedSource},usableFraction:{value:0.8,unit:'1',source:assumedSource}});
+  const r=engineeringEstimateInputs(archive.manifest.project,archive);
+  expect(r.energy).toEqual({volts:25.5});
+  expect(r.problems.map(p=>p.code)).toContain('ENERGY_CAPACITY_UNAVAILABLE');
+});
