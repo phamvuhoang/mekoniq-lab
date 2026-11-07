@@ -35,9 +35,27 @@
     ]
   },
   "candidate": {
-    "commit": null,
-    "pin": null,
-    "status": "pending"
+    "commit": {
+      "lab": "2fd7199e91431e613c01b130b4f1fea1d9e0893e (+ uncommitted evidence docs at record time)",
+      "source": "54bf2034ff6a001ea0622af6911cebdc4353e3b6"
+    },
+    "pin": "unchanged: config/source-runtime.lock.json still f82b2057\u2026 (runtime artifact not re-exported)",
+    "status": "partial",
+    "recordedOn": "2026-11-07",
+    "commands": [
+      "pnpm test (lab): 217 passed, 1 skipped",
+      "pnpm exec playwright test ui.spec.ts: 27 passed, 12 skipped (need runtime)",
+      "pnpm exec playwright test brand-ui brand-accessibility controller-report: 14 passed",
+      "source: vitest lab-*/engineering*/contracts 64 files 550 passed, 2 skipped",
+      "source: pytest simulation+agent+hardware+contracts 354 passed, 1 skipped"
+    ],
+    "notRun": [
+      "source integration suites that need Postgres/Supabase (ECONNREFUSED 127.0.0.1:57422; Docker down)",
+      "twin-workspace, coffee-journey, twin-recovery, twin-inputs, fault-schedule, arm-simulation, offline-bv01 (mock launcher / offline bundle)",
+      "service-journey (runtime-e2e)",
+      "measure-twin-ui benchmark",
+      "record-regression / acceptance"
+    ]
   },
   "rows": [
     {
@@ -50,7 +68,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -60,7 +79,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -70,7 +90,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "pass (27 passed, 12 skipped)"
           }
         }
       ]
@@ -85,7 +106,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -95,7 +117,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -105,7 +128,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "pass (27 passed, 12 skipped)"
           }
         }
       ]
@@ -120,7 +144,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -130,7 +155,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "pass (27 passed, 12 skipped)"
           }
         },
         {
@@ -140,7 +166,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "pytest simulation"
           }
         }
       ]
@@ -155,7 +182,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -165,7 +193,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -175,7 +204,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "not_run",
+            "detail": "see candidate.notRun"
           }
         }
       ]
@@ -190,7 +220,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -200,7 +231,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -210,7 +242,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "not_run",
+            "detail": "see candidate.notRun"
           }
         },
         {
@@ -220,7 +253,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "not_run",
+            "detail": "see candidate.notRun"
           }
         }
       ]
@@ -235,7 +269,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -245,7 +280,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -255,7 +291,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "not_run",
+            "detail": "see candidate.notRun"
           }
         }
       ]
@@ -270,7 +307,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -280,7 +318,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -290,7 +329,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -300,7 +340,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "pytest simulation"
           }
         },
         {
@@ -310,7 +351,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "pass"
           }
         },
         {
@@ -320,7 +362,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "not_run",
+            "detail": "see candidate.notRun"
           }
         }
       ]
@@ -335,7 +378,8 @@
             "command": "pnpm exec vitest run (source)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -345,7 +389,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -355,7 +400,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -365,7 +411,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -375,7 +422,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "not_run",
+            "detail": "see candidate.notRun"
           }
         },
         {
@@ -385,7 +433,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "not_run",
+            "detail": "see candidate.notRun"
           }
         }
       ]
@@ -400,7 +449,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -410,7 +460,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -420,7 +471,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "source vitest run (portable)"
           }
         },
         {
@@ -430,7 +482,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -440,7 +493,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "not_run",
+            "detail": "see candidate.notRun"
           }
         }
       ]
@@ -455,7 +509,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -465,7 +520,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -475,7 +531,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -485,7 +542,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -495,7 +553,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -505,7 +564,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "pass (27 passed, 12 skipped)"
           }
         },
         {
@@ -515,7 +575,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "not_run",
+            "detail": "see candidate.notRun"
           }
         },
         {
@@ -525,7 +586,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "pass"
           }
         }
       ]
@@ -540,7 +602,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -550,7 +613,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -560,7 +624,8 @@
             "command": "pnpm test (lab vitest run)"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "lab vitest run"
           }
         },
         {
@@ -570,7 +635,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "not_run",
+            "detail": "see candidate.notRun"
           }
         }
       ]
@@ -585,7 +651,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "pass (27 passed, 12 skipped)"
           }
         },
         {
@@ -595,7 +662,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "pass"
           }
         },
         {
@@ -605,7 +673,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "pass",
+            "detail": "pass"
           }
         },
         {
@@ -615,7 +684,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "not_run",
+            "detail": "see candidate.notRun"
           }
         },
         {
@@ -625,7 +695,8 @@
             "reason": "not executed at A01 baseline; e2e/native/python/acceptance suites run in D03 preservation gate"
           },
           "candidate": {
-            "status": "pending"
+            "status": "not_run",
+            "detail": "see candidate.notRun"
           }
         }
       ]

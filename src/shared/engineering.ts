@@ -1,4 +1,4 @@
-// Synced from source packages/contracts/generated/engineering.ts @ 80e61a4184b43f93004483aa3e14ebdb05f0bbf9 (sha256 6c39b2552a8dca26c61cf52bb909c914fbdfd21d516ed8e0ce3cd195be609bdc). Run node scripts/sync-engineering-contracts.mjs; do not edit.
+// Synced from source packages/contracts/generated/engineering.ts @ 54bf2034ff6a001ea0622af6911cebdc4353e3b6 (sha256 854c9c8815e89a4a1bb94644bf3ba55c4ee409d735bdb7a6d05bf1356160f1db). Run node scripts/sync-engineering-contracts.mjs; do not edit.
 /* Generated from the engineering schemas. Run pnpm contracts:generate; do not edit. */
 import type {LabProjectV2,AssetRevision} from './types';
 export type CoffeeRecipe=Record<string,unknown>;
@@ -213,6 +213,7 @@ export interface Port {
   continuousCurrentA?: Scalar;
   protocol?: string;
   pinoutRevision?: string;
+  link?: EngineeringId;
 }
 /**
  * This interface was referenced by `EngineeringContracts`'s JSON-Schema
@@ -1767,4 +1768,97 @@ export interface CalibrationDataset {
    * @maxItems 500
    */
   trials: CalibrationTrial[];
+}
+/**
+ * This interface was referenced by `EngineeringContracts`'s JSON-Schema
+ * via the `definition` "CoverageRequirement".
+ */
+export interface CoverageRequirement {
+  id: string;
+  kind: 'joint' | 'pose' | 'contact' | 'sensor' | 'process';
+  entityId: string;
+  minSamples: number;
+  maxGapNs: number;
+}
+/**
+ * This interface was referenced by `EngineeringContracts`'s JSON-Schema
+ * via the `definition` "ThresholdCheck".
+ */
+export interface ThresholdCheck {
+  id: string;
+  kind: 'joint' | 'pose' | 'contact' | 'sensor' | 'process';
+  entityId: string;
+  value: string;
+  rule: 'max' | 'min';
+  limit: number;
+}
+/**
+ * This interface was referenced by `EngineeringContracts`'s JSON-Schema
+ * via the `definition` "CaseResult".
+ */
+export interface CaseResult {
+  id: string;
+  status: 'pass' | 'fail' | 'not_run';
+  detail?: string;
+}
+/**
+ * This interface was referenced by `EngineeringContracts`'s JSON-Schema
+ * via the `definition` "EngineeringAssessment".
+ */
+export interface EngineeringAssessment {
+  status: 'pass' | 'fail' | 'not_run';
+  reasons: string[];
+  capabilities: {
+    geometry: 'unsupported' | 'modeled' | 'verified';
+    rigidBody: 'unsupported' | 'modeled' | 'verified';
+    actuator: 'unsupported' | 'modeled' | 'verified';
+    sensor: 'unsupported' | 'modeled' | 'verified';
+    grasp: 'unsupported' | 'modeled' | 'verified';
+    process: 'unsupported' | 'modeled' | 'verified';
+    calibration: 'unsupported' | 'modeled' | 'verified';
+  };
+  caseResults: CaseResult[];
+  artifactRefs: {
+    sampleCount: number;
+    firstSimTimeNs: string | null;
+    lastSimTimeNs: string | null;
+    samplesSha256: string;
+    artifacts: string[];
+  };
+}
+/**
+ * This interface was referenced by `EngineeringContracts`'s JSON-Schema
+ * via the `definition` "EngineeringRunManifest".
+ */
+export interface EngineeringRunManifest {
+  schemaVersion: 1;
+  execution: 'not_started' | 'completed' | 'aborted';
+  runId: string;
+  bundleDigest: string;
+  expectedEpoch: number;
+  profile: 'engineering-rigid-v1' | 'engineering-contact-v1';
+  /**
+   * @maxItems 200
+   */
+  coverage: CoverageRequirement[];
+  /**
+   * @maxItems 200
+   */
+  checks: ThresholdCheck[];
+  claims: {
+    geometry: 'unsupported' | 'modeled' | 'verified';
+    rigidBody: 'unsupported' | 'modeled' | 'verified';
+    actuator: 'unsupported' | 'modeled' | 'verified';
+    sensor: 'unsupported' | 'modeled' | 'verified';
+    grasp: 'unsupported' | 'modeled' | 'verified';
+    process: 'unsupported' | 'modeled' | 'verified';
+    calibration: 'unsupported' | 'modeled' | 'verified';
+  };
+  calibrationRefs: {
+    [k: string]: string;
+  };
+  /**
+   * @maxItems 200
+   */
+  artifacts: string[];
 }
