@@ -154,6 +154,7 @@ Code W00–W11 trong source không tự trở thành scenario hoặc backend Lab
 
 ## Tài liệu
 
+- **[Đề xuất LinkForge + IR-SIM — 2026-11-08](docs/plans/2026-11-08-linkforge-irsim.md)**: nghiên cứu, spec và plan tích hợp model validation/2D navigation trên Mac. Chưa triển khai provider; không thay trạng thái R-MOCK, native hoặc hardware.
 - **[Physical Robot Lab — lắp ráp và mô phỏng vật lý](docs/specs/2026-11-06-physical-robot-lab/README.md)**: đã có contracts/catalog, resolver/compiler, bundle gateway, trang Lắp ráp, lưu/nhập/xuất archive và đánh giá bằng chứng. Runtime engineering bật bằng các cờ opt-in; compile preview không phải một lần chạy vật lý. Xem [kế hoạch triển khai](docs/plans/2026-11-06-physical-robot-lab/README.md) và [bằng chứng, giới hạn hiện tại](docs/implementation/evidence/physical-robot-lab/README.md). Linux/Gazebo/MoveIt, G1–G3 và nghiệm thu phần cứng vẫn chưa hoàn thành.
 - [Remediation Plan 01 và trạng thái các gate](docs/reviews/2026-11-05-plan-01-remediation.md).
 - [Tương thích runtime và giới hạn bằng chứng](docs/simulation-compatibility.md); [record pin/hash máy đọc](config/simulation-compatibility.json).
