@@ -2,6 +2,7 @@
 import nativeFixture from '../../fixtures/twins/native-bv01-v2.json' with {type:'json'};
 import coffeeFixture from '../../fixtures/twins/coffee-cell-v2.json' with {type:'json'};
 import restaurantFixture from '../../fixtures/twins/restaurant-v2.json' with {type:'json'};
+import serveDesign from '../../fixtures/engineering/serve-demo-v1/serve-project.json' with {type:'json'};
 import type {AssetRevision,LabProjectV2} from '../shared/types';
 import {tr} from '../i18n';
 /** Present only on an engineering preset: the exact draft that was compiled and the receipt for it. */
@@ -24,6 +25,11 @@ for(const [id,scenarioId,seed,title,summary] of [
  ['campaign','CAMPAIGN-FD02-FD07-BV01-BV03',3,()=>tr('Chiến dịch hai robot','2台ロボットの連続シナリオ','Two-robot campaign'),()=>tr('Hai AMR dùng chung hành lang, món ăn và hai recipe cà phê.','2台のAMRが通路を共有し、料理と2種のコーヒーを配送。','Two AMRs share a corridor while delivering food and two coffee recipes.')],
 ] as const)presets.push({...presets[0]!,id,scenarioId,seed,title,summary,project:structuredClone(mixedProject),names:{...presets[0]!.names,'amr-2':'AMR-2'},roles:{entities:['amr','arm','coffee_machine'],points:['kitchen','coffee_pickup','table','parking']}});
 presets.push({...presets[0]!,id:'native-bv01',mode:'simulation',backendSetId:'coffee-simulation',seed:23,project:nativeFixture.project as LabProjectV2,assets:nativeFixture.assets as AssetRevision[],title:()=>tr('BV01 native SIM','BV01 ネイティブSIM','BV01 native SIM'),summary:()=>tr('Gazebo + LinuxCNC · hình học PUMA560 SIM đã ghim · chưa xác minh phần cứng','Gazebo + LinuxCNC · 固定PUMA560 SIM形状 · 実機未検証','Gazebo + LinuxCNC · pinned PUMA560 SIM geometry · no hardware validation')});
+/** IR-SIM 2D FD01 on the Serve robot: runs only from a receipt the Assembly page compiled for exactly the open Serve design (never from this fixture copy). */
+export const IRSIM_SET='engineering-irsim-2d-v1',IRSIM_PROFILE='engineering-irsim-2d-v1';
+presets.push({id:'irsim-fd01',mode:'simulation',scenarioId:'IR-FD01',scenarioRevision:1,backendSetId:IRSIM_SET,seed:5,project:structuredClone(serveDesign.runtimeProject) as LabProjectV2,assets:[],names:{'amr-1':'Serve-1'},roles:{entities:['amr'],points:['kitchen','table','parking']},
+ engineering:{project:structuredClone(serveDesign) as unknown as import('../shared/engineering').EngineeringProject,receipt:null},
+ title:()=>tr('IR-SIM 2D · giao món FD01','IR-SIM 2D · FD01配膳','IR-SIM 2D · FD01 delivery'),summary:()=>tr('Robot Serve · nhà hàng 10 bàn · mô phỏng 2D di động, không phải Gazebo hay phần cứng','Serveロボット · 10卓レストラン · ポータブル2D、Gazebo・実機ではない','Serve robot · 10-table restaurant · portable 2D, not Gazebo or hardware')});
 export const presetById=(id:string)=>presets.find(p=>p.id===id);
 /** Display name of an entity, point, cup or job; unknown ids are shown as-is, never invented. */
 export function nameOf(preset:TwinPreset|undefined,id:string):string {

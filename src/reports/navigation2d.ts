@@ -1,0 +1,69 @@
+// IR-SIM 2D navigation evidence (navigation-run-evidence-v1) of a run report, as the Lab may show it. The document is validated against the synced source
+// schema; anything unknown is unsupported, and "complete" needs every signal to agree (server completeness, end record, gaps, listing, sensor publications).
+// Imported folders are a trust boundary: every listed chunk that is present must match its size and SHA-256 (else refused); one that is absent makes the
+// imported copy incomplete. The Lab never reads chunk contents to upgrade a verdict.
+import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
+import componentSchema from '../shared/engineering-schemas/engineering-component.schema.json' with {type:'json'};
+import physicalSchema from '../shared/engineering-schemas/robot-physical-model-v1.schema.json' with {type:'json'};
+import evidenceSchema from '../shared/engineering-schemas/navigation-run-evidence-v1.schema.json' with {type:'json'};
+import type {NavigationRunEvidenceV1} from '../shared/navigation2d';
+import type {RunReport} from '../scenarios/controls';
+import type {LabProjectV2} from '../shared/types';
+import {validReportShape} from './report-shape';
+import {MAX_EVIDENCE_BYTES,safeArtifactPath} from './verification';
+import {validateProjectV2} from '../project/schema';
+import {hashJson} from '../twin/hash';
+const ajv=new Ajv({strict:false,allErrors:true});addFormats(ajv);
+ajv.addSchema(componentSchema,'engineering-component.schema.json');ajv.addSchema(physicalSchema,'robot-physical-model-v1.schema.json');
+const validEvidence=ajv.compile<NavigationRunEvidenceV1>(evidenceSchema);
+export interface NavigationEvidenceView {supported:boolean;provider:string|null;complete:boolean;reasons:string[]}
+const STREAMS=['trajectory','sensors','control','collisions'] as const;
+/** The evidence document, or null when absent or not a navigation-run-evidence-v1 the Lab knows (closed schema, provider irsim_2d, safe chunk names). */
+export function navigationEvidence(report:RunReport):NavigationRunEvidenceV1|null{
+ const n=report.navigation2d;
+ return validEvidence(n)&&n.engine.id==='irsim_2d'&&STREAMS.every(s=>n.artifacts[s].every(a=>safeArtifactPath(a.path)&&!a.path.includes('/')))?n:null;
+}
+const contiguous=(chunks:{firstTick:number;lastTick:number}[],from:number,to:number)=>{let next=from;for(const c of [...chunks].sort((a,b)=>a.firstTick-b.firstTick)){if(c.firstTick!==next||c.lastTick<c.firstTick)return false;next=c.lastTick+1;}return next===to+1;};
+export function navigationEvidenceView(report:RunReport):NavigationEvidenceView{
+ if(report.navigation2d===undefined)return {supported:false,provider:null,complete:false,reasons:['NAVIGATION_EVIDENCE_ABSENT']};
+ const n=navigationEvidence(report);
+ if(!n)return {supported:false,provider:null,complete:false,reasons:['NAVIGATION_EVIDENCE_SCHEMA_UNKNOWN']};
+ const reasons:string[]=[],h=n.clock.tickHorizon;
+ if(!n.completeness)reasons.push('COMPLETENESS_UNKNOWN');else if(n.completeness.status!=='complete')reasons.push(...n.completeness.reasons.length?n.completeness.reasons:['EVIDENCE_INCOMPLETE']);
+ if(!n.recording)reasons.push('EVIDENCE_END_UNKNOWN');else if(n.recording.lastTick!==h||n.recording.terminal!==null)reasons.push(n.recording.terminal?`EVIDENCE_TERMINAL:${n.recording.terminal}`:'EVIDENCE_END_MISMATCH');
+ for(const g of [...n.recordingGaps,...n.recording?.gaps??[]])reasons.push(`RECORDING_GAP:${g.reason}`);
+ if(!contiguous(n.artifacts.trajectory,0,h))reasons.push('TRAJECTORY_LISTING_GAP');
+ if(h>0&&!contiguous(n.artifacts.control,0,h-1))reasons.push('CONTROL_LISTING_GAP');
+ const pubs=report.metrics.navigation?.sensorPublications;
+ if(!pubs)reasons.push('SENSOR_PUBLICATIONS_UNKNOWN');else if(!pubs.complete||pubs.recorded!==pubs.expected)reasons.push('SENSOR_PUBLICATIONS_INCOMPLETE');
+ else if(pubs.expected>0&&!n.artifacts.sensors.length)reasons.push('SENSOR_LISTING_EMPTY');
+ return {supported:true,provider:n.engine.id,complete:reasons.length===0,reasons:[...new Set(reasons)]};
+}
+/** Expected/actual per assertion as the evidence states it; an unknown document has none (never a pass). */
+export const navigationRows=(report:RunReport)=>navigationEvidence(report)?.assertions.map(a=>({id:a.id,result:a.result,detail:a.detail}))??[];
+const hex=async(f:File)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await f.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join('');
+/** Read-only import of an IR-SIM evidence folder: report.json, project.json and the chunk files its navigation2d listing names (flat, by name). */
+export async function importNavigationEvidence(files:readonly File[]):Promise<{origin:'imported';report:RunReport;project:LabProjectV2}>{
+ if(!files.length||files.length>10000||files.reduce((n,f)=>n+f.size,0)>MAX_EVIDENCE_BYTES)throw new Error('EVIDENCE_SIZE_LIMIT');
+ const entries=new Map<string,File>();
+ for(const f of files){const path=f.webkitRelativePath?f.webkitRelativePath.split('/').slice(1).join('/'):f.name;if(!safeArtifactPath(path)||entries.has(path))throw new Error('ARTIFACT_PATH_INVALID');entries.set(path,f);}
+ const reportFile=entries.get('report.json');if(!reportFile)throw new Error('REPORT_MISSING');
+ const value:unknown=JSON.parse(await reportFile.text());
+ if(!validReportShape(value))throw new Error('REPORT_INVALID');
+ const report=structuredClone(value as RunReport),n=navigationEvidence(report);
+ if(!n)throw new Error('NAVIGATION_EVIDENCE_SCHEMA_UNKNOWN');
+ const missing:string[]=[];
+ for(const s of STREAMS)for(const a of n.artifacts[s]){
+  const file=entries.get(a.path)??entries.get(`evidence/${a.path}`);
+  if(!file){missing.push(a.path);continue;}
+  if(file.size!==a.bytes||await hex(file)!==a.sha256)throw new Error('ARTIFACT_HASH_MISMATCH');
+ }
+ const projectFile=entries.get('project.json');if(!projectFile)throw new Error('PROJECT_MISSING');
+ const project=validateProjectV2(JSON.parse(await projectFile.text()));
+ if(hashJson(project)!==report.manifest.project.hash)throw new Error('PROJECT_HASH_MISMATCH');
+ if(hashJson(project.world)!==report.manifest.world.hash)throw new Error('WORLD_HASH_MISMATCH');
+ // a downgrade only: chunks this folder does not carry make the imported copy incomplete, with the names
+ if(missing.length)n.completeness={status:'incomplete',reasons:[...n.completeness?.reasons??[],...missing.map(p=>`EVIDENCE_CHUNK_MISSING:${p}`)].slice(0,50)};
+ return {origin:'imported',report,project};
+}

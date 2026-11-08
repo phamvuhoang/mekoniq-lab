@@ -6,13 +6,17 @@ import type {RunVerification} from '../reports/contracts/verification-types';
 import type {LabProjectV2} from '../shared/types';
 import type {TwinSample} from '../twin/store';
 import type {BundleReceipt,EngineeringAssessment,EngineeringProject,EngineeringRef} from '../shared/engineering';
+import type {ModelValidationReportV1} from '../shared/navigation2d';
+import {validModelValidationReport} from './model-validation';
 export interface TwinHealth {scenarioRequirements?:Record<string,{mock:string[];simulation:string[]}>;
  /** Server-advertised optional features, e.g. engineering_bundle_v1. Absent on runtimes that predate engineering. */
  capabilities?:string[];
  /** scenarioId -> backendSetId -> what that pairing needs; engineering clients must read this instead of scenarioRequirements. */
  scenarioRequirementsByBackendSet?:Record<string,Record<string,{supported:boolean;required:string[];reasonCodes:string[]}>>;protocolMajors:number[];sourceCommit:string;schemaHash:string;scenarioIds:string[];
  backends:{id:string;modes:string[];installed:boolean;compatible:boolean;reachable:boolean;commissioned:boolean;enabled:boolean;reason?:string}[];
- backendSets:{id:string;mode:string;access:string;backends:string[]}[];features?:{polling?:boolean;sse?:boolean;readiness?:boolean};}
+ /** `execution` is the set's optional clock metadata (portable IR-SIM: source_fixed_step); legacy sets omit it and keep their behaviour. It never grants anything by itself. */
+ backendSets:{id:string;mode:string;access:string;backends:string[];execution?:BackendExecution}[];features?:{polling?:boolean;sse?:boolean;readiness?:boolean};}
+export interface BackendExecution {host:'portable_python'|'linux_native';clock:'source_fixed_step'|'native';manualStep:boolean;speedMultipliers:number[]}
 export interface ReadinessSnapshot {checkedAt:string;expiresAt:string;scenarioId:string;backendSetId:string;checks:{id:string;status:'ready'|'blocked'|'unknown';reasonCodes:string[];evidenceRef:string|null}[];canStart:boolean}
 export interface RunSnapshotV2 {schemaVersion:2;id:string;mode:'mock'|'simulation'|'hardware';access:string;backendSetId:string;backends:string[];
  status:'ready'|'running'|'paused'|'awaiting_confirmation'|'needs_attention'|'completed'|'cancelled'|'failed';runRevision:number;eventCursor:string|null;telemetryCursor:string|null;
@@ -42,7 +46,11 @@ export interface ArmStopView {latched:boolean;reconcileRequired:boolean;reason:s
 export interface RunReport {verification?:RunVerification;/** Present only on engineering runs; older reports have neither field. */engineeringEvidence?:EngineeringAssessment;manifest:{engineering?:{bundleDigest:string;projectDigest:string};armCollisionScene?:{hash:string;profile:LabProjectV2['armCollisionProfile']|null;profileHash:string|null;world:LabProjectV2['world'];worldHash:string;robotGeometry:{id:string;radiusM:number|null}[]};hashAlgorithm?:string;designHash?:string;models?:{id:string;revision:string|number;hash:string;provenance:string}[];recipes?:{id:string;revision:number;hash:string}[];profiles?:{id:string;revision:number;hash:string;provenance:string}[];adapterHash?:string;calibration?:{status:string;revision:string|number|null;hash:string|null;reason?:string};runId:string;sourceCommit:string;mode:string;access:string;backendSetId:string;backends:{id:string;version:string;model:string;dynamics:boolean}[];clock:{tickMs:number;native?:{provider:'gazebo_nav2';originNs:string;businessEpochMs:number}};seed:number;
   scenario:{id:string;revision:number;hash:string};project:{id:string;revision:number;hash:string};world:{id:string;revision:number;hash:string};assets:{id:string;revision:number;contentHash:string;resolved:boolean}[]};
  outcome:{status:string;served:string;tick:number;simTimeNs:string};
- metrics:{maxConcurrentMovers?:number;distanceM:Record<string,number>;collision:{available:boolean;reason?:string;contacts:number|null;minSeparationM:number|null}};
+ metrics:{maxConcurrentMovers?:number;distanceM:Record<string,number>;collision:{available:boolean;reason?:string;contacts:number|null;minSeparationM:number|null};
+  /** IR-SIM only: plant metrics the runtime recomputed from its durable evidence. */
+  navigation?:{coverage?:string;horizon?:number|null;collisionEpisodes?:number|null;safetyEnvelopeEpisodes?:number|null;minClearanceM?:number|null;minSeparationM?:number|null;sensorPublications?:{expected:number;recorded:number;complete:boolean};reasons?:string[]}};
+ /** IR-SIM only (navigation-run-evidence-v1); read through reports/navigation2d, never trusted raw. */
+ navigation2d?:import('../shared/navigation2d').NavigationRunEvidenceV1;
  /** Durable: read back from the source journal, each with its journal sequence. */
  businessEvents:{sequence:string;at:string;type:string;kind:string;id:string;state?:Record<string,unknown>}[];faults:{tick:number;faultId:string;entityId:string|null}[];
  effects:{id:string;type:string;status:string;attempts:number;payload:Record<string,unknown>}[];attention?:Attention[];
@@ -85,6 +93,9 @@ export interface TwinRuntime {
  /** Read access to a bundle this session compiled (or reclaimed): its manifest and content-addressed blobs. */
  engineeringManifest?(bundleDigest:string):Promise<EngineeringManifest>;
  engineeringBlob?(sha256:string):Promise<Uint8Array>;
+ /** LinkForge shadow validation of one robot of a bundle this session owns (POST /engineering/validate), and a report read back by digest. */
+ validateEngineeringModel?(ref:EngineeringRef,robotId:string):Promise<ModelValidationReportV1>;
+ readModelValidation?(reportDigest:string):Promise<ModelValidationReportV1>;
  health():Promise<TwinHealth>;pair(token:string):Promise<void>;readonly paired:boolean;
  /** Drop the in-memory CSRF token after the runtime lost the session (restart): the pair form shows again. */
  forget():void;
@@ -111,6 +122,14 @@ export function httpTwinRuntime(base='/lab/v2'):TwinRuntime {
   get paired(){return !!csrf;},forget(){csrf='';},
   health:()=>request<TwinHealth>('/health'),
   compileEngineering:project=>request<BundleReceipt>('/engineering/compile',{project}),
+  async validateEngineeringModel(engineeringRef,robotId){const r=await request<{report?:unknown}>('/engineering/validate',{engineeringRef,robotId});if(!validModelValidationReport(r.report))throw new TwinRuntimeError('MODEL_VALIDATION_SCHEMA_UNKNOWN',[],502);return r.report;},
+  async readModelValidation(digest){
+   if(!/^[0-9a-f]{64}$/.test(digest))throw new TwinRuntimeError('INVALID_REPORT_DIGEST',[],0);
+   const r=await request<unknown>(`/engineering/validations/${digest}`);
+   if(!validModelValidationReport(r))throw new TwinRuntimeError('MODEL_VALIDATION_SCHEMA_UNKNOWN',[],502);
+   if(r.reportDigest!==digest)throw new TwinRuntimeError('MODEL_VALIDATION_DIGEST_MISMATCH',[],502);
+   return r;
+  },
   engineeringManifest:digest=>request<EngineeringManifest>(`/engineering/bundles/${encodeURIComponent(digest)}/manifest`),
   async engineeringBlob(sha256){
    const response=await fetch(`${base}/engineering/blobs/${encodeURIComponent(sha256)}`,{credentials:'same-origin',cache:'no-store'});
@@ -131,4 +150,14 @@ export function httpTwinRuntime(base='/lab/v2'):TwinRuntime {
   get:id=>request<RunView>(run(id)),
   report:id=>request<RunReport>(`${run(id)}/report`),
  };
+}
+/** What the run controls may offer, from the set's execution metadata in health. Mock: Lab step/auto-run. Simulation with a source fixed-step clock:
+ * step and pacing at the set's multipliers (no step while paused unless manualStep). Native or unknown simulation: the engine owns time, no Lab step. */
+export interface ClockControls {clock:'mock'|'source_fixed_step'|'native';step:boolean;play:boolean;speeds:number[]}
+export function clockControls(view:RunView,health:TwinHealth|null):ClockControls{
+ const live=['running','awaiting_confirmation'].includes(view.run.status),paused=view.run.status==='paused';
+ if(view.run.mode==='mock')return {clock:'mock',step:live,play:live,speeds:[1,4,16,64]};
+ const e=health?.backendSets.find(s=>s.id===view.run.backendSetId)?.execution;
+ if(view.run.mode!=='simulation'||e?.clock!=='source_fixed_step')return {clock:'native',step:false,play:false,speeds:[]};
+ return {clock:'source_fixed_step',step:live||paused&&e.manualStep,play:live,speeds:e.speedMultipliers.filter(n=>[1,4,16,64].includes(n))};
 }

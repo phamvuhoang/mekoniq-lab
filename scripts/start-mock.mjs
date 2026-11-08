@@ -10,7 +10,7 @@ import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {checkedRuntime} from './runtime-artifact.mjs';
 export const MOCK_BACKENDS=['mock_amr','mock_coffee','mock_arm'];
-const FORBIDDEN_PORTS=[1880,1884];// operational Node-RED/MQTT on live robots
+export const FORBIDDEN_PORTS=[1880,1884];// operational Node-RED/MQTT on live robots
 const lab=fileURLToPath(new URL('../',import.meta.url));
 export function assertNode(version=process.versions.node){if(Number(version.split('.')[0])!==24)throw new Error(`UNSUPPORTED_NODE:${version}. Use Node.js 24 (see .node-version), then run pnpm lab:mock.`);}
 export function assertPlatform(platform=process.platform){if(!['darwin','linux'].includes(platform))throw new Error(`UNSUPPORTED_OS:${platform}. The mock launcher supports macOS and Linux (Linux not yet verified on a fresh host).`);}
@@ -37,14 +37,18 @@ const waitFor=(child,name,until,ms)=>new Promise((ok,fail)=>{
  child.once('exit',onExit);
  const i=setInterval(async()=>{try{const v=await until();if(v!==undefined){clearTimeout(t);clearInterval(i);child.off('exit',onExit);ok(v);}}catch{/* not yet */}},100);
 });
-async function main(){
+/**
+ * One launcher loop for the mock and the IR-SIM launchers: checks, then the pinned runtime and the UI as the only processes it owns, stopped on Ctrl-C.
+ * `prepare` runs after the runtime pin is verified and before anything is spawned; it returns extra runtime argv/env (IR-SIM: the verified tool paths).
+ */
+export async function launch({argv=process.argv.slice(2),prepare=async()=>({args:[],env:{}}),check=checkHealth,banner}={}){
  const started=performance.now(),owned=[];
  let stopping;
  const stop=()=>stopping??=Promise.all(owned.filter(c=>c.exitCode===null&&c.signalCode===null).map(c=>new Promise(r=>{const k=setTimeout(()=>c.kill('SIGKILL'),5000);c.once('exit',()=>{clearTimeout(k);r();});c.kill('SIGTERM');})));
  for(const s of ['SIGINT','SIGTERM'])process.on(s,()=>{if(stopping)return;console.log('\nStopping the runtime and UI this launcher started…');void stop().then(()=>process.exit(0));});
  try{
   assertNode();assertPlatform();
-  const o=options(process.argv.slice(2));
+  const o=options(argv);
   assertPort(o.uiPort);assertPort(o.runtimePort);if(o.uiPort===o.runtimePort)throw new Error('INVALID_PORT:ui and runtime ports must differ');
   let runtime;
   try{runtime=await checkedRuntime(o.root);}catch(e){throw new Error(`${e.code==='ENOENT'?'RUNTIME_NOT_INSTALLED':e.message}. ${PREVIEW}`);}
@@ -52,17 +56,18 @@ async function main(){
   if(!(lock.protocolMajors??[lock.protocolMajor]).includes(2))throw new Error(`RUNTIME_PROTOCOL_V2_REQUIRED: pinned artifact offers protocol ${lock.protocolMajor} only. ${PREVIEW}`);
   const vite=join(lab,'node_modules/vite/bin/vite.js');
   await access(vite).catch(()=>{throw new Error('DEPENDENCIES_NOT_INSTALLED: run pnpm install --frozen-lockfile once (the launcher never downloads).');});
+  const extra=await prepare(o,lock);
   await portFree(o.runtimePort);await portFree(o.uiPort);
-  const rt=spawn(process.execPath,[file,'--port',String(o.runtimePort),'--data-dir',o.dataDir],{cwd:o.root,stdio:['ignore','pipe','inherit'],env:process.env});owned.push(rt);
+  const rt=spawn(process.execPath,[file,'--port',String(o.runtimePort),'--data-dir',o.dataDir,...extra.args],{cwd:o.root,stdio:['ignore','pipe','inherit'],env:{...process.env,...extra.env}});owned.push(rt);
   let out='';rt.stdout.on('data',c=>{out+=c;});
-  const token=await waitFor(rt,'RUNTIME',()=>/Pairing token \(expires in 5 minutes; one use\): (\S+)/.exec(out)?.[1],15000);
+  const token=await waitFor(rt,'RUNTIME',()=>/Pairing token \(expires in 5 minutes; one use\): (\S+)/.exec(out)?.[1],extra.readyMs??15000);
   const health=await (await fetch(`http://127.0.0.1:${o.runtimePort}/lab/v2/health`)).json();
-  checkHealth(health,lock);
+  check(health,lock);
   const ui=spawn(process.execPath,[vite,'--host','127.0.0.1','--port',String(o.uiPort),'--strictPort'],{cwd:lab,stdio:['ignore','ignore','inherit'],env:{...process.env,LAB_RUNTIME_PORT:String(o.runtimePort)}});owned.push(ui);
   await waitFor(ui,'UI',async()=>(await fetch(`http://127.0.0.1:${o.uiPort}/`)).ok||undefined,30000);
-  console.log(`Mekoniq Robot Lab — mock twin (simulated; no robot hardware)
+  console.log(`${banner??'Mekoniq Robot Lab — mock twin (simulated; no robot hardware)'}
 Source ${lock.sourceCommit} · artifact ${lock.artifactSha256.slice(0,12)} · protocol ${health.protocolMajors.join('/')}
-Backends: ${MOCK_BACKENDS.join(', ')} · journal ${o.dataDir}
+Backends: ${extra.backends??MOCK_BACKENDS.join(', ')} · journal ${o.dataDir}
 Owned processes: runtime pid ${rt.pid}, UI pid ${ui.pid}
 Open http://127.0.0.1:${o.uiPort} and enter this one-use pairing code (expires in 5 minutes): ${token}
 Ready in ${Math.round(performance.now()-started)} ms. Press Ctrl-C to stop.`);
@@ -71,4 +76,5 @@ Ready in ${Math.round(performance.now()-started)} ms. Press Ctrl-C to stop.`);
   if(!stopping){console.error(`A launcher process exited unexpectedly (${code}); stopping the other one.`);await stop();process.exitCode=1;}
  }catch(e){console.error(e.message);await stop();process.exitCode=1;}
 }
+const main=()=>launch();
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await main();

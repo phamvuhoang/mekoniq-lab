@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {sceneEntities,type TwinFrame,type ViewState} from '../twin/scene';
 import {amrFootprint,assetOf} from '../twin/amr';
+import {footprintInMap} from '../twin/lidar';
 export interface Twin3d {canvas:HTMLCanvasElement;/** Move into a re-rendered stage and size from it. */attach(host:HTMLElement):void;update(f:TwinFrame,vs:ViewState):void;dispose():void}
 const LIME=0xb4f375,NAVY=0x182a33;
 export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:()=>void):Twin3d|null {
@@ -37,6 +38,7 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
    const floor=new THREE.Mesh(new THREE.PlaneGeometry(w.width,w.height),mat(0x101e25));floor.rotation.x=-Math.PI/2;floor.position.copy(at(w.width/2,w.height/2));dynamic.add(floor);
    const grid=new THREE.GridHelper(Math.max(w.width,w.height),Math.max(w.width,w.height),0x4a626a,0x2c424b);grid.position.copy(at(Math.max(w.width,w.height)/2,Math.max(w.width,w.height)/2,0.001));dynamic.add(grid);
    for(const o of w.obstacles){const m=new THREE.Mesh(new THREE.BoxGeometry(o.width,0.9,o.height),mat(0x29414b));m.position.copy(at(o.x+o.width/2,o.y+o.height/2,0.45));dynamic.add(m);}
+   for(const o of f.navigation?.world.obstacles??[])dynamic.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(o.verticesM.map(v=>at(v[0]!,v[1]!,0.04))),new THREE.LineBasicMaterial({color:0xf0b45a})));
    // Tables are schematic context, not collision geometry; runtime obstacles and footprint overlays remain the model.
    for(const p of w.points.filter(p=>p.kind==='table')){const table=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,0.08,20),mat(0x43585d));table.position.copy(at(p.x,p.y,0.72));dynamic.add(table);}
    for(const e of sceneEntities(f)){
@@ -49,7 +51,8 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
    }
    for(const r of f.view?.entities??[]){
     if(vs.layers.path&&r.path.length){dynamic.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([[r.pose.x,r.pose.y],...r.path].map(([x,y])=>at(x!,y!,0.02))),new THREE.LineDashedMaterial({color:LIME,dashSize:0.08,gapSize:0.06})).computeLineDistances());}
-    const poly=vs.layers.footprint?amrFootprint(assetOf(f.preset.project,f.preset.assets,r.id),r.pose):null;
+    // IR-SIM runs: the compiled footprint on the drive frame (T_map_base x T_base_drive); other runs: the Lab asset footprint
+    const model=f.navigation?.robots.find(x=>x.robotId===r.id)?.model,poly=vs.layers.footprint?model?footprintInMap(model,r.pose):f.navigation?null:amrFootprint(assetOf(f.preset.project,f.preset.assets,r.id),r.pose):null;
     if(poly)dynamic.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(poly.map(([x,y])=>at(x,y,0.03))),new THREE.LineBasicMaterial({color:0x9dccff})));
     if(vs.layers.frames){const ax=new THREE.AxesHelper(0.4);ax.position.copy(at(r.pose.x,r.pose.y,0.5));ax.rotation.y=r.pose.yawRad;dynamic.add(ax);}
    }

@@ -30,6 +30,7 @@ export function openReplay(value:unknown) {
 import type {RunReport as RunReportV2} from '../scenarios/controls';
 import {validVerification,safeArtifactPath} from './verification';
 import {compareRuns,reportKpis} from './compare';
+import {navigationEvidence,navigationEvidenceView,navigationRows} from './navigation2d';
 import {esc} from '../ui/icons';
 export function summarizeReportV2(r:RunReportV2){
  const t=r.telemetry;
@@ -54,7 +55,8 @@ export function reportCsv(report:RunReportV2){
  const rows=[['stream','sequence_or_seq','time','tick','entity_or_kind','id','type','quality','detail','raw_sim_time_ns'],
   ...r.businessEvents.map(e=>['business',e.sequence,e.at,eventTick(e.at),e.kind,e.id,e.type,'',e.state??{},'']),
   ...(r.telemetry?.samples??[]).map(s=>['telemetry',s.seq,s.observedAt,Number.isFinite(sampleTick(s))?sampleTick(s):'',s.entityId,`${s.providerId}/${s.bootId}`,'TwinSample',s.quality,{simTimeNs:s.simTimeNs,providerId:s.providerId,observed:s.observed,commanded:s.commanded,reasonCodes:s.reasonCodes},s.simTimeNs]),
-  ...reportKpis(r).map(k=>['kpi','','','',k.unit,k.id,k.definition,k.available?'available':'unavailable',k.available?k.value:k.reason,''])];
+  ...reportKpis(r).map(k=>['kpi','','','',k.unit,k.id,k.definition,k.available?'available':'unavailable',k.available?k.value:k.reason,'']),
+  ...navigationRows(r).map(a=>['navigation_assertion','','','','irsim_2d',a.id,a.detail,a.result,'',''])];
  return rows.map(x=>x.map(cell).join(',')).join('\n')+'\n';
 }
 /** Self-contained static HTML: no script, no external resource; every runtime string escaped. */
@@ -71,6 +73,7 @@ export function reportHtml(report:RunReportV2,o:{compareWith?:RunReportV2;title?
 <p class="note">Evidence: ${esc(m.mode)} / ${esc(m.access)}. Workflow outcome and assertions are separate; this static export cannot run or resend anything.</p>
 <h2>Source manifest</h2>${table(['Field','Value'],[['runId',m.runId],['sourceCommit',m.sourceCommit],['backendSetId',m.backendSetId],['backends',m.backends.map(x=>`${x.id}@${x.version} ${x.model}${x.dynamics?' dynamics':''}`).join(', ')],['clock',`${m.clock.tickMs} ms tick`],['scenario',`${m.scenario.id} r${m.scenario.revision} ${m.scenario.hash}`],['project',`${m.project.id} r${m.project.revision} ${m.project.hash}`],['world',`${m.world.id} r${m.world.revision} ${m.world.hash}`],['assets',m.assets.map(a=>`${a.id} r${a.revision} ${a.resolved?'resolved':'unresolved'}`).join(', ')||'—']])}
 ${verification}
+${r.navigation2d!==undefined?(()=>{const v=navigationEvidenceView(r),n=navigationEvidence(r);return `<h2>Navigation evidence (IR-SIM 2D)</h2><p>${esc(v.supported?`${v.provider} · ${v.complete?'complete':'incomplete'}`:'unavailable')}${v.reasons.length?`: ${esc(v.reasons.join(', '))}`:''}</p>${n?table(['Assertion','Result','Detail'],navigationRows(r).map(a=>[a.id,a.result,a.detail]))+table(['Digest','Value'],[['trajectory',n.digests.trajectoryDigest],['sensor',n.digests.sensorDigest],['assertion',n.digests.assertionDigest]]):''}<p class="note">Planar kinematic 2D simulation; not Gazebo, native or hardware evidence.</p>`;})():''}
 <h2>Seeds</h2>${table(['Run','Seed'],[[m.runId,m.seed],...b?[[b.manifest.runId,b.manifest.seed]]:[]])}
 <h2>Sample counts</h2>${table(['Stream','Entity','Count'],[['business events (durable)','all',r.businessEvents.length],...Object.entries(t?.sampleCounts??{}).map(([k,v])=>['telemetry (lossy)',k,v])])}
 <h2>KPIs</h2>${table(['KPI','Value','Unit','Population','Definition'],reportKpis(r).map(k=>[k.id,k.available?k.value:`unavailable (${k.reason})`,k.unit,`1 run, ${k.samples} samples`,k.definition]))}

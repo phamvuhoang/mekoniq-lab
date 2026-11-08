@@ -1,6 +1,6 @@
 // Preflight before a run: every item is pass/fail with a reason (text, not color) and, when it is about the project, the affected entity.
 // It only explains; the runtime re-checks everything on create and is the authority.
-import type {TwinHealth,ReadinessSnapshot} from './controls';
+import {engineeringRefFor,TwinRuntimeError,type TwinHealth,type ReadinessSnapshot} from './controls';
 import type {TwinPreset} from './catalog';
 import {tr} from '../i18n';
 export interface Check {id:string;ok:boolean;label:string;detail:string;entityId?:string}
@@ -15,6 +15,10 @@ export function preflight(p:TwinPreset,health:TwinHealth|null,paired:boolean,sna
   {id:'backend',ok:!!set&&set.mode===(p.mode??'mock')&&!off.length,label:`${tr('Bộ backend','バックエンドセット','Backend set')} ${p.backendSetId}`,detail:!health?'—':!set?tr('Runtime không có bộ này','このセットなし','Set not offered by this runtime'):off.length?`${tr('Chưa bật','無効','Not enabled')}: ${off.map(b=>`${b}${health.backends.find(x=>x.id===b)?.reason?` (${health.backends.find(x=>x.id===b)!.reason})`:''}`).join(', ')}`:`${set.mode} · ${set.backends.join(', ')}`},
   {id:'scenario',ok:!!health?.scenarioIds.includes(p.scenarioId),label:`${tr('Kịch bản','シナリオ','Scenario')} ${p.scenarioId}`,detail:!health?'—':health.scenarioIds.includes(p.scenarioId)?`r${p.scenarioRevision}`:tr('Runtime không có kịch bản này','このシナリオなし','Scenario not offered by this runtime')},
  ];
+ if(p.engineering){let ok=false,detail:string;
+  try{const ref=engineeringRefFor(p.engineering.project,p.engineering.receipt);ok=true;detail=`bundle ${ref.bundleDigest.slice(0,12)} · ${p.engineering.project.requestedProfile}`;}
+  catch(e){detail=`${e instanceof TwinRuntimeError?e.code:String(e)} · ${tr('Mở và compile thiết kế trên trang Lắp ráp','組立ページで設計を開いてコンパイル','Open and compile the design on the Assembly page')}`;}
+  checks.push({id:'engineering',ok,label:tr('Bundle kỹ thuật cho đúng bản nháp','この下書きのコンパイル済みバンドル','Compiled bundle for this exact draft'),detail});}
  for(const kind of p.roles.entities){const e=p.project.entities.find(x=>x.kind===kind);checks.push({id:`entity-${kind}`,ok:!!e,label:`${tr('Thực thể','エンティティ','Entity')} ${kind}`,detail:e?e.id:tr('Thiếu trong dự án','プロジェクトに不足','Missing from the project'),...e?{entityId:e.id}:{}});}
  for(const kind of p.roles.points){const q=p.project.world.points.find(x=>x.kind===kind);checks.push({id:`point-${kind}`,ok:!!q,label:`${tr('Điểm','地点','Point')} ${kind}`,detail:q?`${q.name} (${q.x}, ${q.y}) m`:tr('Thiếu trong mặt bằng','レイアウトに不足','Missing from the layout')});}
  if(health?.features?.readiness){

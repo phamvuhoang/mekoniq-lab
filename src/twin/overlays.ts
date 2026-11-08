@@ -1,10 +1,15 @@
 // Layer toggles and legend. Each overlay states its provenance; status is always text or pattern, never color alone.
 import {tr} from '../i18n';
-export type Layer='footprint'|'path'|'contacts'|'frames';
+/** footprint = physical footprint, path = planned path, contacts = collision; safety/observed/scan exist for IR-SIM 2D runs (compiled navigation scene). */
+export type Layer='footprint'|'safety'|'path'|'observed'|'scan'|'contacts'|'frames';
 export type Layers=Record<Layer,boolean>;
-export const LAYERS:Layer[]=['footprint','path','contacts','frames'];
-export const defaultLayers=():Layers=>({footprint:true,path:true,contacts:false,frames:false});
-export const layerLabel=(l:Layer)=>({footprint:tr('Vùng chiếm chỗ','フットプリント','Footprint'),path:tr('Đường đi','経路','Path'),contacts:tr('Tiếp xúc','接触','Contacts'),frames:tr('Khung tọa độ','座標系','Frames')})[l];
+export const LAYERS:Layer[]=['footprint','safety','path','observed','scan','contacts','frames'];
+export const defaultLayers=():Layers=>({footprint:true,safety:false,path:true,observed:false,scan:false,contacts:false,frames:false});
+export const layerLabel=(l:Layer)=>({footprint:tr('Vùng chiếm chỗ','フットプリント','Footprint'),safety:tr('Vùng an toàn','安全エンベロープ','Safety envelope'),path:tr('Đường đi','経路','Path'),observed:tr('Đường đã đi','走行軌跡','Observed path'),scan:'LiDAR',contacts:tr('Tiếp xúc','接触','Contacts'),frames:tr('Khung tọa độ','座標系','Frames')})[l];
+/** Where an IR-SIM layer's data comes from, with units; shown beside the layer, never implied by color. */
+export const layerProvenance=(l:Layer)=>({footprint:tr('compiled · khung drive → base · m','コンパイル済み · drive→base座標 · m','compiled · drive → base frame · m'),safety:tr('chính sách mô hình (biên an toàn) · không phải chứng nhận phanh · m','モデル方針(安全余裕)· 制動証明ではない · m','model policy (safety margin) · not a braking certificate · m'),
+ path:tr('runtime không gửi đường kế hoạch cho trình duyệt','計画経路はブラウザに送られません','planned path is not sent to the browser by this runtime'),observed:tr('telemetry IR-SIM (mất mẫu được, không nối qua khoảng trống) · m','IR-SIMテレメトリ(欠落あり、欠落は結ばない)· m','IR-SIM telemetry (lossy, never joined across gaps) · m'),
+ scan:tr('LiDAR tại pose của đúng tick mẫu · m','サンプルtickの姿勢でのLiDAR · m','LiDAR at the pose of its own sample tick · m'),contacts:tr('từ evidence bền của runtime','ランタイムの永続証跡から','from the runtime durable evidence'),frames:'map / base_link'})[l];
 export const toggleLayer=(layers:Layers,l:Layer):Layers=>({...layers,[l]:!layers[l]});
 /** Legend: what each mark means. Mock "observed" values come from the backend's observation stream (a model), not from a sensor. */
 export const legend=()=>[

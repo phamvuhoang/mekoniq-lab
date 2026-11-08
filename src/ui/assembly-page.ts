@@ -4,7 +4,8 @@ import type {BundleReceipt,Bom,CompiledScene,EngineeringProject} from '../shared
 import {EngineeringProjectStore} from '../project/engineering-store';
 import {EngineeringProjectRepository} from '../project/engineering-repository';
 import {checkArchive} from '../project/engineering-archive';
-import {addInstance,archiveFor,archiveMetadata,catalogFromArchive,connect,disconnect,mergeCatalog,parseArchive,previewProblems,referenceCatalog,referenceProject,removeInstance,serializeArchive,uniqueInstanceId,type AssemblyCatalog} from '../design/assembly';
+import {addInstance,archiveFor,archiveMetadata,catalogFromArchive,connect,disconnect,mergeCatalog,parseArchive,previewProblems,referenceCatalog,referenceProject,removeInstance,serializeArchive,serveCatalog,serveProject,uniqueInstanceId,type AssemblyCatalog} from '../design/assembly';
+import {modelValidationPanel,validationView,type ValidationState} from './model-validation-panel';
 import {estimateSummary} from '../design/engineering-estimates';
 import {buildEngineeringCandidate} from '../deployment/engineering-bundle';
 import {httpTwinRuntime,type TwinRuntime} from '../scenarios/controls';
@@ -29,6 +30,9 @@ export class AssemblyWorkspace {
   private restored=false;
   private designChanges=0;
   private disposeScene:(()=>void)|null=null;
+  private validation:ValidationState|null=null;
+  private validating=false;
+  private validationError='';
   constructor(private readonly rerender:()=>void,private readonly rt:TwinRuntime=httpTwinRuntime(),private readonly download:(name:string,data:string)=>void=()=>{}) {
     // a new draft: the reference world and entities, no parts chosen yet, so every blocker is visible from the start
     const base=referenceProject();
@@ -40,6 +44,9 @@ export class AssemblyWorkspace {
   /** Digest of the design as it is now; the same value a compile receipt and a run's engineering reference carry. */
   projectDigest():string {return hashJson(this.design());}
   private stale():boolean {return !!this.receipt&&this.receipt.projectDigest!==hashJson(this.design());}
+  /** The design and its receipt as they are now, for an engineering twin preset (the twin re-checks that the receipt is for exactly this draft). */
+  engineeringInput():{project:EngineeringProject;receipt:BundleReceipt|null} {return {project:this.design(),receipt:this.receipt};}
+  private currentRef() {return this.receipt?.state==='compiled'&&!this.stale()?{bundleDigest:this.receipt.bundleDigest,projectDigest:this.receipt.projectDigest}:null;}
   private edit(change:(p:EngineeringProject)=>EngineeringProject):void {this.store.replaceDraft(change(this.store.getDraft()));this.rerender();}
   private saveTimer:ReturnType<typeof setTimeout>|null=null;
   private scheduleSave():void {
@@ -87,12 +94,15 @@ export class AssemblyWorkspace {
     const compile=this.canCompile===false?`<p class="notice-inline" data-testid="asm-no-runtime">${tr('Runtime không có engineering_bundle_v1: vẫn thiết kế, lưu và xuất được, nhưng chưa compile.','ランタイムにengineering_bundle_v1がありません。設計・保存・書き出しは可能ですが、コンパイルはできません。','This runtime has no engineering_bundle_v1: you can still design, save and export, but not compile.')}</p>`:'';
     const receiptView=this.receipt?`<div data-testid="asm-receipt" data-state="${this.receipt.state}">${chip(this.stale()?tr('đã cũ: thiết kế đã đổi','古い: 設計変更済み','stale: design changed'):this.receipt.state,this.stale()?'warn':'')} ${this.receipt.state==='compiled'?`<small>bundle ${short(this.receipt.bundleDigest)} · scene ${short(this.receipt.sceneDigest)} · ${this.receipt.runnable?tr('chạy được','実行可','runnable'):tr('không chạy được: chưa có môi trường native được qualify','実行不可: ネイティブ未認定','not runnable: no qualified native environment')}</small>`:''}${list(receiptProblems)}</div>`:'';
     const summary=estimateSummary(p,archive),num=(v:number|null,unit:string)=>v===null?`<span class="unknown-text">${tr('chưa rõ','不明','unknown')}</span>`:`<b>${+v.toFixed(2)}</b> ${unit}`;
+    const ref=this.currentRef(),validation=modelValidationPanel({v:this.validation,view:validationView(this.validation,{projectDigest:hashJson(p),ref},p),robots:p.runtimeProject.entities.filter(e=>e.kind==='amr').map(e=>e.id),canValidate:!!ref&&!!this.rt.validateEngineeringModel&&!!this.canCompile,busy:this.validating||this.busy,error:this.validationError});
+    const world=p.runtimeProject.world,worldEdit=`<p class="asm-world"><label for="asm-world-width">${tr('Chiều rộng mặt bằng (m)','レイアウト幅(m)','World width (m)')}</label> <input id="asm-world-width" type="number" min="1" max="200" step="0.5" value="${world.width}"> · ${tr('chiều cao','高さ','height')} ${world.height} m · <code>${esc(world.id)}</code> · ${world.points.filter(q=>q.kind==='table').length} ${tr('bàn','テーブル','tables')} · ${world.obstacles.length} ${tr('vật cản','障害物','obstacles')}</p>`;
     const estimates=`<div data-testid="asm-estimates"><p>${tr('Khối lượng AMR','AMR質量','AMR mass')}: <span data-testid="asm-est-mass">${num(summary.massKg,'kg')}</span> · ${tr('Năng lượng dùng được (danh định, chưa có duty/derating)','使用可能エネルギー(公称、デューティ/ディレーティング前)','Usable energy (nominal, before duty or derating)')}: <span data-testid="asm-est-energy">${num(summary.nominalUsableWh,'Wh')}</span></p>${summary.missing.length?`<ul class="asm-problems" data-testid="asm-est-missing">${summary.missing.map(m=>`<li data-code="${esc(m.code)}"><b>${esc(m.code)}</b> ${esc(m.detail)}</li>`).join('')}</ul>`:''}</div>`;
     return `<section class="panel assembly-page" data-testid="assembly-page" aria-labelledby="asm-title">
 <div class="panel-heading"><h2 id="asm-title">${tr('Lắp ráp kỹ thuật','エンジニアリング組立','Engineering assembly')}</h2>
 <p>${tr('Bản xem trước ngoại tuyến là cấu trúc; thông số của linh kiện ứng viên là giả định cho tới khi có nguồn.','オフラインのプレビューは構造のみ。候補部品のパラメータは出典が揃うまで仮定です。','The offline preview is structural; candidate part parameters are assumptions until sourced.')}</p></div>
 <div class="asm-toolbar">
 <button class="button" data-action="asm-reference">${tr('Mở AMR tham chiếu FD01','FD01参照AMRを開く','Open FD01 reference AMR')}</button>
+<button class="button" data-action="asm-serve">${tr('Mở robot Serve (IR-SIM 2D)','Serveロボットを開く(IR-SIM 2D)','Open Serve robot (IR-SIM 2D)')}</button>
 <button class="button quiet" data-action="asm-undo" ${this.busy?'disabled':''}>${tr('Hoàn tác','元に戻す','Undo')}</button>
 <button class="button quiet" data-action="asm-redo">${tr('Làm lại','やり直す','Redo')}</button>
 <button class="button quiet" data-action="asm-export">${tr('Xuất dự án kỹ thuật','エンジニアリング書き出し','Export engineering project')}</button>
@@ -102,14 +112,16 @@ export class AssemblyWorkspace {
 <span class="asm-status" data-testid="asm-save-state" data-state="${this.saveState}">${{idle:'',saving:tr('đang lưu…','保存中…','saving…'),saved:tr('đã lưu','保存済み','saved'),error:tr('chưa lưu: ','未保存: ','not saved: ')+esc(this.message)}[this.saveState]}</span></div>
 ${this.message&&this.saveState!=='error'?`<p role="status" data-testid="asm-message">${esc(this.message)}</p>`:''}
 ${compile}
-<p class="asm-meta" data-testid="asm-meta">rev ${p.revision} · ${tr('mã thiết kế','設計ID','design')} <code data-testid="asm-digest">${short(hashJson(p))}</code> · ${archive.manifest.missingDigests.length?`<span data-testid="asm-missing">${tr('thiếu','不足','missing')} ${archive.manifest.missingDigests.length} ${tr('tệp tham chiếu','参照ファイル','referenced files')}</span>`:tr('đủ tệp tham chiếu','参照ファイルは揃っています','all referenced files present')}</p>
+<p class="asm-meta" data-testid="asm-meta">${esc(p.requestedProfile)} · rev ${p.revision} · ${tr('mã thiết kế','設計ID','design')} <code data-testid="asm-digest">${short(hashJson(p))}</code> · ${archive.manifest.missingDigests.length?`<span data-testid="asm-missing">${tr('thiếu','不足','missing')} ${archive.manifest.missingDigests.length} ${tr('tệp tham chiếu','参照ファイル','referenced files')}</span>`:tr('đủ tệp tham chiếu','参照ファイルは揃っています','all referenced files present')}</p>
 <div class="asm-grid"><div><h3>${tr('Linh kiện trong catalog','カタログ部品','Catalog parts')}</h3><table class="asm-parts"><tbody>${parts}</tbody></table></div>
 <div><h3>${tr('Linh kiện đã dùng','使用中の部品','Parts in this design')}</h3><table data-testid="asm-instances"><tbody>${instances||`<tr><td>${tr('Chưa có linh kiện nào.','部品がありません。','No parts yet.')}</td></tr>`}</tbody></table>
 <h3>${tr('Kết nối','接続','Connections')}</h3><ul data-testid="asm-connections">${links}</ul>
 <form id="asm-connect" class="asm-connect"><label>${tr('Từ cổng','元ポート','From port')}<select name="from">${ports.map(option).join('')}</select></label> <label>${tr('Tới cổng','先ポート','To port')}<select name="to">${ports.map(option).join('')}</select></label> <label>${tr('Loại','種類','Kind')}<select name="kind"><option value="mount">mount</option><option value="power">power</option><option value="data">data</option></select></label> <button class="button" type="submit">${tr('Kết nối','接続','Connect')}</button></form></div></div>
 <h3>${tr('Vấn đề cần xử lý','対処が必要な問題','Blockers')}</h3><div data-testid="asm-problems">${list(problems)}</div>
 <h3>${tr('Ước tính từ thiết kế','設計からの推定','Estimates from the design')}</h3>${estimates}
+<h3>${tr('Mặt bằng','レイアウト','World')}</h3>${worldEdit}
 <h3>${tr('Kết quả compile','コンパイル結果','Compile result')}</h3>${receiptView}${bom}
+${validation}
 <div id="asm-scene" data-testid="asm-scene" class="asm-scene" role="img" aria-label="${tr('Cảnh đã compile','コンパイル済みシーン','Compiled scene')}">${this.scene?'':tr('Chưa có cảnh: compile để xem hình học do compiler tạo ra.','シーンなし: コンパイルするとコンパイラ生成のジオメトリを表示します。','No scene yet: compile to see the compiler\'s own geometry.')}</div></section>`;
   }
   mounted():void {
@@ -131,6 +143,8 @@ ${compile}
       case 'asm-export': this.exportDesign();break;
       case 'asm-candidate': void this.candidate();break;
       case 'asm-compile': void this.compile();break;
+      case 'asm-serve': this.openServe();break;
+      case 'asm-validate': if (value) void this.validate(value);break;
     }
   }
   submit(form:HTMLFormElement):boolean {
@@ -138,6 +152,25 @@ ${compile}
     const data=new FormData(form),from=String(data.get('from')??''),to=String(data.get('to')??'');
     if (from&&to&&from!==to) this.edit(p=>connect(p,from,to,String(data.get('kind')) as 'mount'|'power'|'data'));
     return true;
+  }
+  /** Design-field edits from inputs; each is one undoable revision and makes any receipt/validation stale. */
+  change(id:string,value:string):void {
+    const width=Number(value);
+    if (id==='asm-world-width'&&Number.isFinite(width)&&width>=1&&width<=200&&width!==this.design().runtimeProject.world.width) this.edit(p=>({...p,revision:p.revision+1,runtimeProject:{...p.runtimeProject,revision:p.runtimeProject.revision+1,world:{...p.runtimeProject.world,revision:p.runtimeProject.world.revision+1,width}}}));
+  }
+  private openServe():void {
+    mergeCatalog(this.catalog,serveCatalog());
+    this.store.load(serveProject());
+    this.receipt=null;this.bom=null;this.scene=null;this.message='';
+    this.rerender();
+  }
+  private async validate(robotId:string):Promise<void> {
+    const ref=this.currentRef();
+    if (!ref||!this.rt.validateEngineeringModel||this.validating) return;
+    this.validating=true;this.validationError='';this.rerender();
+    try {this.validation={ref,robotId,report:await this.rt.validateEngineeringModel(ref,robotId)};}
+    catch (e) {this.validationError=tr('Runtime từ chối kiểm tra: ','ランタイムが検証を拒否: ','The runtime refused validation: ')+((e as {message?:string}).message??String(e));}
+    finally {this.validating=false;this.rerender();}
   }
   private openReference():void {
     // additive: components of a design opened earlier stay available, so undo can come back to it

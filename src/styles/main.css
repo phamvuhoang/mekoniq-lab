@@ -2300,6 +2300,12 @@ label.button:has(+ input:focus-visible) {
 .tw-job.attention{fill:#3a2222;stroke:var(--danger);stroke-width:2;stroke-dasharray:3 2}
 .tw-footprint{fill:#9dccff22;stroke:var(--blue);stroke-width:2}
 .tw-footprint.unknown{fill:none;stroke-dasharray:6 4}
+.tw-compiled-obstacle{fill:#3a2f2b;stroke:var(--amber);stroke-width:2}
+.tw-safety{fill:none;stroke:var(--amber);stroke-width:1.5;stroke-dasharray:3 3}
+.tw-observed{fill:none;stroke:#d3dcd3;stroke-width:2}
+.tw-scan{fill:var(--accent)}
+.nav-assertions td{white-space:normal;overflow-wrap:anywhere;min-width:7em}
+.layer-provenance{margin:4px 0 0;padding:0;list-style:none;font-size:12px;color:var(--muted,#9aa)}
 .tw-unknown-label,.tw-contacts{fill:var(--amber);font:12px var(--mono)}
 .tw-path{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-dasharray:8 6}
 .tw-goal{fill:none;stroke:var(--accent);stroke-width:2}

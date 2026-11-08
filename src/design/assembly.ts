@@ -1,4 +1,6 @@
 import reference from '../../fixtures/engineering/reference-catalog.json' with {type:'json'};
+import serve from '../../fixtures/engineering/serve-demo-v1/serve-components.json' with {type:'json'};
+import serveDesign from '../../fixtures/engineering/serve-demo-v1/serve-project.json' with {type:'json'};
 import type {ComponentRevision,EngineeringProject,Problem} from '../shared/engineering';
 import {componentDigest,requiredDigests,type EngineeringArchiveFiles} from '../project/engineering-archive';
 import {canonicalJson,sha256Hex} from '../twin/hash';
@@ -46,6 +48,13 @@ export function mergeCatalog(into:AssemblyCatalog,from:AssemblyCatalog):void {
   for (const [k,v] of Object.entries(from.extras)) into.extras[k]??=v;
 }
 export const referenceProject=():EngineeringProject=>structuredClone(reference.project) as unknown as EngineeringProject;
+/** The Serve demo (portable IR-SIM 2D profile), synced byte for byte from source robotics/navigation-2d/fixtures/serve-demo-v1. Illustrative geometry. */
+export const serveProject=():EngineeringProject=>structuredClone(serveDesign) as unknown as EngineeringProject;
+export const serveCatalog=():AssemblyCatalog=>{
+  const catalog={...structuredClone({components:serve.components,models:serve.models}),blobs:{},extras:{}} as unknown as AssemblyCatalog;
+  for (const [digest,model] of Object.entries(catalog.models)) {const bytes=new TextEncoder().encode(canonicalJson(model));if (sha256Hex(bytes)===digest) catalog.blobs[digest]={bytes,mediaType:'application/json',license:'internal'};}
+  return catalog;
+};
 const IDENTITY={xyzM:[0,0,0] as [number,number,number],quaternionXyzw:[0,0,0,1] as [number,number,number,number]};
 const problem=(code:string,path:string,detail:string):Problem=>({code,path,blocking:true,detail});
 

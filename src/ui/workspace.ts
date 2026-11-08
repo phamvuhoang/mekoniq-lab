@@ -3,7 +3,13 @@ import {editSchedule} from '../scenarios/fault-schedule';
 import {ProjectStore} from '../project/store';
 // Twin workspace: persistent mode/backend/revision bar, scene (2D plan or optional 3D), layers + legend, entity list, operations and
 // engineering panels. All execution goes through TwinRuntime; selection/layers/view are local view state only.
-import {requestForPreset,httpTwinRuntime,TwinRuntimeError,type RunReport,type RunView,type TwinHealth,type TwinRuntime,type ReadinessSnapshot} from '../scenarios/controls';
+import {requestForPreset,httpTwinRuntime,TwinRuntimeError,clockControls,engineeringRefFor,type RunReport,type RunView,type TwinHealth,type TwinRuntime,type ReadinessSnapshot} from '../scenarios/controls';
+import {backendSetOptions} from '../scenarios/support';
+import {loadNavigationScene} from '../scenarios/engineering';
+import {importNavigationEvidence} from '../reports/navigation2d';
+import type {NavigationSceneV1} from '../shared/navigation2d';
+import {IRSIM_PROFILE,type EngineeringPresetInput} from '../scenarios/catalog';
+import {layerProvenance} from '../twin/overlays';
 import {presets,presetById,nameOf,type TwinPreset} from '../scenarios/catalog';
 import {preflight,ready} from '../scenarios/preflight';
 import {renderTwin,sceneEntities,kindLabel,type TwinFrame,type ViewState} from '../twin/scene';
@@ -41,15 +47,26 @@ export class TwinWorkspace {
  private business=0;private ticker:ReturnType<typeof setInterval>|undefined;private painted='';private refreshing=false;
  private replay:ReplayState|null=null;private replayTimer:ReturnType<typeof setInterval>|undefined;private previous:RunReport|null=null;
  private scheduleOpen=false;private scheduleDraft:ScheduleDraft={faultId:'reboot',targetId:'',trigger:'elapsed_sim_ms',value:'1000',durationMs:'1000'};private projects=new ProjectStore();
+ /** IR-SIM runs: the run bundle's compiled navigation scene, loaded once per run from the bundle the runtime locked. */
+ private navigation:NavigationSceneV1|null=null;
  private runSpeed=16;private evidenceStore=new EvidenceStore();private saved:SavedEvidence[]=[];private savedLoaded=false;private archived=false;
  private tokenDraft='';private busy=false;private playing=false;private notice='';private fault='cup-removed';private confirming:string|null=null;private confirmationKind:'reconcile'|'restoreCup'='reconcile';private reconcileTargets:string[]=[];
  /** `engineeringProjectDigest` is the digest of the engineering design the Assembly page holds now; saved engineering evidence is current only while it matches. */
- constructor(private rerender:()=>void,private rt:TwinRuntime=httpTwinRuntime(),private engineeringProjectDigest:()=>string|undefined=()=>undefined){
+ /** `engineeringInput` is the Assembly page's current design and receipt; an engineering preset runs from it only when its profile matches (re-checked against the receipt). */
+ constructor(private rerender:()=>void,private rt:TwinRuntime=httpTwinRuntime(),private engineeringProjectDigest:()=>string|undefined=()=>undefined,private engineeringInput:()=>EngineeringPresetInput|undefined=()=>undefined){
   onSelection(id=>{this.vs={...this.vs,selected:id};this.rerender();});
  }
  /** The durable view, with AMR poses taken from newer telemetry (or from the replay cursor); stale/lost telemetry is drawn as unknown. */
+ /** An engineering preset takes the open Assembly design (and its receipt) when it has this preset's profile; otherwise it keeps a null receipt and preflight says so. */
+ private resolve(p:TwinPreset):TwinPreset{
+  if(!p.engineering)return p;
+  const input=this.engineeringInput();
+  return input&&input.project.requestedProfile===IRSIM_PROFILE&&p.engineering.project.requestedProfile===IRSIM_PROFILE?{...p,engineering:{project:input.project,receipt:input.receipt},project:structuredClone(input.project.runtimeProject)}:p;
+ }
+ private refOf(p:TwinPreset){try{return p.engineering?engineeringRefFor(p.engineering.project,p.engineering.receipt):undefined;}catch{return null;}}
+ private clock(){return this.view?clockControls(this.view,this.health):undefined;}
  private frame():TwinFrame {
-  const v=this.view,base={preset:this.runPreset??this.preset,report:this.report};
+  const v=this.view,base={preset:this.runPreset??this.resolve(this.preset),report:this.report,navigation:this.runPreset?.engineering?this.navigation:null};
   if(!v)return {...base,view:v};
   if(this.replay){const r=this.replay,projection=r.rp.project(v,r.tick);return {...base,...projection};}
   const now=performance.now();
@@ -102,10 +119,10 @@ export class TwinWorkspace {
  private async refresh(){this.refreshing=true;try{if(this.view)await this.apply(await this.rt.get(this.view.run.id));this.rerender();}catch{/* keep the last snapshot */}finally{this.refreshing=false;}}
  private async saveEvidence(){if(!this.report||!this.runPreset||typeof indexedDB==='undefined')return;await this.evidenceStore.save(captureEvidence(this.report,this.runPreset.project));this.saved=await this.evidenceStore.list();}
  private evidenceHtml(){
-  return `<section class="panel" data-testid="saved-evidence"><h3>${tr('Báo cáo đã lưu','保存済みレポート','Saved reports')}</h3><p class="field-help">${tr('Báo cáo được giữ nguyên. Phạm vi cũ cần chạy lại khi đầu vào đổi.','レポートは不変。入力変更時は該当範囲を再実行。','Reports stay unchanged. Changed inputs require new evidence for the affected scope.')}</p><label for="twin-import-evidence">${tr('Nhập thư mục bằng chứng (chỉ đọc)','検証フォルダを読み込む(読み取り専用)','Import evidence folder (read-only)')}</label><input id="twin-import-evidence" type="file" multiple webkitdirectory ${this.busy||this.playing?'disabled':''}>${this.saved.map(s=>{const state=evidenceStatus(s,this.preset.project,this.report?.manifest.scenario.id===s.report.manifest.scenario.id?this.report:null,{engineeringProjectDigest:this.engineeringProjectDigest()});return `<p><button class="text-button" data-action="twin-open-evidence" data-value="${esc(s.id)}">${s.origin==='imported'?tr('Đã nhập','インポート済み','Imported')+' · ':''}${esc(s.report.manifest.scenario.id)} · ${esc(s.report.manifest.runId.slice(0,8))} · tick ${s.report.outcome.tick}</button> <span data-testid="evidence-status">${state.stale?`${tr('bằng chứng cũ','古い検証記録','stale evidence')}: ${state.scopes.join(', ')}`:tr('khớp đầu vào','入力一致','inputs match')}${!state.runtimeChecked?` · ${tr('chưa so runtime','ランタイム未比較','runtime not compared')}`:''}</span></p>`;}).join('')||'<p>—</p>'}</section>`;
+  return `<section class="panel" data-testid="saved-evidence"><h3>${tr('Báo cáo đã lưu','保存済みレポート','Saved reports')}</h3><p class="field-help">${tr('Báo cáo được giữ nguyên. Phạm vi cũ cần chạy lại khi đầu vào đổi.','レポートは不変。入力変更時は該当範囲を再実行。','Reports stay unchanged. Changed inputs require new evidence for the affected scope.')}</p><label for="twin-import-evidence">${tr('Nhập thư mục bằng chứng (chỉ đọc)','検証フォルダを読み込む(読み取り専用)','Import evidence folder (read-only)')}</label><input id="twin-import-evidence" type="file" multiple webkitdirectory ${this.busy||this.playing?'disabled':''}>${this.saved.map(s=>{const state=evidenceStatus(s,this.resolve(this.preset).project,this.report?.manifest.scenario.id===s.report.manifest.scenario.id?this.report:null,{engineeringProjectDigest:this.engineeringProjectDigest()});return `<p><button class="text-button" data-action="twin-open-evidence" data-value="${esc(s.id)}">${s.origin==='imported'?tr('Đã nhập','インポート済み','Imported')+' · ':''}${esc(s.report.manifest.scenario.id)} · ${esc(s.report.manifest.runId.slice(0,8))} · tick ${s.report.outcome.tick}</button> <span data-testid="evidence-status">${state.stale?`${tr('bằng chứng cũ','古い検証記録','stale evidence')}: ${state.scopes.join(', ')}`:tr('khớp đầu vào','入力一致','inputs match')}${!state.runtimeChecked?` · ${tr('chưa so runtime','ランタイム未比較','runtime not compared')}`:''}</span></p>`;}).join('')||'<p>—</p>'}</section>`;
  }
- private runSettings(){const speed=this.preset.project.entities.find(e=>e.kind==='amr')?.speedLimitMps??0.5;return `<label>${tr('Môi trường cho lần chạy mới','新しい実行の環境','Environment for new run')}<select id="twin-backend-set" ${this.busy||this.playing||this.replay||this.archived?'disabled':''}>${(this.health?.backendSets??[{id:this.preset.backendSetId,mode:this.preset.mode??'mock',access:'simulated',backends:[]}]).filter(s=>['mock','simulation'].includes(s.mode)&&s.access==='simulated').map(s=>`<option value="${esc(s.id)}" ${s.id===this.preset.backendSetId?'selected':''}>${esc(s.id)} · ${s.mode}</option>`).join('')}</select></label>${faultScheduleEditor(this.preset.project,this.scheduleDraft,this.busy||this.playing||!!this.replay||this.archived,this.preset.mode??'mock',this.scheduleOpen)}<div class="twin-settings"><label for="twin-run-speed">${tr('Tốc độ chạy','実行速度','Run speed')}</label><select id="twin-run-speed">${[1,4,16,64].map(n=>`<option value="${n}" ${n===this.runSpeed?'selected':''}>${n}×</option>`).join('')}</select><label for="twin-speed-limit">${tr('Giới hạn AMR cho lần chạy mới (m/s)','新しい実行のAMR速度上限(m/s)','AMR limit for new runs (m/s)')}</label><input id="twin-speed-limit" type="number" min="0.01" max="0.5" step="0.01" value="${speed}"><button class="button quiet" data-action="twin-run" ${this.busy||this.playing||!!this.replay||this.archived||!this.rt.paired?'disabled':''}>${tr('Chạy với đầu vào mới','変更した入力で実行','Run with edited inputs')}</button>${this.rt.paired?(this.rt.recoverableRunIds??[]).map(id=>`<button class="text-button" data-action="twin-reclaim" data-value="${esc(id)}" ${this.busy?'disabled':''}>${tr('Mở lại chỉ xem/đối soát','表示・照合のみで再開','Reopen for view/reconcile')} · ${esc(id.slice(0,8))}</button>`).join(''):''}</div>`;}
- private readinessPreset(){return this.view?.run.status==='ready'&&this.runPreset?this.runPreset:this.preset;}
+ private runSettings(){const speed=this.preset.project.entities.find(e=>e.kind==='amr')?.speedLimitMps??0.5;return `<label>${tr('Môi trường cho lần chạy mới','新しい実行の環境','Environment for new run')}<select id="twin-backend-set" ${this.busy||this.playing||this.replay||this.archived?'disabled':''}>${(this.health?backendSetOptions(this.health):[{id:this.preset.backendSetId,mode:this.preset.mode??'mock',selectable:true,reasons:[]}]).map(s=>`<option value="${esc(s.id)}" ${s.id===this.preset.backendSetId?'selected':''} ${s.selectable||s.id===this.preset.backendSetId?'':'disabled'}>${esc(s.id)} · ${s.mode}${s.reasons.length?` · ${tr('không khả dụng','利用不可','unavailable')}: ${esc(s.reasons.join(', '))}`:''}</option>`).join('')}</select></label>${faultScheduleEditor(this.preset.project,this.scheduleDraft,this.busy||this.playing||!!this.replay||this.archived,this.preset.mode??'mock',this.scheduleOpen)}<div class="twin-settings"><label for="twin-run-speed">${tr('Tốc độ chạy','実行速度','Run speed')}</label><select id="twin-run-speed">${(this.clock()?.speeds.length?this.clock()!.speeds:[1,4,16,64]).map(n=>`<option value="${n}" ${n===this.runSpeed?'selected':''}>${n}×</option>`).join('')}</select><label for="twin-speed-limit">${tr('Giới hạn AMR cho lần chạy mới (m/s)','新しい実行のAMR速度上限(m/s)','AMR limit for new runs (m/s)')}</label><input id="twin-speed-limit" type="number" min="0.01" max="0.5" step="0.01" value="${speed}"><button class="button quiet" data-action="twin-run" ${this.busy||this.playing||!!this.replay||this.archived||!this.rt.paired?'disabled':''}>${tr('Chạy với đầu vào mới','変更した入力で実行','Run with edited inputs')}</button>${this.rt.paired?(this.rt.recoverableRunIds??[]).map(id=>`<button class="text-button" data-action="twin-reclaim" data-value="${esc(id)}" ${this.busy?'disabled':''}>${tr('Mở lại chỉ xem/đối soát','表示・照合のみで再開','Reopen for view/reconcile')} · ${esc(id.slice(0,8))}</button>`).join(''):''}</div>`;}
+ private readinessPreset(){return this.view?.run.status==='ready'&&this.runPreset?this.runPreset:this.resolve(this.preset);}
  private watchReadinessExpiry(){
   clearTimeout(this.readinessExpiry);
   const delay=this.readiness?Date.parse(this.readiness.expiresAt)-Date.now():NaN;
@@ -114,7 +131,8 @@ export class TwinWorkspace {
  private async checkReadiness(p=this.readinessPreset()){
   const request=++this.readinessRequest;this.readiness=null;this.watchReadinessExpiry();
   if(!this.health?.features?.readiness||!this.rt.paired||!this.rt.readiness)return;
-  try{const answer=await this.rt.readiness(p.scenarioId,p.backendSetId,p.project);if(request===this.readinessRequest&&p===this.readinessPreset()){this.readiness=answer;this.watchReadinessExpiry();}}catch{/* the unknown state keeps Start disabled */}
+  const ref=this.refOf(p);if(ref===null)return;// an engineering preset without a receipt for this exact draft: preflight already says why
+  try{const answer=await (ref?this.rt.readiness(p.scenarioId,p.backendSetId,undefined,ref):this.rt.readiness(p.scenarioId,p.backendSetId,p.project));if(request===this.readinessRequest&&p.id===this.readinessPreset().id&&p.backendSetId===this.readinessPreset().backendSetId){this.readiness=answer;this.watchReadinessExpiry();}}catch{/* the unknown state keeps Start disabled */}
  }
  async checkHealth(){try{this.health=await this.rt.health();}catch{this.health=null;}await this.checkReadiness();this.healthChecked=true;this.probing=false;this.rerender();}
  private bar(){
@@ -138,13 +156,15 @@ ${r?`${item(tr('Trạng thái','状態','Status'),statusText(r.status),'run-stat
   const c=preflight(this.readinessPreset(),this.health,this.rt.paired,this.readiness);
   return `<div class="preflight" data-testid="preflight"><h3>${tr('Kiểm tra trước khi chạy','実行前チェック','Preflight')}</h3><ul>${c.map(x=>`<li class="${x.ok?'ok':'fail'}"><span class="check-mark" aria-hidden="true">${icon(x.ok?'check':'cross',14)}</span><span><b>${esc(x.label)}</b> <span class="state-text">${x.ok?tr('đạt','合格','pass'):tr('chưa đạt','未達','fail')}</span><br><small>${esc(x.detail)}</small></span>${x.entityId?`<button class="text-button" data-action="twin-select" data-value="${esc(x.entityId)}">${tr('Xem','表示','Show')}</button>`:''}</li>`).join('')}</ul>${this.health?.features?.readiness&&this.rt.paired?`<button class="button quiet" data-action="twin-readiness" ${this.busy?'disabled':''}>${tr('Kiểm tra lại','再確認','Check again')}</button>`:''}</div>`;
  }
- private operations(f:TwinFrame){return operationsPanel({paired:this.rt.paired,ready:ready(preflight(this.readinessPreset(),this.health,this.rt.paired,this.readiness)),busy:this.busy||!!this.replay,playing:this.playing,view:f.view,preset:f.preset},this.checks());}
+ private operations(f:TwinFrame){const clock=this.clock();return operationsPanel({paired:this.rt.paired,ready:ready(preflight(this.readinessPreset(),this.health,this.rt.paired,this.readiness)),busy:this.busy||!!this.replay,playing:this.playing,view:f.view,preset:f.preset,...clock&&!this.replay?{clock}:{}},this.checks());}
  private entityList(f:TwinFrame){return sceneEntities(f).map(e=>`<li><button data-action="twin-select" data-value="${esc(e.id)}" aria-pressed="${e.id===this.vs.selected}"><span class="entity-kind">${esc(kindLabel(e.kind))}</span><b>${esc(e.name)}</b>${e.name!==e.id?`<small>${esc(e.id)}</small>`:''}${e.status?`<span class="state-text">${esc(stateLabel(e.status))}</span>`:''}</button></li>`).join('');}
  html():string {
   this.scheduleOpen=(document.getElementById('twin-fault-schedule') as HTMLDetailsElement|null)?.open??this.scheduleOpen;
   const f=this.frame(),ents=sceneEntities(f),sel=this.vs.selected,insp=inspect(f,sel,f.seen??this.seen),p=f.preset;
   const presetsHtml=`<div class="twin-presets" role="group" aria-label="${tr('Preset kịch bản','シナリオプリセット','Scenario presets')}">${presets.map(x=>`<button class="preset-option" data-action="twin-preset" data-value="${x.id}" aria-pressed="${x.id===this.preset.id}" aria-label="${esc(x.title())}" aria-describedby="preset-${x.id}-summary">${icon(x.id==='coffee'?'coffee':'robot',20)}<span><b>${esc(x.title())}</b><small id="preset-${x.id}-summary">${esc(x.summary())}</small></span></button>`).join('')}</div>`;
-  const layers=`<div class="twin-layers" role="group" aria-label="${tr('Lớp hiển thị','表示レイヤー','Layers')}">${LAYERS.map(l=>`<button data-action="twin-layer" data-value="${l}" aria-pressed="${this.vs.layers[l]}">${layerLabel(l)}</button>`).join('')}</div>`;
+  // IR-SIM runs add safety/observed/scan layers, each with its provenance; other runs keep the four legacy layers
+  const shown=LAYERS.filter(l=>f.navigation||!['safety','observed','scan'].includes(l));
+  const layers=`<div class="twin-layers" role="group" aria-label="${tr('Lớp hiển thị','表示レイヤー','Layers')}">${shown.map(l=>`<button data-action="twin-layer" data-value="${l}" aria-pressed="${this.vs.layers[l]}">${layerLabel(l)}</button>`).join('')}</div>${f.navigation?`<ul class="layer-provenance" data-testid="layer-provenance">${shown.filter(l=>l!=='frames').map(l=>`<li data-layer="${l}"><b>${layerLabel(l)}</b>: ${esc(layerProvenance(l))}</li>`).join('')}</ul>`:''}`;
   const viewSwitch=`<div class="viewer-switch" role="group" aria-label="${tr('Kiểu xem','表示形式','View')}"><button data-action="twin-view" data-value="3d" aria-pressed="${this.vs.view==='3d'}" ${this.webglFailed?'disabled':''}>3D</button><button data-action="twin-view" data-value="2d" aria-pressed="${this.vs.view==='2d'}">2D</button></div>`;
   const legendHtml=`<ul class="twin-legend" data-testid="twin-legend" aria-label="${tr('Chú giải','凡例','Legend')}">${legend().map(x=>`<li><i class="mark ${x.mark}" aria-hidden="true"></i><b>${x.label}</b><small>${x.note}</small></li>`).join('')}</ul>`;
   const list=`<ul class="entity-list" id="twin-entity-list" data-testid="entity-list" aria-label="${tr('Đối tượng trong twin','ツイン内の対象','Twin objects')}">${this.entityList(f)}</ul>`;
@@ -166,7 +186,7 @@ ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớ
   const importer=document.getElementById('twin-import-evidence') as HTMLInputElement|null;
   const projectImporter=document.getElementById('twin-project-import') as HTMLInputElement|null;
   projectImporter?.addEventListener('change',()=>{const file=projectImporter.files?.[0];if(!file||this.busy||this.playing||this.replay||this.archived)return;void this.call(async()=>{if(file.size>MAX_PROJECT_BYTES)throw new Error('PROJECT_TOO_LARGE');const project=await this.projects.importV2(await file.text());this.preset={...this.preset,project};this.readiness=null;});},{once:true});
-  importer?.addEventListener('change',()=>{const files=Array.from(importer.files??[]);if(!files.length)return;void this.call(async()=>{const imported=await importControllerBundle(files);const saved={...captureEvidence(imported.report,imported.project),origin:'imported' as const};await this.evidenceStore.save(saved);this.saved=await this.evidenceStore.list();this.notice=tr('Đã nhập bằng chứng chỉ đọc; không thay đổi readiness.','読み取り専用の証跡を取り込みました。実行準備状態は変更しません。','Read-only evidence imported; readiness is unchanged.');});},{once:true});
+  importer?.addEventListener('change',()=>{const files=Array.from(importer.files??[]);if(!files.length)return;void this.call(async()=>{const report=files.find(f=>(f.webkitRelativePath?f.webkitRelativePath.split('/').slice(1).join('/'):f.name)==='report.json'),isNavigation=report?!!JSON.parse(await report.text())?.navigation2d:false;const imported=isNavigation?await importNavigationEvidence(files):await importControllerBundle(files);const saved={...captureEvidence(imported.report,imported.project),origin:'imported' as const};await this.evidenceStore.save(saved);this.saved=await this.evidenceStore.list();this.notice=tr('Đã nhập bằng chứng chỉ đọc; không thay đổi readiness.','読み取り専用の証跡を取り込みました。実行準備状態は変更しません。','Read-only evidence imported; readiness is unchanged.');});},{once:true});
   if(!this.savedLoaded&&typeof indexedDB!=='undefined'){this.savedLoaded=true;void this.evidenceStore.list().then(saved=>{this.saved=saved;this.rerender();}).catch(e=>{this.notice=String(e);this.rerender();});}
   if(this.view&&this.rt.paired&&!this.streams&&!this.archived)this.openStreams(this.view);
   const token=document.getElementById('twin-pair-token') as HTMLInputElement|null;if(token&&this.tokenDraft)token.value=this.tokenDraft;
@@ -217,19 +237,21 @@ ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớ
   if(!this.health)throw new TwinRuntimeError('RUNTIME_UNAVAILABLE',[],0);
   if(this.health.features?.readiness){
    if(!this.rt.readiness)throw new TwinRuntimeError('READINESS_NOT_CHECKED',[],0);
-   const snapshot=await this.rt.readiness(p.scenarioId,p.backendSetId,p.project);
+   const ref=this.refOf(p);if(ref===null)throw new TwinRuntimeError('ENGINEERING_NOT_COMPILED',[],0);
+   const snapshot=await (ref?this.rt.readiness(p.scenarioId,p.backendSetId,undefined,ref):this.rt.readiness(p.scenarioId,p.backendSetId,p.project));
    this.readiness=snapshot;this.watchReadinessExpiry();
    if(!ready(preflight(p,this.health,this.rt.paired,snapshot)))throw new TwinRuntimeError('RUNTIME_NOT_READY',snapshot.checks.flatMap(c=>c.reasonCodes),422);
   }
   await this.saveEvidence();
   if(this.view&&!this.archived&&this.rt.archive){this.streams?.close();this.streams=null;clearInterval(this.ticker);await this.rt.archive(this.view.run.id);}
   this.archived=false;
-  this.previous=this.report;this.view=null;this.report=null;this.seen={};this.runPreset={...p,project:structuredClone(p.project)};this.stopReplay();this.replay=null;
+  this.previous=this.report;this.view=null;this.report=null;this.seen={};this.runPreset={...p,project:structuredClone(p.project)};this.stopReplay();this.replay=null;this.navigation=null;
+  const ref=this.refOf(p);if(ref)this.navigation=await loadNavigationScene(this.rt,ref.bundleDigest).catch(()=>null);
   const v=await this.rt.create(requestForPreset(p),{sourceCommit:this.health.sourceCommit,schemaHash:this.health.schemaHash});
-  await this.apply(v);this.openStreams(v);if(start){await this.act('start');if(p.mode!=='simulation')await this.act('step',{ticks:STEP_TICKS});}
+  await this.apply(v);this.openStreams(v);if(start){await this.act('start');if(this.clock()?.step)await this.act('step',{ticks:STEP_TICKS});}
  }
  private async play(){
-  if(this.view?.run.mode==='simulation')return;
+  if(!this.view||!clockControls(this.view,this.health).play)return;
   this.playing=true;
   await this.call(async()=>{
    while(this.playing&&this.view&&['running','awaiting_confirmation'].includes(this.view.run.status)){const started=performance.now();await this.act('step',{ticks:PLAY_TICKS});this.rerender();const delay=PLAY_TICKS*(this.report?.manifest.clock.tickMs??20)/this.runSpeed-(performance.now()-started);if(delay>0)await new Promise(resolve=>setTimeout(resolve,delay));}
@@ -270,13 +292,13 @@ ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớ
    return this.rerender();
   }
   if(this.replay||this.archived)return;
-  if(action==='twin-run')return void this.call(()=>this.create(this.preset));
+  if(action==='twin-run')return void this.call(()=>this.create(this.resolve(this.preset)));
   if(action==='twin-reset')return this.view&&this.runPreset?void this.call(()=>this.create(this.runPreset!,false)):undefined;
   if(action==='twin-start')return void this.call(()=>this.act('start'));
   if(action==='twin-rerun')return this.view&&this.runPreset?void this.call(()=>this.create(this.runPreset!)):undefined;
   if(!this.view)return;
   if(this.view.controlAccess==='view_reconcile'&&!['twin-reconcile','twin-confirm-cancel','twin-confirm-ok'].includes(action))return;
-  if(action==='twin-step'&&this.view.run.mode!=='simulation')return void this.call(()=>this.act('step',{ticks:STEP_TICKS}));
+  if(action==='twin-step'&&this.clock()?.step)return void this.call(()=>this.act('step',{ticks:STEP_TICKS}));
   if(action==='twin-play')return void this.play();
   if(action==='twin-stop'){this.playing=false;return this.rerender();}
   if(action==='twin-cancel')return void this.call(()=>this.act('cancel'));
@@ -289,7 +311,7 @@ ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớ
   if(action==='twin-confirm-ok'&&this.confirming){const subjectId=this.confirming;this.confirming=null;this.reconcileTargets=[];if(this.confirmationKind==='reconcile'&&!this.knownReconciliationTargets().includes(subjectId))return this.rerender();return void this.call(()=>this.act(this.confirmationKind,{subjectId}));}
  }
  private knownReconciliationTargets(){return this.view?[...new Set(this.view.attention.map(a=>reconciliationSubject(a,this.view!)).filter((id):id is string=>id!==null))]:[];}
- change(id:string,value:string){if(id==='twin-backend-set'&&!this.busy&&!this.playing&&!this.replay&&!this.archived){const set=this.health?.backendSets.find(s=>s.id===value&&['mock','simulation'].includes(s.mode)&&s.access==='simulated');if(set){const compatible=set.mode==='simulation'&&this.preset.scenarioId==='BV01'?presetById('native-bv01'):set.mode==='mock'&&this.preset.id==='native-bv01'?presetById('coffee'):this.preset;this.preset={...(compatible??this.preset),mode:set.mode as 'mock'|'simulation',backendSetId:set.id};if(set.mode==='simulation')this.scheduleDraft={...this.scheduleDraft,faultId:'cup-removed',targetId:''};this.readiness=null;void this.checkReadiness(this.preset).then(()=>this.rerender());}return this.rerender();}if(id.startsWith('twin-schedule-')){const d=this.scheduleDraft;if(id==='twin-schedule-fault'){d.faultId=value;d.targetId='';}if(id==='twin-schedule-target')d.targetId=value;if(id==='twin-schedule-trigger'&&(value==='phase'||value==='elapsed_sim_ms')){d.trigger=value;d.value=value==='phase'?'grasp':'1000';}if(id==='twin-schedule-value')d.value=value;if(id==='twin-schedule-duration')d.durationMs=value;return this.rerender();}if(id==='twin-reconcile-target'&&this.confirmationKind==='reconcile'){this.confirming=this.reconcileTargets.includes(value)&&this.knownReconciliationTargets().includes(value)?value:null;return this.rerender();}if(id==='twin-run-speed'&&[1,4,16,64].includes(Number(value))){this.runSpeed=Number(value);this.rerender();}if(id==='twin-speed-limit'){const n=Number(value);if(Number.isFinite(n)&&n>0&&n<=0.5){this.preset={...this.preset,project:{...this.preset.project,revision:this.preset.project.revision+1,entities:this.preset.project.entities.map(e=>e.kind==='amr'?{...e,speedLimitMps:n}:e)}};this.rerender();}}if(id==='twin-fault')this.fault=value;if(id==='twin-replay-cursor')this.input(id,value);}
+ change(id:string,value:string){if(id==='twin-backend-set'&&!this.busy&&!this.playing&&!this.replay&&!this.archived){const set=backendSetOptions(this.health).find(s=>s.id===value&&s.selectable)?this.health!.backendSets.find(s=>s.id===value):undefined;if(set){const compatible=set.mode==='simulation'&&this.preset.scenarioId==='BV01'?presetById('native-bv01'):set.mode==='mock'&&this.preset.id==='native-bv01'?presetById('coffee'):this.preset;this.preset={...(compatible??this.preset),mode:set.mode as 'mock'|'simulation',backendSetId:set.id};if(set.mode==='simulation')this.scheduleDraft={...this.scheduleDraft,faultId:'cup-removed',targetId:''};this.readiness=null;void this.checkReadiness(this.preset).then(()=>this.rerender());}return this.rerender();}if(id.startsWith('twin-schedule-')){const d=this.scheduleDraft;if(id==='twin-schedule-fault'){d.faultId=value;d.targetId='';}if(id==='twin-schedule-target')d.targetId=value;if(id==='twin-schedule-trigger'&&(value==='phase'||value==='elapsed_sim_ms')){d.trigger=value;d.value=value==='phase'?'grasp':'1000';}if(id==='twin-schedule-value')d.value=value;if(id==='twin-schedule-duration')d.durationMs=value;return this.rerender();}if(id==='twin-reconcile-target'&&this.confirmationKind==='reconcile'){this.confirming=this.reconcileTargets.includes(value)&&this.knownReconciliationTargets().includes(value)?value:null;return this.rerender();}if(id==='twin-run-speed'&&[1,4,16,64].includes(Number(value))){this.runSpeed=Number(value);this.rerender();}if(id==='twin-speed-limit'){const n=Number(value);if(Number.isFinite(n)&&n>0&&n<=0.5){this.preset={...this.preset,project:{...this.preset.project,revision:this.preset.project.revision+1,entities:this.preset.project.entities.map(e=>e.kind==='amr'?{...e,speedLimitMps:n}:e)}};this.rerender();}}if(id==='twin-fault')this.fault=value;if(id==='twin-replay-cursor')this.input(id,value);}
  /** Scrub: update the replay body and the scene in place so the range input keeps focus and drag state. */
  input(id:string,value:string){if(id!=='twin-replay-cursor'||!this.replay)return;this.replay.tick=Number(value);this.scrubbed();}
  private scrubbed(){

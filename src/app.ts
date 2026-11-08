@@ -95,7 +95,7 @@ export class LabApp {
   // one runtime client for every page: the pairing (CSRF token, ownership proofs) lives in it, so a session made on the Twin page also serves Assembly
   private runtime = httpTwinRuntime();
   private assembly = new AssemblyWorkspace(() => this.render(), this.runtime, (name, data) => this.download(name, data));
-  private twin = new TwinWorkspace(() => this.render(), this.runtime, () => this.assembly.projectDigest());
+  private twin = new TwinWorkspace(() => this.render(), this.runtime, () => this.assembly.projectDigest(), () => this.assembly.engineeringInput());
   constructor(host: HTMLElement) {
     this.host = host;
     this.bind();
@@ -1102,6 +1102,7 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
     this.host.addEventListener("change", (e) => {
       const input = e.target as HTMLInputElement;
       if (input.id.startsWith("twin-")) return this.twin.change(input.id, input.value);
+      if (input.id.startsWith("asm-") && input.id !== "asm-import") return this.assembly.change(input.id, input.value);
       if (input.id === "import-project" && input.files?.[0]) {
         const file = input.files[0];
         void this.operation(async () => {

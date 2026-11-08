@@ -4,6 +4,19 @@ import type {TwinHealth} from './controls';
 export interface CampaignEntry {id:string;seed:number;repeat:number;mock:{backendSetId:string};simulation:{backendSetId:string;requires:string[]}}
 export interface CampaignFixture {schemaVersion:1;id:string;revision:number;title:string;note?:string;scenarios:CampaignEntry[]}
 export interface SupportRow {scenarioId:string;mode:'mock'|'simulation';backendSetId:string;status:'available'|'unavailable'|'unknown';reasons:string[]}
+export interface SetOption {id:string;mode:string;selectable:boolean;reasons:string[]}
+/** Backend sets the run selector offers. Portable sets (execution.host portable_python, i.e. IR-SIM 2D) are selectable only when health reports every backend
+ * installed, enabled, compatible and reachable and advertises irsim_navigation_v1; legacy sets keep their behaviour (always listed and selectable). */
+export function backendSetOptions(health:TwinHealth|null):SetOption[]{
+ return (health?.backendSets??[]).filter(s=>['mock','simulation'].includes(s.mode)&&s.access==='simulated').map(s=>{
+  if(s.execution?.host!=='portable_python')return {id:s.id,mode:s.mode,selectable:true,reasons:[]};
+  const reasons:string[]=[];
+  for(const id of s.backends){const b=health!.backends.find(x=>x.id===id);
+   reasons.push(...!b?[`BACKEND_UNKNOWN:${id}`]:!b.installed?[`BACKEND_NOT_INSTALLED:${id}${b.reason?` (${b.reason})`:''}`]:!b.enabled?[`BACKEND_NOT_ENABLED:${id}`]:!b.compatible?[`BACKEND_INCOMPATIBLE:${id}`]:!b.reachable?[`BACKEND_UNREACHABLE:${id}`]:[]);}
+  if(s.backends.includes('irsim_2d')&&!health!.capabilities?.includes('irsim_navigation_v1'))reasons.push('CAPABILITY_MISSING:irsim_navigation_v1');
+  return {id:s.id,mode:s.mode,selectable:!reasons.length,reasons};
+ });
+}
 export function supportMatrix(health:TwinHealth|null,fixture:CampaignFixture):SupportRow[] {
  return fixture.scenarios.flatMap(s=>(['mock','simulation'] as const).map((mode):SupportRow=>{
   const backendSetId=s[mode].backendSetId;

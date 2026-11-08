@@ -5,6 +5,7 @@ import type {RunReport} from '../scenarios/controls';
 import type {openReplayV2} from '../reports/replay';
 import {compareRuns} from '../reports/compare';
 import {engineeringView} from '../reports/engineering-view';
+import {navigationEvidence,navigationEvidenceView,navigationRows} from '../reports/navigation2d';
 import {summarizeReportV2} from '../reports/metrics';
 import {icon,esc} from './icons';
 import {tr} from '../i18n';
@@ -43,6 +44,16 @@ ${v.blockers.length?`<ul class="blockers" data-testid="engineering-blockers">${v
 <ul class="capabilities">${v.capabilities.map(c=>`<li data-capability="${esc(c.id)}" data-level="${c.level}"><b>${esc(c.id)}</b> ${level[c.level]}</li>`).join('')}</ul>
 <p class="source-note">${tr('Mô phỏng không phải bằng chứng phần cứng; chỉ mức "đã xác minh" dựa trên hiệu chuẩn đo thật.','シミュレーションはハード証拠ではありません。「検証済み」は実測校正のみ。','Simulation is not hardware evidence; only "verified" rests on measured calibration.')}</p></div>`;
 }
+/** IR-SIM 2D evidence: provider, completeness with every reason, and each assertion's own result. Reports without it say unavailable (never pass). */
+export function navigationHtml(report:RunReport):string{
+ if(report.navigation2d===undefined&&!report.manifest.backends.some(b=>b.id==='irsim_2d'))return '';
+ const v=navigationEvidenceView(report),n=navigationEvidence(report),m=report.metrics.navigation,result=(r:string)=>({pass:tr('đạt','合格','pass'),fail:tr('không đạt','不合格','fail'),inconclusive:tr('chưa kết luận','判定不能','inconclusive'),not_run:tr('chưa chạy','未実行','not run')})[r]??r;
+ return `<div data-testid="navigation-evidence" data-supported="${v.supported}" data-complete="${v.complete}"><h3>${tr('Bằng chứng điều hướng 2D','2Dナビゲーション証跡','2D navigation evidence')}</h3>
+<p><b>${v.supported?esc(v.provider!):tr('không khả dụng','利用不可','unavailable')}</b> · ${v.complete?tr('đầy đủ','完全','complete'):tr('chưa đầy đủ','不完全','incomplete')}${v.reasons.length?`: <span data-testid="navigation-reasons">${esc(v.reasons.join(', '))}</span>`:''}</p>
+${n?`<p class="field-help">tick 0–${n.clock.tickHorizon} · ${n.controller.id} ${esc(n.controller.version)} · IR-SIM ${esc(n.engine.version)} · Python ${esc(n.engine.pythonVersion)} · ${esc(n.engine.platform)} · seed ${n.seed.runSeed}/${n.seed.engineSeed} · trajectory <code>${esc(n.digests.trajectoryDigest.slice(0,12))}</code> · sensor <code>${esc(n.digests.sensorDigest.slice(0,12))}</code>${m?.sensorPublications?` · LiDAR ${m.sensorPublications.recorded}/${m.sensorPublications.expected}`:''}</p>
+<div class="eng-table-wrap" tabindex="0" role="region" aria-label="${tr('Khẳng định điều hướng','ナビゲーションのアサーション','Navigation assertions')}"><table class="eng-table nav-assertions" data-testid="navigation-assertions"><thead><tr><th scope="col">${tr('Khẳng định','アサーション','Assertion')}</th><th scope="col">${tr('Kết quả','結果','Result')}</th><th scope="col">${tr('Chi tiết','詳細','Detail')}</th></tr></thead><tbody>${navigationRows(report).map(r=>`<tr data-result="${esc(r.result)}"><th scope="row">${esc(r.id)}</th><td><span class="state-text">${result(r.result)}</span></td><td>${esc(r.detail)}</td></tr>`).join('')}</tbody></table></div>`:''}
+<p class="source-note">${tr('Mô phỏng 2D động học phẳng; không phải bằng chứng Gazebo, native hay phần cứng.','平面運動学の2Dシミュレーション。Gazebo・ネイティブ・実機の証拠ではありません。','Planar kinematic 2D simulation; not Gazebo, native or hardware evidence.')}</p></div>`;
+}
 export function reportPanel(report:RunReport|null,o:{replay:ReplayState|null;previous:RunReport|null;selected:string|null;business:number}):string{
  if(!report)return '';
  const s=summarizeReportV2(report),cmp=!o.replay&&o.previous?compareRuns(o.previous,report):null;
@@ -58,7 +69,7 @@ export function reportPanel(report:RunReport|null,o:{replay:ReplayState|null;pre
 ${cmp.inputs.length?`<p class="field-help">${tr('Đầu vào khác','異なる入力','Changed inputs')}: ${cmp.inputs.map(i=>`${esc(i.field)} ${esc(String(i.a).slice(0,12))} → ${esc(String(i.b).slice(0,12))}`).join(' · ')}</p>`:''}
 <table class="eng-table"><thead><tr><th scope="col">KPI</th><th scope="col">${tr('Trước','前回','Previous')}</th><th scope="col">${tr('Lần này','今回','This run')}</th><th scope="col">Δ</th><th scope="col">${tr('Đơn vị','単位','Unit')}</th></tr></thead><tbody>${cmp.kpis.map(k=>`<tr><th scope="row" title="${esc(k.definition)}">${esc(k.id)}</th><td>${k.a===null?`<span class="unknown-text">${tr('không có','なし','n/a')}</span>`:fmt(k.a)}</td><td>${k.b===null?`<span class="unknown-text">${tr('không có','なし','n/a')}</span>`:fmt(k.b)}</td><td>${k.delta===null?'—':fmt(k.delta)}</td><td>${esc(k.unit)}</td></tr>`).join('')}</tbody></table></div>`:'';
  const exports=`<div class="run-actions" role="group" aria-label="${tr('Xuất báo cáo','レポート出力','Export report')}">${['json','csv','html'].map(f=>`<button class="button quiet" data-action="twin-export" data-value="${f}">${icon('arrow',14)}${f.toUpperCase()}</button>`).join('')}</div>`;
- return `<section class="panel report-panel" data-testid="report-panel" aria-labelledby="report-title"><div class="panel-heading"><h2 id="report-title">${tr('Xem lại & báo cáo','再生とレポート','Replay & report')}</h2><span class="pill">${esc(s.evidence)}</span></div>${streams}${engineeringHtml(report)}${verification}${replay}${compare}${exports}<button class="button quiet" data-action="twin-save-evidence">${tr('Lưu báo cáo bất biến','不変レポートを保存','Save immutable report')}</button></section>`;
+ return `<section class="panel report-panel" data-testid="report-panel" aria-labelledby="report-title"><div class="panel-heading"><h2 id="report-title">${tr('Xem lại & báo cáo','再生とレポート','Replay & report')}</h2><span class="pill">${esc(s.evidence)}</span></div>${streams}${engineeringHtml(report)}${navigationHtml(report)}${verification}${replay}${compare}${exports}<button class="button quiet" data-action="twin-save-evidence">${tr('Lưu báo cáo bất biến','不変レポートを保存','Save immutable report')}</button></section>`;
 }
 
 export function controllerVerificationHtml(report:RunReport,tick:number):string{

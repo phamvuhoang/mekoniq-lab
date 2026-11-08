@@ -9,10 +9,26 @@ import {esc} from '../ui/icons';
 import {tr} from '../i18n';
 import {stateLabel} from '../ui/labels';
 import type {Held} from './store';
-export interface TwinFrame {preset:TwinPreset;view:RunView|null;report:RunReport|null;seen?:Record<string,number>;/** latest telemetry per entity from the browser store (plan 03: arm joints) */samples?:Record<string,Held>;nowMs?:number}
+import type {NavigationSceneV1} from '../shared/navigation2d';
+import {footprintInMap,scanLayer,type ScanSample} from './lidar';
+import {layerProvenance} from './overlays';
+export interface TwinFrame {preset:TwinPreset;view:RunView|null;report:RunReport|null;seen?:Record<string,number>;/** latest telemetry per entity from the browser store (plan 03: arm joints) */samples?:Record<string,Held>;nowMs?:number;
+ /** IR-SIM 2D runs: the run bundle's compiled navigation scene (footprints, sensors, obstacles) and, for imported evidence only, scans with their own-tick poses. */
+ navigation?:NavigationSceneV1|null;scans?:{scans:ScanSample[]}}
 export interface ViewState {view:'2d'|'3d';layers:Layers;selected:string|null}
 export interface SceneEntity {id:string;kind:string;name:string;x:number;y:number;source:'observed'|'modeled'|'derived'|'unknown';status?:string}
 const S=100;
+/** Observed path from the lossy telemetry: one polyline per run of consecutive samples; a jump in sim time larger than two sample periods is a gap and is
+ * never joined (so no distance is drawn across it). */
+export function observedSegments(f:TwinFrame,entityId:string):[number,number][][]{
+ const t=f.report?.telemetry,period=t&&t.rateHz>0?1e9/t.rateHz:NaN,out:[number,number][][]=[];let last:bigint|null=null;
+ for(const s of (t?.samples??[]).filter(x=>x.entityId===entityId&&x.quality==='valid'&&x.simTimeNs!==null&&typeof x.observed?.xM==='number').sort((a,b)=>BigInt(a.seq)<BigInt(b.seq)?-1:1)){
+  const now=BigInt(s.simTimeNs!);
+  if(last===null||!Number.isFinite(period)||Number(now-last)>2*period)out.push([]);
+  out[out.length-1]!.push([s.observed!.xM as number,s.observed!.yM as number]);last=now;
+ }
+ return out.filter(x=>x.length>1);
+}
 /** Everything selectable, with where it is drawn. Shared by the 2D plan, the 3D view and the entity list so selection means the same thing. */
 export function sceneEntities(f:TwinFrame):SceneEntity[] {
  const p=f.preset.project,l=cellLayout(p),v=f.view,out:SceneEntity[]=[];
@@ -38,15 +54,28 @@ export function renderTwin(f:TwinFrame,vs:ViewState):string {
  const grid=Array.from({length:Math.floor(w.width)+1},(_,n)=>`<text x="${X(n)}" y="-8" text-anchor="middle" class="tw-axis">${n} m</text>`).join('');
  const obstacles=w.obstacles.map(o=>`<rect class="tw-obstacle" x="${X(o.x)}" y="${Y(o.y+o.height)}" width="${o.width*S}" height="${o.height*S}" rx="4"><title>${esc(o.id)} · ${tr('mô hình','モデル','modeled')}</title></rect>${L.contacts?`<rect class="tw-clearance" x="${X(o.x)-8}" y="${Y(o.y+o.height)-8}" width="${o.width*S+16}" height="${o.height*S+16}" rx="10"/>`:''}`).join('');
  const points=w.points.map(q=>`<g class="tw-point" transform="translate(${pt(q.x,q.y)})"><circle r="5"/><text y="20" text-anchor="middle">${esc(nameOf(f.preset,q.id))}</text></g>`).join('');
- let overlay='';
- if(L.footprint)for(const e of ents){
+ let overlay='';const nav=f.navigation;
+ if(nav){
+  // compiled obstacles are what the plant collides with; table points stay icons, so a decorative table is never mistaken for geometry
+  overlay+=nav.world.obstacles.map(o=>`<polygon class="tw-compiled-obstacle" points="${o.verticesM.map(v=>pt(v[0]!,v[1]!)).join(' ')}"><title>${esc(o.id)} · ${tr('vật cản đã compile','コンパイル済み障害物','compiled obstacle')}</title></polygon>`).join('');
+  for(const e of ents.filter(x=>x.kind==='amr')){
+   const model=nav.robots.find(r=>r.robotId===e.id)?.model,pose=v?.entities.find(r=>r.id===e.id)?.pose??{x:e.x,y:e.y,yawRad:0};
+   if(!model){overlay+=`<text class="tw-unknown-label" x="${X(e.x)}" y="${Y(e.y)-36}" text-anchor="middle">? ${tr('không có mô hình compile','コンパイル済みモデルなし','no compiled model')}</text>`;continue;}
+   if(L.footprint)overlay+=`<polygon class="tw-footprint" data-layer="footprint" points="${footprintInMap(model,pose).map(([x,y])=>pt(x,y)).join(' ')}"><title>${esc(layerProvenance('footprint'))}</title></polygon>`;
+   if(L.safety)overlay+=`<polygon class="tw-safety" data-layer="safety" points="${footprintInMap(model,pose,nav.policy.parameters.safetyMarginM).map(([x,y])=>pt(x,y)).join(' ')}"><title>${esc(layerProvenance('safety'))}</title></polygon>`;
+   if(L.observed)for(const seg of observedSegments(f,e.id))overlay+=`<polyline class="tw-observed" data-layer="observed" points="${seg.map(([x,y])=>pt(x,y)).join(' ')}"><title>${esc(layerProvenance('observed'))}</title></polyline>`;
+  }
+  if(L.scan){const s=scanLayer(f.scans);overlay+=s.available?s.scans.map(x=>x.hitPointsM.map(([px,py])=>`<circle class="tw-scan" data-layer="scan" cx="${X(px).toFixed(1)}" cy="${Y(py).toFixed(1)}" r="2"/>`).join('')).join(''):`<text class="tw-unknown-label" data-testid="scan-unavailable" x="${X(w.width)-6}" y="${Y(w.height)+18}" text-anchor="end">LiDAR: ${esc(s.reason!)}</text>`;}
+  if(L.path)overlay+=`<text class="tw-unknown-label" x="6" y="${Y(w.height)+18}">${esc(layerProvenance('path'))}</text>`;
+ }
+ if(L.footprint&&!nav)for(const e of ents){
   if(e.kind!=='amr')continue;
   const pose=v?.entities.find(r=>r.id===e.id)?.pose??{x:e.x,y:e.y,yawRad:0},poly=amrFootprint(assetOf(p,f.preset.assets,e.id),pose),resolved=runtimeResolved(f.report,p,e.id);
   overlay+=poly?`<polygon class="tw-footprint ${resolved===false?'unknown':''}" points="${poly.map(([x,y])=>pt(x,y)).join(' ')}"><title>${resolved===false?tr('Footprint của Lab; runtime chạy mô hình điểm (chưa rõ)','Labの形状。ランタイムは点モデル(不明)','Lab footprint; the runtime ran a point model (unknown)'):tr('Footprint mô hình','モデル形状','Modeled footprint')}</title></polygon>${resolved===false?`<text class="tw-unknown-label" x="${X(pose.x)}" y="${Y(pose.y)-34}" text-anchor="middle">? ${tr('hình học runtime','実行時形状','runtime geometry')}</text>`:''}`
    :`<circle class="tw-footprint unknown" cx="${X(pose.x)}" cy="${Y(pose.y)}" r="30"/><text class="tw-unknown-label" x="${X(pose.x)}" y="${Y(pose.y)-36}" text-anchor="middle">? footprint</text>`;
  }
  if(L.path&&v)for(const r of v.entities)if(r.path.length)overlay+=`<polyline class="tw-path" points="${[[r.pose.x,r.pose.y],...r.path].map(([x,y])=>pt(x!,y!)).join(' ')}"><title>${tr('Đường đi đã lệnh','指令経路','Commanded path')}</title></polyline><circle class="tw-goal" cx="${X(r.path[r.path.length-1]![0])}" cy="${Y(r.path[r.path.length-1]![1])}" r="7"/>`;
- if(L.contacts){const c=f.report?.metrics.collision;overlay+=`<text class="tw-contacts" x="${X(w.width)-6}" y="${Y(0)-8}" text-anchor="end">${tr('Tiếp xúc','接触','Contacts')}: ${!c?'—':c.available?String(c.contacts):`? (${esc(c.reason??'unknown')})`}</text>`;}
+ if(L.contacts){const c=f.report?.metrics.collision,n=f.report?.metrics.navigation;if(nav&&n)overlay+=`<text class="tw-contacts" x="${X(w.width)-6}" y="${Y(0)-28}" text-anchor="end">${tr('Đợt va chạm / vùng an toàn','衝突/安全エンベロープ','Collision / safety episodes')}: ${n.collisionEpisodes??'?'} / ${n.safetyEnvelopeEpisodes??'?'}</text>`;overlay+=`<text class="tw-contacts" x="${X(w.width)-6}" y="${Y(0)-8}" text-anchor="end">${tr('Tiếp xúc','接触','Contacts')}: ${!c?'—':c.available?String(c.contacts):`? (${esc(c.reason??'unknown')})`}</text>`;}
  if(L.frames){
   const axes=(x:number,y:number,yaw:number,label:string)=>{const c=Math.cos(yaw),s=Math.sin(yaw);return `<g class="tw-frame"><line x1="${X(x)}" y1="${Y(y)}" x2="${X(x+0.35*c)}" y2="${Y(y+0.35*s)}" class="x"/><line x1="${X(x)}" y1="${Y(y)}" x2="${X(x-0.35*s)}" y2="${Y(y+0.35*c)}" class="y"/><text x="${X(x+0.4*c)}" y="${Y(y+0.4*s)}">x</text><text x="${X(x-0.4*s)}" y="${Y(y+0.4*c)}">y</text><text x="${X(x)+6}" y="${Y(y)+16}" class="tw-frame-name">${esc(label)}</text></g>`;};
   overlay+=axes(0,0,0,'map');
