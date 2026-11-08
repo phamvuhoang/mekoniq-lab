@@ -7,7 +7,7 @@ import addFormats from 'ajv-formats';
 import componentSchema from '../shared/engineering-schemas/engineering-component.schema.json' with {type:'json'};
 import physicalSchema from '../shared/engineering-schemas/robot-physical-model-v1.schema.json' with {type:'json'};
 import evidenceSchema from '../shared/engineering-schemas/navigation-run-evidence-v1.schema.json' with {type:'json'};
-import type {NavigationRunEvidenceV1} from '../shared/navigation2d';
+import type {NavigationRunEvidenceV1,NavigationSceneV1} from '../shared/navigation2d';
 import type {RunReport} from '../scenarios/controls';
 import type {LabProjectV2} from '../shared/types';
 import {validReportShape} from './report-shape';
@@ -23,6 +23,14 @@ const STREAMS=['trajectory','sensors','control','collisions'] as const;
 export function navigationEvidence(report:RunReport):NavigationRunEvidenceV1|null{
  const n=report.navigation2d;
  return validEvidence(n)&&n.engine.id==='irsim_2d'&&STREAMS.every(s=>n.artifacts[s].every(a=>safeArtifactPath(a.path)&&!a.path.includes('/')))?n:null;
+}
+/** The compiled scene a report may draw: only the one its own evidence names (sceneDigest). A live run whose report carries no evidence yet keeps the scene of the bundle
+ * it was created from; anything else is unavailable with the reason — never another run's geometry. */
+export function boundNavigationScene(report:RunReport|null,scene:NavigationSceneV1|null,live:boolean):{scene:NavigationSceneV1|null;reason:string|null}{
+ const pending=live&&report?.navigation2d===undefined,want=report&&!pending?navigationEvidence(report)?.sceneDigest??null:null;
+ if(!pending&&!want)return {scene:null,reason:'NAVIGATION_SCENE_UNBOUND'};
+ if(!scene)return {scene:null,reason:'NAVIGATION_SCENE_UNAVAILABLE'};
+ return pending||scene.sceneDigest===want?{scene,reason:null}:{scene:null,reason:'NAVIGATION_SCENE_MISMATCH'};
 }
 const contiguous=(chunks:{firstTick:number;lastTick:number}[],from:number,to:number)=>{let next=from;for(const c of [...chunks].sort((a,b)=>a.firstTick-b.firstTick)){if(c.firstTick!==next||c.lastTick<c.firstTick)return false;next=c.lastTick+1;}return next===to+1;};
 export function navigationEvidenceView(report:RunReport):NavigationEvidenceView{

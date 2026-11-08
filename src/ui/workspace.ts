@@ -6,7 +6,7 @@ import {ProjectStore} from '../project/store';
 import {requestForPreset,httpTwinRuntime,TwinRuntimeError,clockControls,engineeringRefFor,type RunReport,type RunView,type TwinHealth,type TwinRuntime,type ReadinessSnapshot} from '../scenarios/controls';
 import {backendSetOptions} from '../scenarios/support';
 import {loadNavigationScene} from '../scenarios/engineering';
-import {importNavigationEvidence} from '../reports/navigation2d';
+import {boundNavigationScene,importNavigationEvidence} from '../reports/navigation2d';
 import type {NavigationSceneV1} from '../shared/navigation2d';
 import {IRSIM_PROFILE,type EngineeringPresetInput} from '../scenarios/catalog';
 import {layerProvenance} from '../twin/overlays';
@@ -48,7 +48,11 @@ export class TwinWorkspace {
  private replay:ReplayState|null=null;private replayTimer:ReturnType<typeof setInterval>|undefined;private previous:RunReport|null=null;
  private scheduleOpen=false;private scheduleDraft:ScheduleDraft={faultId:'reboot',targetId:'',trigger:'elapsed_sim_ms',value:'1000',durationMs:'1000'};private projects=new ProjectStore();
  /** IR-SIM runs: the run bundle's compiled navigation scene, loaded once per run from the bundle the runtime locked. */
- private navigation:NavigationSceneV1|null=null;
+ private navigation:NavigationSceneV1|null=null;private sceneLoad=0;
+ /** The scene this frame may draw: bound to the shown report's own evidence (an opened report is never live). */
+ private scene(){return boundNavigationScene(this.report,this.navigation,!this.archived);}
+ /** Replace the scene with the one of `bundle` (or none); a later load or create() wins over an earlier one. */
+ private loadScene(bundle:string|undefined){this.navigation=null;const token=++this.sceneLoad;if(bundle)void loadNavigationScene(this.rt,bundle).catch(()=>null).then(s=>{if(token===this.sceneLoad){this.navigation=s;this.rerender();}});}
  private runSpeed=16;private evidenceStore=new EvidenceStore();private saved:SavedEvidence[]=[];private savedLoaded=false;private archived=false;
  private tokenDraft='';private busy=false;private playing=false;private notice='';private fault='cup-removed';private confirming:string|null=null;private confirmationKind:'reconcile'|'restoreCup'='reconcile';private reconcileTargets:string[]=[];
  /** `engineeringProjectDigest` is the digest of the engineering design the Assembly page holds now; saved engineering evidence is current only while it matches. */
@@ -66,7 +70,7 @@ export class TwinWorkspace {
  private refOf(p:TwinPreset){try{return p.engineering?engineeringRefFor(p.engineering.project,p.engineering.receipt):undefined;}catch{return null;}}
  private clock(){return this.view?clockControls(this.view,this.health):undefined;}
  private frame():TwinFrame {
-  const v=this.view,base={preset:this.runPreset??this.resolve(this.preset),report:this.report,navigation:this.runPreset?.engineering?this.navigation:null};
+  const v=this.view,base={preset:this.runPreset??this.resolve(this.preset),report:this.report,navigation:this.runPreset?.engineering?this.scene().scene:null};
   if(!v)return {...base,view:v};
   if(this.replay){const r=this.replay,projection=r.rp.project(v,r.tick);return {...base,...projection};}
   const now=performance.now();
@@ -164,7 +168,7 @@ ${r?`${item(tr('Trạng thái','状態','Status'),statusText(r.status),'run-stat
   const presetsHtml=`<div class="twin-presets" role="group" aria-label="${tr('Preset kịch bản','シナリオプリセット','Scenario presets')}">${presets.map(x=>`<button class="preset-option" data-action="twin-preset" data-value="${x.id}" aria-pressed="${x.id===this.preset.id}" aria-label="${esc(x.title())}" aria-describedby="preset-${x.id}-summary">${icon(x.id==='coffee'?'coffee':'robot',20)}<span><b>${esc(x.title())}</b><small id="preset-${x.id}-summary">${esc(x.summary())}</small></span></button>`).join('')}</div>`;
   // IR-SIM runs add safety/observed/scan layers, each with its provenance; other runs keep the four legacy layers
   const shown=LAYERS.filter(l=>f.navigation||!['safety','observed','scan'].includes(l));
-  const layers=`<div class="twin-layers" role="group" aria-label="${tr('Lớp hiển thị','表示レイヤー','Layers')}">${shown.map(l=>`<button data-action="twin-layer" data-value="${l}" aria-pressed="${this.vs.layers[l]}">${layerLabel(l)}</button>`).join('')}</div>${f.navigation?`<ul class="layer-provenance" data-testid="layer-provenance">${shown.filter(l=>l!=='frames').map(l=>`<li data-layer="${l}"><b>${layerLabel(l)}</b>: ${esc(layerProvenance(l))}</li>`).join('')}</ul>`:''}`;
+  const layers=`<div class="twin-layers" role="group" aria-label="${tr('Lớp hiển thị','表示レイヤー','Layers')}">${shown.map(l=>`<button data-action="twin-layer" data-value="${l}" aria-pressed="${this.vs.layers[l]}">${layerLabel(l)}</button>`).join('')}</div>${f.navigation?`<ul class="layer-provenance" data-testid="layer-provenance">${shown.filter(l=>l!=='frames').map(l=>`<li data-layer="${l}"><b>${layerLabel(l)}</b>: ${esc(layerProvenance(l))}</li>`).join('')}</ul>`:''}${this.runPreset?.engineering&&!f.navigation?`<p class="source-note" data-testid="navigation-scene-unavailable" role="status">${icon('info',15)}${tr('Lớp hình học điều hướng không khả dụng','ナビゲーション形状レイヤーは利用できません','Navigation geometry layers unavailable')}: ${esc(this.scene().reason??'')}</p>`:''}`;
   const viewSwitch=`<div class="viewer-switch" role="group" aria-label="${tr('Kiểu xem','表示形式','View')}"><button data-action="twin-view" data-value="3d" aria-pressed="${this.vs.view==='3d'}" ${this.webglFailed?'disabled':''}>3D</button><button data-action="twin-view" data-value="2d" aria-pressed="${this.vs.view==='2d'}">2D</button></div>`;
   const legendHtml=`<ul class="twin-legend" data-testid="twin-legend" aria-label="${tr('Chú giải','凡例','Legend')}">${legend().map(x=>`<li><i class="mark ${x.mark}" aria-hidden="true"></i><b>${x.label}</b><small>${x.note}</small></li>`).join('')}</ul>`;
   const list=`<ul class="entity-list" id="twin-entity-list" data-testid="entity-list" aria-label="${tr('Đối tượng trong twin','ツイン内の対象','Twin objects')}">${this.entityList(f)}</ul>`;
@@ -245,8 +249,8 @@ ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớ
   await this.saveEvidence();
   if(this.view&&!this.archived&&this.rt.archive){this.streams?.close();this.streams=null;clearInterval(this.ticker);await this.rt.archive(this.view.run.id);}
   this.archived=false;
-  this.previous=this.report;this.view=null;this.report=null;this.seen={};this.runPreset={...p,project:structuredClone(p.project)};this.stopReplay();this.replay=null;this.navigation=null;
-  const ref=this.refOf(p);if(ref)this.navigation=await loadNavigationScene(this.rt,ref.bundleDigest).catch(()=>null);
+  this.previous=this.report;this.view=null;this.report=null;this.seen={};this.runPreset={...p,project:structuredClone(p.project)};this.stopReplay();this.replay=null;this.navigation=null;const token=++this.sceneLoad;
+  const ref=this.refOf(p);if(ref){const s=await loadNavigationScene(this.rt,ref.bundleDigest).catch(()=>null);if(token===this.sceneLoad)this.navigation=s;}
   const v=await this.rt.create(requestForPreset(p),{sourceCommit:this.health.sourceCommit,schemaHash:this.health.schemaHash});
   await this.apply(v);this.openStreams(v);if(start){await this.act('start');if(this.clock()?.step)await this.act('step',{ticks:STEP_TICKS});}
  }
@@ -269,7 +273,7 @@ ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớ
    const reclaimed=await this.rt.reclaim!(value);
    this.stopReplay();this.replay=null;this.archived=false;this.streams?.close();this.streams=null;clearInterval(this.ticker);
    this.view=null;this.report=null;this.runPreset=null;this.seen={};
-   this.runPreset=this.reclaimedPreset(reclaimed);await this.apply(reclaimed);this.openStreams(reclaimed);
+   this.runPreset=this.reclaimedPreset(reclaimed);this.loadScene(reclaimed.lockedInput?.engineering?.ref.bundleDigest);await this.apply(reclaimed);this.openStreams(reclaimed);
    this.notice=tr('Đã mở lại để xem và đối soát. Không phát lại chuyển động.','表示と照合のみで再開しました。動作は再送されません。','Reopened for viewing and reconciliation. Motion is not replayed.');
   });
   if(action.startsWith('twin-schedule-')||action==='twin-project-export'){
@@ -280,7 +284,7 @@ ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớ
    if(action==='twin-project-export'){const url=URL.createObjectURL(new Blob([JSON.stringify(this.preset.project,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='lab-project.json';a.click();URL.revokeObjectURL(url);return;}
   }
   if(action==='twin-save-evidence')return void this.call(()=>this.saveEvidence());
-  if(action==='twin-open-evidence'&&value){const saved=this.saved.find(s=>s.id===value);if(!saved)return;this.playing=false;this.streams?.close();this.streams=null;clearInterval(this.ticker);this.stopReplay();this.archived=true;this.report=structuredClone(saved.report);const preset=presets.find(p=>p.scenarioId===saved.report.manifest.scenario.id)??this.preset;this.runPreset={...preset,project:structuredClone(saved.project)};const m=saved.report.manifest;this.view={run:{schemaVersion:2,id:m.runId,mode:m.mode==='simulation'?'simulation':'mock',access:m.access,backendSetId:m.backendSetId,backends:m.backends.map(b=>b.id),status:saved.report.outcome.status as RunView['run']['status'],runRevision:0,eventCursor:null,telemetryCursor:null,fidelity:'modeled',ageMs:0,sourceCommit:m.sourceCommit,scenarioId:m.scenario.id,scenarioRevision:m.scenario.revision,seed:m.seed},tick:saved.report.outcome.tick,simTimeNs:saved.report.outcome.simTimeNs,model:m.backends[0]?.model??'unknown',entities:saved.project.entities.filter(e=>e.kind==='amr').map(e=>({id:e.id,kind:'amr',pose:{x:NaN,y:NaN,yawRad:NaN},quality:'stale',moving:false,hold:null,goal:null,path:[],distanceM:NaN})),workload:[],awaiting:[],attention:[],served:saved.report.outcome.served,coffee:null};this.replay={rp:openReplayV2(this.report),tick:saved.report.outcome.tick,playing:false};return this.rerender();}
+  if(action==='twin-open-evidence'&&value){const saved=this.saved.find(s=>s.id===value);if(!saved)return;this.playing=false;this.streams?.close();this.streams=null;clearInterval(this.ticker);this.stopReplay();this.archived=true;this.report=structuredClone(saved.report);const preset=presets.find(p=>p.scenarioId===saved.report.manifest.scenario.id)??this.preset;this.runPreset={...preset,project:structuredClone(saved.project)};const m=saved.report.manifest;this.loadScene(m.engineering?.bundleDigest);this.view={run:{schemaVersion:2,id:m.runId,mode:m.mode==='simulation'?'simulation':'mock',access:m.access,backendSetId:m.backendSetId,backends:m.backends.map(b=>b.id),status:saved.report.outcome.status as RunView['run']['status'],runRevision:0,eventCursor:null,telemetryCursor:null,fidelity:'modeled',ageMs:0,sourceCommit:m.sourceCommit,scenarioId:m.scenario.id,scenarioRevision:m.scenario.revision,seed:m.seed},tick:saved.report.outcome.tick,simTimeNs:saved.report.outcome.simTimeNs,model:m.backends[0]?.model??'unknown',entities:saved.project.entities.filter(e=>e.kind==='amr').map(e=>({id:e.id,kind:'amr',pose:{x:NaN,y:NaN,yawRad:NaN},quality:'stale',moving:false,hold:null,goal:null,path:[],distanceM:NaN})),workload:[],awaiting:[],attention:[],served:saved.report.outcome.served,coffee:null};this.replay={rp:openReplayV2(this.report),tick:saved.report.outcome.tick,playing:false};return this.rerender();}
   if(action==='twin-export'&&this.report)return this.download(value??'json');
   if(action==='twin-replay'&&this.report){this.playing=false;this.replay={rp:openReplayV2(this.report),tick:0,playing:false};return this.rerender();}
   if(action==='twin-replay-exit'){this.stopReplay();this.replay=null;if(this.archived){this.archived=false;this.view=null;this.report=null;this.runPreset=null;}this.painted='';return this.rerender();}
