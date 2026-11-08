@@ -30,8 +30,19 @@ export function navigationEvidenceView(report:RunReport):NavigationEvidenceView{
  const n=navigationEvidence(report);
  if(!n)return {supported:false,provider:null,complete:false,reasons:['NAVIGATION_EVIDENCE_SCHEMA_UNKNOWN']};
  const reasons:string[]=[],h=n.clock.tickHorizon;
- if(!n.completeness)reasons.push('COMPLETENESS_UNKNOWN');else if(n.completeness.status!=='complete')reasons.push(...n.completeness.reasons.length?n.completeness.reasons:['EVIDENCE_INCOMPLETE']);
- if(!n.recording)reasons.push('EVIDENCE_END_UNKNOWN');else if(n.recording.lastTick!==h||n.recording.terminal!==null)reasons.push(n.recording.terminal?`EVIDENCE_TERMINAL:${n.recording.terminal}`:'EVIDENCE_END_MISMATCH');
+ if(!n.completeness)reasons.push('COMPLETENESS_UNKNOWN');
+ else if(n.completeness.status!=='complete')reasons.push(...n.completeness.reasons.length?n.completeness.reasons:['EVIDENCE_INCOMPLETE']);
+ else if(n.completeness.reasons.length)reasons.push('COMPLETENESS_CONTRADICTORY',...n.completeness.reasons);
+ // the recorder's end record, as source evidence.ts reads it: an early terminal, a last durable tick off the horizon, and a run tick the chunks have not reached (or passed)
+ const end=n.recording;
+ if(!end)reasons.push('EVIDENCE_END_UNKNOWN');
+ else{
+  if(end.terminal!==null)reasons.push(`EVIDENCE_TERMINAL:${end.terminal}`);
+  if(end.lastTick!==h)reasons.push('EVIDENCE_END_MISMATCH');
+  const run=end.runTick??null,last=end.lastTick??-1;
+  if(run!==null&&run>last)reasons.push('EVIDENCE_PENDING');
+  if(run!==null&&last>run)reasons.push(`EVIDENCE_AHEAD_OF_CHECKPOINT:${run+1}-${last}`);
+ }
  for(const g of [...n.recordingGaps,...n.recording?.gaps??[]])reasons.push(`RECORDING_GAP:${g.reason}`);
  if(!contiguous(n.artifacts.trajectory,0,h))reasons.push('TRAJECTORY_LISTING_GAP');
  if(h>0&&!contiguous(n.artifacts.control,0,h-1))reasons.push('CONTROL_LISTING_GAP');
@@ -40,8 +51,13 @@ export function navigationEvidenceView(report:RunReport):NavigationEvidenceView{
  else if(pubs.expected>0&&!n.artifacts.sensors.length)reasons.push('SENSOR_LISTING_EMPTY');
  return {supported:true,provider:n.engine.id,complete:reasons.length===0,reasons:[...new Set(reasons)]};
 }
-/** Expected/actual per assertion as the evidence states it; an unknown document has none (never a pass). */
-export const navigationRows=(report:RunReport)=>navigationEvidence(report)?.assertions.map(a=>({id:a.id,result:a.result,detail:a.detail}))??[];
+/** Expected/actual per assertion as the evidence states it; an unknown document has none (never a pass). While the evidence view is not complete a 'pass' rests on
+ * a recording that is not established, so it reads 'unverified' with the view's reasons; any other result (fail, inconclusive, not_run) is kept as stated. */
+export function navigationRows(report:RunReport):{id:string;result:string;detail:string;reasons:string[]}[]{
+ const n=navigationEvidence(report);if(!n)return [];
+ const v=navigationEvidenceView(report);
+ return n.assertions.map(a=>a.result==='pass'&&!v.complete?{id:a.id,result:'unverified',detail:a.detail,reasons:v.reasons}:{id:a.id,result:a.result,detail:a.detail,reasons:[]});
+}
 const hex=async(f:File)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await f.arrayBuffer())),b=>b.toString(16).padStart(2,'0')).join('');
 /** Read-only import of an IR-SIM evidence folder: report.json, project.json and the chunk files its navigation2d listing names (flat, by name). */
 export async function importNavigationEvidence(files:readonly File[]):Promise<{origin:'imported';report:RunReport;project:LabProjectV2}>{

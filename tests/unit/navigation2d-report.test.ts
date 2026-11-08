@@ -9,6 +9,7 @@ import type {RunReport} from '../../src/scenarios/controls';
 import restaurant from '../../fixtures/twins/restaurant-v2.json' with {type:'json'};
 import {hashJson} from '../../src/twin/hash';
 import {reportCsv,reportHtml} from '../../src/reports/metrics';
+import {navigationHtml} from '../../src/ui/report-panel';
 
 const D=(c:string)=>c.repeat(64),sha=(b:Uint8Array)=>createHash('sha256').update(b).digest('hex');
 const chunk=(stream:string,n:number,lines:string[])=>{const bytes=gzipSync(lines.join('\n')+'\n');return {path:`${stream}-${String(n).padStart(6,'0')}-abcdef01.ndjson.gz`,bytes,ref:(first:number,last:number)=>({path:`${stream}-${String(n).padStart(6,'0')}-abcdef01.ndjson.gz`,sha256:sha(bytes),bytes:bytes.length,firstTick:first,lastTick:last})};};
@@ -56,6 +57,36 @@ test('incomplete evidence is never complete: server verdict, missing end record,
  for(const [n,reason] of cases){const v=navigationEvidenceView(report({navigation2d:n}));expect(v.complete,reason).toBe(false);expect(v.reasons,reason).toContain(reason);}
  const pubs=navigationEvidenceView(report({metrics:{distanceM:{},collision:{available:false,contacts:null,minSeparationM:null},navigation:{sensorPublications:{expected:81,recorded:40,complete:false}}}}));
  expect(pubs.complete).toBe(false);expect(pubs.reasons).toContain('SENSOR_PUBLICATIONS_INCOMPLETE');
+});
+test('review C01 F4: every signal must agree; each disagreement is named (runTick, contradictory completeness, end record, gaps, listings, sensors)',()=>{
+ const e=evidence,rec=(r:Record<string,unknown>)=>({...e(),recording:{...e().recording,...r}});
+ const cases:[unknown,string[],Record<string,unknown>?][]=[
+  [rec({runTick:500}),['EVIDENCE_PENDING']],
+  [rec({runTick:300}),['EVIDENCE_AHEAD_OF_CHECKPOINT:301-400']],
+  [{...e(),completeness:{status:'complete',reasons:['EVIDENCE_TICKS_MISSING']}},['COMPLETENESS_CONTRADICTORY','EVIDENCE_TICKS_MISSING']],
+  [rec({terminal:'WORKER_LOST'}),['EVIDENCE_TERMINAL:WORKER_LOST']],
+  [rec({lastTick:399,runTick:399}),['EVIDENCE_END_MISMATCH']],
+  [rec({lastTick:399}),['EVIDENCE_END_MISMATCH','EVIDENCE_PENDING']],
+  [rec({lastTick:399,terminal:'WORKER_LOST',runTick:399}),['EVIDENCE_TERMINAL:WORKER_LOST','EVIDENCE_END_MISMATCH']],
+  [rec({gaps:[{fromTick:10,toTick:12,reason:'DISK_FULL'}]}),['RECORDING_GAP:DISK_FULL']],
+  [{...e(),artifacts:{...e().artifacts,control:[e().artifacts.control[0]!]}},['CONTROL_LISTING_GAP']],
+  [{...e(),artifacts:{...e().artifacts,sensors:[]}},['SENSOR_LISTING_EMPTY']],
+  [e(),['SENSOR_PUBLICATIONS_UNKNOWN'],{metrics:{distanceM:{},collision:{available:false,contacts:null,minSeparationM:null}}}],
+ ];
+ for(const [n,reasons,over] of cases){const v=navigationEvidenceView(report({navigation2d:n,...over}));expect(v.complete,reasons.join()).toBe(false);expect(v.reasons,reasons.join()).toEqual(reasons);}
+ // a run still null before start, or a run tick equal to the last durable tick, says nothing against completeness
+ for(const runTick of [null,400])expect(navigationEvidenceView(report({navigation2d:rec({runTick})})).complete).toBe(true);
+});
+test('review C01 F3: an incomplete view never shows or exports a pass; fails stay fails; reasons travel with the CSV row',()=>{
+ const n={...evidence(),completeness:{status:'incomplete',reasons:['EVIDENCE_CHUNK_MISSING:trajectory-000002-abcdef01.ndjson.gz']},assertions:[{id:'EVIDENCE_COVERAGE',result:'pass',detail:'all ticks'},{id:'IR-ARRIVAL',result:'pass',detail:'arrived'},{id:'IR-NO-COLLISION',result:'fail',detail:'contact at 120'},{id:'REPEATABILITY_CROSS_PLATFORM',result:'not_run',detail:'no platform qualified'}]};
+ const r=report({navigation2d:n});
+ expect(navigationRows(r).map(a=>[a.id,a.result])).toEqual([['EVIDENCE_COVERAGE','unverified'],['IR-ARRIVAL','unverified'],['IR-NO-COLLISION','fail'],['REPEATABILITY_CROSS_PLATFORM','not_run']]);
+ const csv=reportCsv(r);expect(csv).not.toMatch(/navigation_assertion.*,pass,/);
+ expect(csv).toContain('navigation_assertion,,,,irsim_2d,IR-ARRIVAL,arrived,unverified,EVIDENCE_CHUNK_MISSING:trajectory-000002-abcdef01.ndjson.gz,');
+ expect(csv).toContain('navigation_assertion,,,,irsim_2d,IR-NO-COLLISION,contact at 120,fail,,');
+ const html=reportHtml(r);expect(html).not.toContain('<td>pass</td>');expect(html).toContain('<td>unverified</td>');
+ const panel=navigationHtml(r);expect(panel).not.toContain('data-result="pass"');expect(panel).toContain('data-result="unverified"');expect(panel).toContain('not established');
+ expect(navigationRows(report()).map(a=>a.result)).toEqual(['pass','not_run']);// a complete view keeps its passes
 });
 test('import: a folder with every chunk verifies; a missing scan chunk imports as incomplete; a changed chunk or unknown schema is refused',async()=>{
  const ok=await importNavigationEvidence(files(report()));

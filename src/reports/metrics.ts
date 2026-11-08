@@ -56,7 +56,7 @@ export function reportCsv(report:RunReportV2){
   ...r.businessEvents.map(e=>['business',e.sequence,e.at,eventTick(e.at),e.kind,e.id,e.type,'',e.state??{},'']),
   ...(r.telemetry?.samples??[]).map(s=>['telemetry',s.seq,s.observedAt,Number.isFinite(sampleTick(s))?sampleTick(s):'',s.entityId,`${s.providerId}/${s.bootId}`,'TwinSample',s.quality,{simTimeNs:s.simTimeNs,providerId:s.providerId,observed:s.observed,commanded:s.commanded,reasonCodes:s.reasonCodes},s.simTimeNs]),
   ...reportKpis(r).map(k=>['kpi','','','',k.unit,k.id,k.definition,k.available?'available':'unavailable',k.available?k.value:k.reason,'']),
-  ...navigationRows(r).map(a=>['navigation_assertion','','','','irsim_2d',a.id,a.detail,a.result,'',''])];
+  ...navigationRows(r).map(a=>['navigation_assertion','','','','irsim_2d',a.id,a.detail,a.result,a.reasons.join(' '),''])];
  return rows.map(x=>x.map(cell).join(',')).join('\n')+'\n';
 }
 /** Self-contained static HTML: no script, no external resource; every runtime string escaped. */
