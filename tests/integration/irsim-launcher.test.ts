@@ -2,14 +2,14 @@
 // its lock and never starts anything (no runtime, no UI, no mock stand-in) when a check fails. Health must show a live irsim_2d; `lab:mock` is untouched.
 import {expect,test} from 'vitest';
 import {spawn} from 'node:child_process';
-import {mkdtemp,mkdir,writeFile,readFile,rm,symlink,chmod} from 'node:fs/promises';
+import {mkdtemp,mkdir,writeFile,readFile,rm,symlink,chmod,copyFile} from 'node:fs/promises';
 import {createServer} from 'node:net';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {dirname,join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 // @ts-expect-error CLI JavaScript boundary
-import {installRuntime,validatePortableTools,verifyPortableTree} from '../../scripts/runtime-artifact.mjs';
+import {installRuntime,installedManifest,validatePortableTools,verifyPortableTree} from '../../scripts/runtime-artifact.mjs';
 // @ts-expect-error CLI JavaScript boundary
 import {checkIRSimHealth,irsimOptions,venvProblem} from '../../scripts/start-irsim.mjs';
 const lab=fileURLToPath(new URL('../../',import.meta.url)),launcher=join(lab,'scripts/start-irsim.mjs');
@@ -79,6 +79,13 @@ test('launcher tree check: exact closure passes; a changed, missing, unlisted or
  await rm(join(src,'robotics/simulation/compiler/description.py'));
  await symlink('/etc/hosts',join(src,'robotics/model-validation/linkforge_worker/link.py'));
  expect((await verifyPortableTree(tools,src)).sort()).toEqual(['robotics/model-validation/linkforge_worker/link.py:SYMLINK','robotics/navigation-2d/irsim_worker/__main__.py:CHANGED','robotics/navigation-2d/irsim_worker/extra.py:UNLISTED','robotics/simulation/compiler/description.py:MISSING']);
+}));
+test('pinned runtime: the closure covers the packages the description helper imports, so an edited actors/scenario.py is a mismatch',()=>withTmp(async(tmp)=>{
+ const p=(await installedManifest(lab,JSON.parse(await readFile(join(lab,'config/source-runtime.lock.json'),'utf8')))).portableSimulationTools as Tools,src=join(tmp,'source');
+ for(const f of p.closure.files){await mkdir(dirname(join(src,f.path)),{recursive:true});await copyFile(join(lab,'../source',f.path),join(src,f.path));}
+ expect(await verifyPortableTree(p,src)).toEqual([]);
+ for(const f of ['actors/scenario.py','worlds/generate_restaurant.py']){await mkdir(dirname(join(src,'robotics/simulation',f)),{recursive:true});await writeFile(join(src,'robotics/simulation',f),'raise SystemExit("unpinned")\n');}
+ expect((await verifyPortableTree(p,src)).sort()).toEqual(['robotics/simulation/actors/scenario.py:CHANGED','robotics/simulation/worlds/generate_restaurant.py:CHANGED']);
 }));
 test('venv check: CPython 3.11 with every locked package at its version; anything else names the problem',()=>withTmp(async(tmp)=>{
  expect(await venvProblem(await fakePython(tmp,[3,11],{'ir-sim':'2.12.0',numpy:'2.1.0'}),LOCK)).toBeNull();
