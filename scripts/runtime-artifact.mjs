@@ -1,4 +1,4 @@
-import {readFile,writeFile,mkdir,rename,stat,rm,readdir} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,rename,stat,rm,readdir,lstat,realpath} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {createHash,randomUUID} from 'node:crypto';
 import {auditBundle} from './runtime-audit.mjs';
@@ -12,9 +12,51 @@ export function validateManifest(m) {
  const majors=m.protocolMajors??[m.protocolMajor];
  if(!Array.isArray(majors)||!majors.includes(m.protocolMajor)||!majors.every(n=>LAB_PROTOCOL_MAJORS.includes(n)))throw new Error(`UNSUPPORTED_PROTOCOL:${majors}`);
  if(m.schemas!==undefined&&(!Array.isArray(m.schemas)||m.schemas.length>256||!m.schemas.every(n=>typeof n==='string'&&SCHEMA_NAME.test(n))))throw new Error('INVALID_RUNTIME_MANIFEST');
+ if(m.portableSimulationTools!==undefined)validatePortableTools(m.portableSimulationTools);
  return m;
 }
-const lockOf=(m)=>({dirty:false,packageVersion:m.packageVersion,toolchain:{node:m.toolchain.node},sourceCommit:m.sourceCommit,schemaHash:m.schemaHash,protocolMajor:m.protocolMajor,...(m.protocolMajors?{protocolMajors:m.protocolMajors}:{}),nodeMajor:m.nodeMajor,artifactSha256:m.artifactSha256,entrypoint:m.entrypoint});
+// ---- portableSimulationTools (IR-SIM 2D / LinkForge, developer Mac): distributed separately from runtime.mjs; the closure names every file the workers may load. ----
+const SHA=/^[a-f0-9]{64}$/,TOOL_PATH=/^[A-Za-z0-9_][A-Za-z0-9_.-]*(\/[A-Za-z0-9_][A-Za-z0-9_.-]*)*$/;
+const safeToolPath=(p)=>typeof p==='string'&&p.length<=512&&TOOL_PATH.test(p)&&p.split('/').every(s=>s!=='.'&&s!=='..');
+/** Closed shape, self-consistent digest, every tool root and lock inside the closure. Anything else is INVALID_PORTABLE_TOOLS: the importer never guesses. */
+export function validatePortableTools(p){
+ const bad=(why)=>{throw new Error(`INVALID_PORTABLE_TOOLS:${why}`);};
+ if(!p||typeof p!=='object'||p.distribution!=='separate'||p.version!==1||p.python?.implementation!=='cpython'||p.python?.version!=='3.11')bad('shape');
+ const c=p.closure,files=c?.files;
+ if(!c||c.version!==1||!SHA.test(c.digest)||!Array.isArray(files)||!files.length||files.length>4096)bad('closure');
+ for(const [i,f] of files.entries())if(!f||Object.keys(f).sort().join()!=='bytes,path,sha256'||!safeToolPath(f.path)||!SHA.test(f.sha256)||!Number.isSafeInteger(f.bytes)||f.bytes<0||i&&!(files[i-1].path<f.path))bad(`file:${f?.path}`);
+ if(digest(JSON.stringify(files))!==c.digest)bad('digest');
+ if(!Array.isArray(p.roots)||!p.roots.length||p.roots.length>16||!p.roots.every(safeToolPath)||files.some(f=>!p.roots.some(r=>f.path.startsWith(r+'/'))))bad('roots');
+ if(!Array.isArray(p.tools)||!p.tools.length||p.tools.length>16)bad('tools');
+ for(const t of p.tools){
+  if(!t||typeof t.id!=='string'||!/^[a-z0-9_]{1,64}$/.test(t.id)||!safeToolPath(t.root)||!files.some(f=>f.path.startsWith(t.root+'/')))bad(`tool:${t?.id}`);
+  if(t.lock!==undefined&&(!safeToolPath(t.lock.path)||!t.lock.path.startsWith(t.root+'/')||files.find(f=>f.path===t.lock.path)?.sha256!==t.lock.sha256))bad(`lock:${t.id}`);
+ }
+ for(const id of ['irsim_worker','linkforge_worker'])if(!p.tools.find(t=>t.id===id)?.lock)bad(`tool:${id}`);
+ return p;
+}
+const SKIP=new Set(['__pycache__','.pytest_cache','.venv','tests']);
+/** Re-hash the tool tree the launcher is about to run against the pinned closure: same walk rules as the source exporter, so an extra, missing or changed file
+ * (or any symlink) under a tool root is a mismatch. Returns the mismatching paths (empty = the tree is exactly the pinned closure). */
+export async function verifyPortableTree(p,sourceRoot){
+ validatePortableTools(p);
+ const root=await realpath(resolve(sourceRoot)),seen=new Map(),problems=[];
+ const walk=async(relative)=>{
+  const path=join(root,relative);let entries;
+  try{if((await lstat(path)).isSymbolicLink()||await realpath(path)!==path)return void problems.push(`${relative}:SYMLINK`);entries=await readdir(path,{withFileTypes:true});}catch{return void problems.push(`${relative}:MISSING`);}
+  for(const e of entries.sort((a,b)=>a.name.localeCompare(b.name,'en'))){
+   if(SKIP.has(e.name))continue;const r=`${relative}/${e.name}`;
+   if(e.isSymbolicLink())problems.push(`${r}:SYMLINK`);else if(e.isDirectory())await walk(r);else if(e.isFile()&&!/\.(pyc|pyo)$/.test(e.name))seen.set(r,digest(await readFile(join(root,r))));
+  }
+ };
+ for(const r of p.roots)await walk(r);
+ for(const f of p.closure.files){const actual=seen.get(f.path);if(actual===undefined)problems.push(`${f.path}:MISSING`);else if(actual!==f.sha256)problems.push(`${f.path}:CHANGED`);seen.delete(f.path);}
+ for(const extra of seen.keys())problems.push(`${extra}:UNLISTED`);
+ return problems;
+}
+/** The manifest of the pinned, installed artifact (already hash-checked by checkedRuntime). */
+export async function installedManifest(root,lock){return validateManifest(JSON.parse(await readFile(join(root,'.runtime',lock.artifactSha256,'manifest.json'),'utf8')));}
+const lockOf=(m)=>({dirty:false,packageVersion:m.packageVersion,toolchain:{node:m.toolchain.node},sourceCommit:m.sourceCommit,schemaHash:m.schemaHash,protocolMajor:m.protocolMajor,...(m.protocolMajors?{protocolMajors:m.protocolMajors}:{}),nodeMajor:m.nodeMajor,artifactSha256:m.artifactSha256,entrypoint:m.entrypoint,...(m.portableSimulationTools?{portableToolsDigest:m.portableSimulationTools.closure.digest}:{})});
 /** Write JSON through a temporary sibling and one rename: a crash leaves the old file or the new one, never half of one. */
 async function writeAtomic(file,value){const tmp=join(resolve(file,'..'),`.${randomUUID()}.tmp`);try{await writeFile(tmp,JSON.stringify(value,null,2)+'\n');await rename(tmp,file);}finally{await rm(tmp,{force:true});}}
 async function writeLock(root,lock){await mkdir(join(root,'config'),{recursive:true});await writeAtomic(join(root,'config','source-runtime.lock.json'),lock);}

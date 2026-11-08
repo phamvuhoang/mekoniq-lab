@@ -1,4 +1,4 @@
-// Synced from source packages/contracts/generated/engineering.ts @ 28b98bf07f2ca93faba97272755cdff5c17fd17b (sha256 7934178d0a9e9f41334dbbebe8659e4a55cb2f4590a304a3b2ff8021486c6416). Run node scripts/sync-engineering-contracts.mjs; do not edit.
+// Synced from source packages/contracts/generated/engineering.ts @ 2a8bcd3b708b489a1c88c2ce14a84b88741a1150 (sha256 33bb9097e18459440b005a72cbca8ab342c59b846ed52c0bd4d531aef50dd060). Run node scripts/sync-engineering-contracts.mjs; do not edit.
 /* Generated from the engineering schemas. Run pnpm contracts:generate; do not edit. */
 import type {LabProjectV2,AssetRevision} from './types';
 export type CoffeeRecipe=Record<string,unknown>;
@@ -86,7 +86,7 @@ export type Joint =
  * This interface was referenced by `EngineeringContracts`'s JSON-Schema
  * via the `definition` "EngineeringProfile".
  */
-export type EngineeringProfile = 'engineering-rigid-v1' | 'engineering-contact-v1';
+export type EngineeringProfile = 'engineering-rigid-v1' | 'engineering-contact-v1' | 'engineering-irsim-2d-v1';
 /**
  * This interface was referenced by `EngineeringContracts`'s JSON-Schema
  * via the `definition` "BundleReceipt".
@@ -304,6 +304,11 @@ export interface SensorModel {
   };
   latency: Scalar;
   dropoutProbability: Scalar;
+  sensorType?: 'lidar_2d';
+  lidar2d?: {
+    beamCount: number;
+    beamCountSource: SourceRef;
+  };
 }
 /**
  * This interface was referenced by `EngineeringContracts`'s JSON-Schema
@@ -753,6 +758,10 @@ export interface ResolvedModels {
   };
   process: {
     [k: string]: ModelDocument;
+  };
+  driveBindingsVersion?: 1;
+  drivesByEntity?: {
+    [k: string]: DriveBinding;
   };
 }
 /**
