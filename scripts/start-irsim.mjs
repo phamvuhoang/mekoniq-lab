@@ -9,6 +9,8 @@
 import {execFile,spawn} from 'node:child_process';
 import {mkdir,readFile,writeFile,access,constants,stat} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
+import {mkdtempSync} from 'node:fs';
+import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {promisify} from 'node:util';
 import {launch,checkHealth,MOCK_BACKENDS} from './start-mock.mjs';
@@ -25,6 +27,9 @@ export function checkIRSimHealth(health,lock){
 // Reads the venv's installed distributions with the standard library only (isolated mode: no user site, no cwd on sys.path).
 const PROBE="import sys,json,importlib.metadata as m\nprint(json.dumps({'version':list(sys.version_info[:2]),'impl':sys.implementation.name,'dists':{d.metadata['Name'].lower().replace('_','-'):d.version for d in m.distributions()}}))";
 const pins=(text)=>[...text.matchAll(/^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;\\]+)/gm)].map(([,n,v])=>[n.toLowerCase().replace(/[_.]/g,'-'),v]);
+// -I ignores PYTHON* variables, so the probe gets the bytecode switches on its command line: -B writes none, -X pycache_prefix (a private empty
+// directory) reads none from __pycache__ beside any source. ponytail: one empty directory per launcher, left in tmpdir.
+let prefix;const pycachePrefix=()=>prefix??=mkdtempSync(join(tmpdir(),'mekoniq-pycache-'));
 /** A preflight child in its own process group, handed to the launcher's `track` at spawn (so Ctrl-C stops it and whatever it started). */
 // spawn, not execFile: execFile does not honour `detached`, so its child would share the launcher's group
 const spawnProbe=(python,args,{timeout,env},track)=>new Promise((ok,fail)=>{
@@ -36,7 +41,7 @@ const spawnProbe=(python,args,{timeout,env},track)=>new Promise((ok,fail)=>{
 /** CPython 3.11 whose installed distributions include every `name==version` of the lock. Returns null when it matches, else the reason code. */
 export async function venvProblem(python,lockText,track=()=>{}){
  try{await access(python,constants.X_OK);if(!(await stat(python)).isFile())return 'PYTHON_MISSING';}catch{return 'PYTHON_MISSING';}
- let probe;try{probe=JSON.parse((await spawnProbe(python,['-I','-c',PROBE],{timeout:20000,env:{PATH:'/usr/bin:/bin',LANG:'C.UTF-8'}},track)).stdout);}catch{return 'PYTHON_UNUSABLE';}
+ let probe;try{probe=JSON.parse((await spawnProbe(python,['-I','-B','-X',`pycache_prefix=${pycachePrefix()}`,'-c',PROBE],{timeout:20000,env:{PATH:'/usr/bin:/bin',LANG:'C.UTF-8'}},track)).stdout);}catch{return 'PYTHON_UNUSABLE';}
  if(probe.impl!=='cpython'||probe.version?.join('.')!=='3.11')return `PYTHON_UNSUPPORTED:${probe.impl}-${probe.version?.join('.')}`;
  const installed=Object.fromEntries(Object.entries(probe.dists??{}).map(([k,v])=>[k.replace(/[_.]/g,'-'),v]));
  const wrong=pins(lockText).filter(([n,v])=>installed[n]!==v).map(([n,v])=>`${n}==${v}${installed[n]?` (found ${installed[n]})`:' (missing)'}`);
@@ -55,7 +60,7 @@ export async function prepareIRSim(o,launch_,lock,track=()=>{}){
  const manifest=await installedManifest(launch_.root,lock),p=manifest.portableSimulationTools;
  if(!p)throw new Error('PORTABLE_TOOLS_NOT_IN_ARTIFACT: the pinned runtime predates portable simulation; import an export that carries portableSimulationTools.');
  const mismatch=await verifyPortableTree(p,o.source);
- if(mismatch.length)throw new Error(`PORTABLE_TOOLS_MISMATCH: ${mismatch.slice(0,5).join(', ')}${mismatch.length>5?` (+${mismatch.length-5})`:''}. The tools in ${o.source} are not the pinned closure ${p.closure.digest.slice(0,12)}.`);
+ if(mismatch.length)throw new Error(`PORTABLE_TOOLS_MISMATCH: ${mismatch.slice(0,5).join(', ')}${mismatch.length>5?` (+${mismatch.length-5})`:''}. The tools in ${o.source} are not the pinned closure ${p.closure.digest.slice(0,12)}.${mismatch.some(m=>m.endsWith(':BYTECODE'))?` Bytecode is never pinned: remove it yourself (e.g. find <tool root> -name __pycache__ -prune -exec rm -rf {} +; the launcher never deletes files).`:''}`);
  const tool=(id)=>p.tools.find(t=>t.id===id),root=(id)=>join(o.source,tool(id).root);
  for(const [id,python,code] of [['irsim_worker',o.irsimPython,'IRSIM'],['linkforge_worker',o.linkforgePython,'LINKFORGE']]){
   const problem=await venvProblem(python,await readFile(join(o.source,tool(id).lock.path),'utf8'),track);

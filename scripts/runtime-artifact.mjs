@@ -35,7 +35,9 @@ export function validatePortableTools(p){
  for(const id of ['irsim_worker','linkforge_worker'])if(!p.tools.find(t=>t.id===id)?.lock)bad(`tool:${id}`);
  return p;
 }
-const SKIP=new Set(['__pycache__','.pytest_cache','.venv','tests']);
+const SKIP=new Set(['.pytest_cache','.venv','tests']);
+// bytecode is never part of the closure: a __pycache__ directory or a .pyc/.pyo under a tool root fails closed (Python could run it instead of the pinned source)
+const BYTECODE=/\.py[co]$/;
 /** Re-hash the tool tree the launcher is about to run against the pinned closure: same walk rules as the source exporter, so an extra, missing or changed file
  * (or any symlink) under a tool root is a mismatch. Returns the mismatching paths (empty = the tree is exactly the pinned closure). */
 export async function verifyPortableTree(p,sourceRoot){
@@ -46,7 +48,7 @@ export async function verifyPortableTree(p,sourceRoot){
   try{if((await lstat(path)).isSymbolicLink()||await realpath(path)!==path)return void problems.push(`${relative}:SYMLINK`);entries=await readdir(path,{withFileTypes:true});}catch{return void problems.push(`${relative}:MISSING`);}
   for(const e of entries.sort((a,b)=>a.name.localeCompare(b.name,'en'))){
    if(SKIP.has(e.name))continue;const r=`${relative}/${e.name}`;
-   if(e.isSymbolicLink())problems.push(`${r}:SYMLINK`);else if(e.isDirectory())await walk(r);else if(e.isFile()&&!/\.(pyc|pyo)$/.test(e.name))seen.set(r,digest(await readFile(join(root,r))));
+   if(e.isSymbolicLink())problems.push(`${r}:SYMLINK`);else if(e.name==='__pycache__'||BYTECODE.test(e.name))problems.push(`${r}:BYTECODE`);else if(e.isDirectory())await walk(r);else if(e.isFile())seen.set(r,digest(await readFile(join(root,r))));
   }
  };
  for(const r of p.roots)await walk(r);

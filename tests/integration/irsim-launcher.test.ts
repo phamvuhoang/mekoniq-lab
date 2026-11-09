@@ -2,6 +2,7 @@
 // its lock and never starts anything (no runtime, no UI, no mock stand-in) when a check fails. Health must show a live irsim_2d; `lab:mock` is untouched.
 import {expect,test} from 'vitest';
 import {spawn} from 'node:child_process';
+import {existsSync} from 'node:fs';
 import {mkdtemp,mkdir,writeFile,readFile,rm,symlink,chmod,copyFile} from 'node:fs/promises';
 import {createServer} from 'node:net';
 import {tmpdir} from 'node:os';
@@ -161,3 +162,48 @@ test('review5 #7: Ctrl-C during the venv preflight stops the probe and its child
   expect(pids.filter(alive),signal).toEqual([]);
  }
 }),60000);
+// review5 #6: planted bytecode beside a pinned source. Same name, same source mtime and size in its header, different body: Python would run it.
+const irPython=join(lab,'../source/.venv-irsim/bin/python');
+const PLANT=`import os,py_compile,sys
+src=sys.argv[1];body=open(src,'rb').read();st=os.stat(src)
+evil=b"raise SystemExit('planted bytecode ran')\\n";evil=evil+b'#'*(len(body)-len(evil)-1)+b'\\n'
+open(src,'wb').write(evil);os.utime(src,ns=(st.st_atime_ns,st.st_mtime_ns))
+py_compile.compile(src,cfile=os.path.join(os.path.dirname(src),'__pycache__',os.path.basename(src)[:-3]+'.cpython-%d%d.pyc'%sys.version_info[:2]))
+open(src,'wb').write(body);os.utime(src,ns=(st.st_atime_ns,st.st_mtime_ns))`;
+test.skipIf(!existsSync(irPython))('review5 #6: planted __pycache__ in a copy of the pinned closure: the launcher refuses it, and the interpreter flags run the source, never the bytecode',()=>withTmp(async(tmp)=>{
+ const p=(await installedManifest(lab,JSON.parse(await readFile(join(lab,'config/source-runtime.lock.json'),'utf8')))).portableSimulationTools as Tools,src=join(tmp,'source');
+ for(const f of p.closure.files){await mkdir(dirname(join(src,f.path)),{recursive:true});await copyFile(join(lab,'../source',f.path),join(src,f.path));}
+ expect(await verifyPortableTree(p,src)).toEqual([]);
+ const root=join(src,'robotics/navigation-2d'),target=join(root,'irsim_worker/__init__.py'),before=await readFile(target);
+ const {execFileSync}=await import('node:child_process');
+ execFileSync(irPython,['-I','-c',PLANT,target]);
+ expect(await readFile(target)).toEqual(before);// every source hash still matches the pin
+ // (1) the launcher's tree check fails closed on the bytecode, naming it
+ expect(await verifyPortableTree(p,src)).toEqual(['robotics/navigation-2d/irsim_worker/__pycache__:BYTECODE']);
+ // the attack is real: writing bytecode off is not reading it off
+ const imp=(args:string[],env:Record<string,string>={},code='import irsim_worker')=>{try{execFileSync(irPython,[...args,'-c',code],{cwd:tmp,env:{PATH:'/usr/bin:/bin',...env},stdio:'pipe'});return 'source';}catch(e){return String((e as {stderr?:Buffer}).stderr).includes('planted bytecode ran')?'planted':String(e);}};
+ expect(imp([],{PYTHONPATH:root,PYTHONDONTWRITEBYTECODE:'1'})).toBe('planted');
+ // (2) with a private empty pycache prefix the interpreter compiles the source instead: the source runtime's env form and the launcher probe's -I form
+ const empty=await mkdtemp(join(tmp,'pycache-'));
+ expect(imp([],{PYTHONPATH:root,PYTHONDONTWRITEBYTECODE:'1',PYTHONPYCACHEPREFIX:empty})).toBe('source');
+ expect(imp(['-I','-B','-X',`pycache_prefix=${empty}`],{},`import sys;sys.path.insert(0,${JSON.stringify(root)});import irsim_worker`)).toBe('source');
+ expect(imp(['-I'],{},`import sys;sys.path.insert(0,${JSON.stringify(root)});import irsim_worker`)).toBe('planted');// -I alone ignores PYTHON* variables: the switches must be on the command line
+ // a sourceless .pyc or a native extension in a tool root is refused too
+ await writeFile(join(root,'irsim_worker/loose.pyc'),'x');await writeFile(join(root,'irsim_worker/ext.cpython-311-darwin.so'),'x');
+ expect((await verifyPortableTree(p,src)).sort()).toEqual(['robotics/navigation-2d/irsim_worker/__pycache__:BYTECODE','robotics/navigation-2d/irsim_worker/ext.cpython-311-darwin.so:UNLISTED','robotics/navigation-2d/irsim_worker/loose.pyc:BYTECODE']);
+}),60000);
+test('review5 #6: the launcher refuses to start over a tool tree holding bytecode, with the offending path and how to clear it',()=>withTmp(async(tmp)=>{
+ const root=join(tmp,'lab'),src=join(tmp,'source'),tools=await sourceTree(src);await installed(root,tmp,tools);
+ const ok=await fakePython(tmp,[3,11],{'ir-sim':'2.12.0',numpy:'2.1.0','linkforge-core':'1.6.0'});
+ await mkdir(join(src,'robotics/model-validation/linkforge_worker/__pycache__'));await writeFile(join(src,'robotics/model-validation/linkforge_worker/__pycache__/__main__.cpython-311.pyc'),'x');
+ const rp=await freePort(),up=await freePort();
+ const r=run(['--root',root,'--source',src,'--data-dir',join(tmp,'runs'),'--runtime-port',String(rp),'--ui-port',String(up),'--irsim-python',ok,'--linkforge-python',ok,'--boot-only']);
+ expect(await r.exit,r.err).toBe(1);expect(r.err).toMatch(/PORTABLE_TOOLS_MISMATCH: robotics\/model-validation\/linkforge_worker\/__pycache__:BYTECODE/);expect(r.err).toMatch(/__pycache__/);
+ expect(await listening(rp)).toBe(false);
+}),30000);
+test('review5 #6: the venv probe runs with bytecode reading and writing off (-I would ignore PYTHON* variables)',()=>withTmp(async(tmp)=>{
+ const f=join(tmp,'python');await writeFile(f,`#!/bin/sh\nprintf '%s\\n' "$@" > ${join(tmp,'argv')}\necho '${JSON.stringify({version:[3,11],impl:'cpython',dists:{'ir-sim':'2.12.0',numpy:'2.1.0'}})}'\n`);await chmod(f,0o755);
+ expect(await venvProblem(f,LOCK)).toBeNull();
+ const argv=(await readFile(join(tmp,'argv'),'utf8')).split('\n');
+ expect(argv.slice(0,3)).toEqual(['-I','-B','-X']);expect(argv[3]).toMatch(/^pycache_prefix=\/.+mekoniq-pycache-/);
+}));
