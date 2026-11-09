@@ -23,7 +23,7 @@ const navigationGenerated=await readFile(here('../../source/packages/contracts/g
 if(!navigationGenerated.includes("from './engineering';"))throw new Error('GENERATED_IMPORT_CHANGED');
 const navigationOutput=`// Synced from source packages/contracts/generated/navigation2d.ts @ ${commit} (sha256 ${createHash('sha256').update(navigationGenerated).digest('hex')}). Run node scripts/sync-engineering-contracts.mjs; do not edit.\n`+navigationGenerated;
 // The Serve demo fixture (portable IR-SIM profile) the Assembly page opens: copied byte for byte after its own manifest hashes verify.
-const fixtureSource=here('../../source/robotics/navigation-2d/fixtures/serve-demo-v1/'),fixtureTarget=here('../fixtures/engineering/serve-demo-v1/'),FIXTURE_FILES=['manifest.json','serve-project.json','serve-components.json','navigation-scene.json'];
+const fixtureSource=here('../../source/robotics/navigation-2d/fixtures/serve-demo-v1/'),fixtureTarget=here('../fixtures/engineering/serve-demo-v1/'),FIXTURE_FILES=['manifest.json','serve-project.json','serve-fleet-project.json','serve-components.json','navigation-scene.json'];
 const fixtureManifest=JSON.parse(await readFile(`${fixtureSource}manifest.json`,'utf8'));
 const fixtureFiles=await Promise.all(FIXTURE_FILES.map(async(n)=>{const b=await readFile(`${fixtureSource}${n}`);if(n!=='manifest.json'&&fixtureManifest.files.find(f=>f.path===n)?.sha256!==createHash('sha256').update(b).digest('hex'))throw new Error(`SERVE_FIXTURE_HASH_MISMATCH:${n}`);return [n,b];}));
 if(execFileSync('git',['status','--porcelain','--','robotics/navigation-2d/fixtures'],{cwd:sourceRoot,encoding:'utf8'}).trim())throw new Error('SOURCE_FIXTURES_DIRTY: commit source before syncing');
