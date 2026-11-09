@@ -112,3 +112,7 @@ test('review5 #4: the report envelope and its navigation evidence must name the 
  // the agreeing envelope (sourceCommit included) stays complete
  expect(navigationEvidenceView(report({navigation2d:{...evidence(),identity:{...ident,sourceCommit:'s'.repeat(40)}}}))).toMatchObject({complete:true,reasons:[]});
 });
+test('review6 C: the source world hash leaves the revision out, so the import compares the world revision on its own',async()=>{
+ const r=report();r.manifest.world={...r.manifest.world,revision:r.manifest.world.revision+1};// same hash, another revision
+ await expect(importNavigationEvidence(files(r))).rejects.toThrow('WORLD_HASH_MISMATCH');
+});

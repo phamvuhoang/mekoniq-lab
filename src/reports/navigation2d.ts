@@ -14,6 +14,7 @@ import {validReportShape} from './report-shape';
 import {MAX_EVIDENCE_BYTES,safeArtifactPath} from './verification';
 import {validateProjectV2} from '../project/schema';
 import {hashJson} from '../twin/hash';
+import {worldHash} from '../twin/model';
 const ajv=new Ajv({strict:false,allErrors:true});addFormats(ajv);
 ajv.addSchema(componentSchema,'engineering-component.schema.json');ajv.addSchema(physicalSchema,'robot-physical-model-v1.schema.json');
 const validEvidence=ajv.compile<NavigationRunEvidenceV1>(evidenceSchema);
@@ -108,7 +109,9 @@ export async function importNavigationEvidence(files:readonly File[]):Promise<{o
  const projectFile=entries.get('project.json');if(!projectFile)throw new Error('PROJECT_MISSING');
  const project=validateProjectV2(JSON.parse(await projectFile.text()));
  if(hashJson(project)!==report.manifest.project.hash)throw new Error('PROJECT_HASH_MISMATCH');
- if(hashJson(project.world)!==report.manifest.world.hash)throw new Error('WORLD_HASH_MISMATCH');
+ // source (navigation2d runner) writes worldHash: the world without its revision counter, so the revision is compared on its own
+ const w=report.manifest.world;
+ if(worldHash(project.world)!==w.hash||project.world.id!==w.id||project.world.revision!==w.revision)throw new Error('WORLD_HASH_MISMATCH');
  // a downgrade only: chunks this folder does not carry make the imported copy incomplete, with the names
  if(missing.length)n.completeness={status:'incomplete',reasons:[...n.completeness?.reasons??[],...missing.map(p=>`EVIDENCE_CHUNK_MISSING:${p}`)].slice(0,50)};
  return {origin:'imported',report,project};
