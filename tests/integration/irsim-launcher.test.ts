@@ -207,3 +207,23 @@ test('review5 #6: the venv probe runs with bytecode reading and writing off (-I 
  const argv=(await readFile(join(tmp,'argv'),'utf8')).split('\n');
  expect(argv.slice(0,3)).toEqual(['-I','-B','-X']);expect(argv[3]).toMatch(/^pycache_prefix=\/.+mekoniq-pycache-/);
 }));
+test('review6 B: a probe that exited but left a child holding its stdout: Ctrl-C still stops that child (the group outlives its leader)',()=>withTmp(async(tmp)=>{
+ const root=join(tmp,'lab'),src=join(tmp,'source'),tools=await sourceTree(src);await installed(root,tmp,tools);
+ const alive=(pid:number)=>{try{process.kill(pid,0);return true;}catch{return false;}};
+ // the third round's child ignores SIGTERM: only the SIGKILL escalation after the bounded wait ends it
+ for(const [round,signal,stubborn] of [[0,'SIGINT',false],[1,'SIGTERM',false],[2,'SIGINT',true]] as const){
+  const gp=join(tmp,`grandchild-${round}.pid`),pp=join(tmp,`probe-${round}.pid`),fake=join(tmp,`probe-${round}`);
+  // the probe answers and exits at once; its background child keeps the probe's stdout open, so the probe's stream never closes
+  await writeFile(fake,`#!/bin/sh\n${stubborn?"(trap '' TERM; exec sleep 60) &":'sleep 60 &'}\necho $! > ${gp}\necho $$ > ${pp}\necho '{"version":[3,11],"impl":"cpython","dists":{}}'\nexit 0\n`);await chmod(fake,0o755);
+  const child=spawn(process.execPath,[launcher,'--root',root,'--source',src,'--data-dir',join(tmp,'runs'),'--runtime-port',String(await freePort()),'--ui-port',String(await freePort()),'--irsim-python',fake,'--linkforge-python',fake],{cwd:lab,stdio:['ignore','pipe','pipe']});
+  const exit=new Promise<number|null>(r=>child.once('exit',c=>r(c)));
+  let leader=NaN,grand=NaN;
+  for(let i=0;i<100;i++){await new Promise(r=>setTimeout(r,50));leader=await readFile(pp,'utf8').then(Number,()=>NaN);grand=await readFile(gp,'utf8').then(Number,()=>NaN);if(Number.isInteger(leader)&&Number.isInteger(grand)&&!alive(leader))break;}
+  expect([alive(leader),alive(grand)],signal).toEqual([false,true]);// the leader is gone, its group is not
+  child.kill(signal);
+  expect(await exit,signal).toBe(signal==='SIGINT'?130:143);
+  for(let i=0;i<100&&alive(grand);i++)await new Promise(r=>setTimeout(r,100));
+  const survived=alive(grand);if(survived)process.kill(grand,'SIGKILL');// never leave the fixture's own child behind, even on RED
+  expect(survived,signal).toBe(false);
+ }
+}),60000);

@@ -46,9 +46,13 @@ const waitFor=(child,name,until,ms)=>new Promise((ok,fail)=>{
 export async function launch({argv=process.argv.slice(2),prepare=async()=>({args:[],env:{}}),check=checkHealth,banner}={}){
  const started=performance.now(),owned=[],track=(c)=>{owned.push(c);return c;};
  let stopping,ready=false;
- const live=(c)=>c.exitCode===null&&c.signalCode===null;
+ // a tracked group (groupKill) lives as long as any member does, whether or not its leader exited: liveness is kill(-pgid, 0), never the leader's state
+ const live=(c)=>{if(!c.groupKill)return c.exitCode===null&&c.signalCode===null;if(!c.pid)return false;try{process.kill(-c.pid,0);return true;}catch(e){return e.code==='EPERM';}};
  const signal=(c,sig)=>{try{if(c.groupKill&&c.pid)process.kill(-c.pid,sig);else c.kill(sig);}catch{/* already gone */}};
- const stop=()=>stopping??=Promise.all(owned.filter(live).map(c=>new Promise(r=>{const k=setTimeout(()=>signal(c,'SIGKILL'),5000);c.once('exit',()=>{clearTimeout(k);if(c.groupKill)signal(c,'SIGKILL');r();});signal(c,'SIGTERM');})));
+ const gone=async(c,ms)=>{for(const end=Date.now()+ms;live(c)&&Date.now()<end;)await new Promise(r=>setTimeout(r,50));return !live(c);};
+ // SIGTERM, a bounded wait, then SIGKILL and a wait for the group (or process) to disappear
+ const stopOne=async(c)=>{signal(c,'SIGTERM');if(!await gone(c,5000)){signal(c,'SIGKILL');await gone(c,2000);}};
+ const stop=()=>stopping??=Promise.all(owned.filter(live).map(stopOne));
  for(const [s,code] of [['SIGINT',130],['SIGTERM',143]])process.on(s,()=>{if(stopping)return;console.log(ready?'\nStopping the runtime and UI this launcher started…':`\n${s} before ready: start aborted, stopping what this launcher started…`);void stop().then(()=>process.exit(ready?0:code));});
  process.once('exit',()=>{for(const c of owned)if(live(c))signal(c,'SIGKILL');});
  try{
@@ -63,12 +67,12 @@ export async function launch({argv=process.argv.slice(2),prepare=async()=>({args
   await access(vite).catch(()=>{throw new Error('DEPENDENCIES_NOT_INSTALLED: run pnpm install --frozen-lockfile once (the launcher never downloads).');});
   const extra=await prepare(o,lock,track);
   await portFree(o.runtimePort);await portFree(o.uiPort);
-  const rt=spawn(process.execPath,[file,'--port',String(o.runtimePort),'--data-dir',o.dataDir,...extra.args],{cwd:o.root,stdio:['ignore','pipe','inherit'],env:{...process.env,...extra.env}});owned.push(rt);
+  const rt=spawn(process.execPath,[file,'--port',String(o.runtimePort),'--data-dir',o.dataDir,...extra.args],{cwd:o.root,stdio:['ignore','pipe','inherit'],env:{...process.env,...extra.env},detached:true});rt.groupKill=true;track(rt);
   let out='';rt.stdout.on('data',c=>{out+=c;});
   const token=await waitFor(rt,'RUNTIME',()=>/Pairing token \(expires in 5 minutes; one use\): (\S+)/.exec(out)?.[1],extra.readyMs??15000);
   const health=await (await fetch(`http://127.0.0.1:${o.runtimePort}/lab/v2/health`)).json();
   check(health,lock);
-  const ui=spawn(process.execPath,[vite,'--host','127.0.0.1','--port',String(o.uiPort),'--strictPort'],{cwd:lab,stdio:['ignore','ignore','inherit'],env:{...process.env,LAB_RUNTIME_PORT:String(o.runtimePort)}});owned.push(ui);
+  const ui=spawn(process.execPath,[vite,'--host','127.0.0.1','--port',String(o.uiPort),'--strictPort'],{cwd:lab,stdio:['ignore','ignore','inherit'],env:{...process.env,LAB_RUNTIME_PORT:String(o.runtimePort)},detached:true});ui.groupKill=true;track(ui);
   await waitFor(ui,'UI',async()=>(await fetch(`http://127.0.0.1:${o.uiPort}/`)).ok||undefined,30000);
   console.log(`${banner??'Mekoniq Robot Lab — mock twin (simulated; no robot hardware)'}
 Source ${lock.sourceCommit} · artifact ${lock.artifactSha256.slice(0,12)} · protocol ${health.protocolMajors.join('/')}
