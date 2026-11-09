@@ -37,10 +37,12 @@ function summarize(kind,text){
  if(kind==='measurement')return {durationMs:j.durationMs,minimumDurationMet:j.minimumDurationMet,profiles:j.results.map(p=>({id:p.id,p95Ms:p.frameIntervals.p95Ms,paintP95Ms:p.workspacePaint.p95Ms,meetsTarget:p.meetsTarget}))};
  return kind==='vitest'?{passed:j.numPassedTests,failed:j.numFailedTests,skipped:j.numPendingTests+(j.numTodoTests??0),total:j.numTotalTests}:{expected:j.stats.expected,unexpected:j.stats.unexpected,skipped:j.stats.skipped,flaky:j.stats.flaky};
 }
+// no single step may hang the recording: a launcher that never exits is a failed step, not a two-hour wait
+const STEP_TIMEOUT_MS=30*60*1000;
 function run(id,repo,cmd,args,{kind=null,files=[],extraEnv={}}={}){
  identityCheckpoint(`${id}:before`);
- const cwd=repo==='source'?SRC:LAB,startedAt=new Date().toISOString(),r=spawnSync(cmd,args,{cwd,env:{...env,...extraEnv},encoding:'utf8',maxBuffer:1<<28}),finishedAt=new Date().toISOString();
- const log=`${id}.log`;writeFileSync(`${OUT}/${log}`,scrub((r.stdout??'')+(r.stderr??'')));
+ const cwd=repo==='source'?SRC:LAB,startedAt=new Date().toISOString(),r=spawnSync(cmd,args,{cwd,env:{...env,...extraEnv},encoding:'utf8',maxBuffer:1<<28,timeout:STEP_TIMEOUT_MS}),finishedAt=new Date().toISOString();
+ const log=`${id}.log`;writeFileSync(`${OUT}/${log}`,scrub((r.stdout??'')+(r.stderr??'')+(r.error?.code==='ETIMEDOUT'?`\n[recorder] step killed after ${STEP_TIMEOUT_MS/60000} min without exiting\n`:'')));
  const command=scrub(`${Object.entries(extraEnv).map(([k,v])=>`${k}=${v}`).join(' ')} ${cmd} ${args.join(' ')}`.trim());
  commands.push({id,repo,command,startedAt,finishedAt,exitCode:r.status,log,logSha256:sha(`${OUT}/${log}`)});
  for(const f of files){

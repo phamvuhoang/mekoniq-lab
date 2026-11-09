@@ -20,6 +20,8 @@ export async function verifyOffline(directory){
  return m;
 }
 const free=port=>new Promise((ok,fail)=>{const s=netServer();s.once('error',()=>fail(new Error(`PORT_IN_USE:${port}`)));s.listen(port,'127.0.0.1',()=>s.close(ok));});
+/** Resolve once the UI server is closed: a stopping launcher also tears down connections still waiting on the runtime, otherwise close() waits for them forever. */
+export const closeServer=server=>new Promise(ok=>{server.close(()=>ok());server.closeAllConnections();});
 export function staticServer(directory,runtimePort){
  const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.webp':'image/webp','.ico':'image/x-icon','.woff2':'font/woff2'};
  return createServer(async(q,r)=>{
@@ -40,11 +42,11 @@ export function staticServer(directory,runtimePort){
 async function main(){
  const started=performance.now();
  let uiPort=4175,runtimePort=4176,data=join(root,'runs'),bootOnly=false,child,server,stopping;
- const stop=()=>stopping??=Promise.all([new Promise(ok=>server?server.close(()=>ok()):ok()),new Promise(ok=>{
+ const stop=()=>stopping??=Promise.all([server?closeServer(server):Promise.resolve(),new Promise(ok=>{
   if(!child||child.exitCode!==null||child.signalCode!==null){ok();return;}
   const timer=setTimeout(()=>child.kill('SIGKILL'),5000);child.once('exit',()=>{clearTimeout(timer);ok();});child.kill('SIGTERM');
  })]);
- for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>{if(!stopping)void stop().then(()=>process.exit(0));});
+ for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>{if(stopping)return;setTimeout(()=>process.exit(1),10000).unref();void stop().then(()=>process.exit(0));});// a stop that is not done in 10 s still exits: nothing here is worth a hung Ctrl-C
  try{
   const args=process.argv.slice(2);for(let i=0;i<args.length;i++){
    if(args[i]==='--ui-port')uiPort=Number(args[++i]);else if(args[i]==='--runtime-port')runtimePort=Number(args[++i]);

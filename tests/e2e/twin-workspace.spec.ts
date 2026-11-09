@@ -57,14 +57,20 @@ test.describe.serial("paired source runtime", () => {
   });
 
   test("layers, legend and one shared selection survive a 3D to 2D switch", async () => {
+    // contact markers are drawn on the 2D plan only, so the layer toggles are flipped there; 3D disables that toggle with a visible reason
+    await page.getByRole("button", { name: "2D", exact: true }).click();
     for (const name of ["Vùng chiếm chỗ", "Đường đi", "Tiếp xúc", "Khung tọa độ"]) {
       const toggle = page.getByRole("button", { name, exact: true });
       const before = await toggle.getAttribute("aria-pressed");
       await toggle.click();
       await expect(toggle).toHaveAttribute("aria-pressed", before === "true" ? "false" : "true");
     }
+    const contacts = page.getByRole("button", { name: "Tiếp xúc", exact: true });
+    const contactsPressed = await contacts.getAttribute("aria-pressed");
     await page.getByRole("button", { name: "Khung tọa độ", exact: true }).click();
     await page.getByRole("button", { name: "3D", exact: true }).click();
+    await expect(contacts).toBeDisabled();
+    await expect(page.getByTestId("layers-2d-only")).toContainText("2D");
     await page.getByTestId("entity-list").getByRole("button", { name: /cup-1/ }).click();
     await expect(page.getByTestId("inspector-title")).toContainText("cup-1");
     // the selection re-rendered the stage: the 3D buffer must follow the new stage size, not a stale/default 640x420
@@ -74,6 +80,8 @@ test.describe.serial("paired source runtime", () => {
     const tick = await page.getByTestId("run-tick").textContent();
     await page.getByRole("button", { name: "2D", exact: true }).click();
     await expect(page.getByTestId("twin-scene").locator('svg [data-entity="cup-1"][data-selected="true"]')).toHaveCount(1);
+    await expect(contacts).toBeEnabled();
+    await expect(contacts).toHaveAttribute("aria-pressed", contactsPressed!);
     await expect(page.getByTestId("inspector-title")).toContainText("cup-1");
     await expect(page.getByTestId("run-status")).toHaveText(status!);
     await expect(page.getByTestId("run-tick")).toHaveText(tick!);
