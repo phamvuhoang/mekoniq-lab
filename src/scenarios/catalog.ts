@@ -3,6 +3,7 @@ import nativeFixture from '../../fixtures/twins/native-bv01-v2.json' with {type:
 import coffeeFixture from '../../fixtures/twins/coffee-cell-v2.json' with {type:'json'};
 import restaurantFixture from '../../fixtures/twins/restaurant-v2.json' with {type:'json'};
 import serveDesign from '../../fixtures/engineering/serve-demo-v1/serve-project.json' with {type:'json'};
+import fleetDesign from '../../fixtures/engineering/serve-demo-v1/serve-fleet-project.json' with {type:'json'};
 import type {AssetRevision,LabProjectV2} from '../shared/types';
 import {tr} from '../i18n';
 /** Present only on an engineering preset: the exact draft that was compiled and the receipt for it. */
@@ -30,6 +31,10 @@ export const IRSIM_SET='engineering-irsim-2d-v1',IRSIM_PROFILE='engineering-irsi
 presets.push({id:'irsim-fd01',mode:'simulation',scenarioId:'IR-FD01',scenarioRevision:1,backendSetId:IRSIM_SET,seed:5,project:structuredClone(serveDesign.runtimeProject) as LabProjectV2,assets:[],names:{'amr-1':'Serve-1'},roles:{entities:['amr'],points:['kitchen','table','parking']},
  engineering:{project:structuredClone(serveDesign) as unknown as import('../shared/engineering').EngineeringProject,receipt:null},
  title:()=>tr('IR-SIM 2D · giao món FD01','IR-SIM 2D · FD01配膳','IR-SIM 2D · FD01 delivery'),summary:()=>tr('Robot Serve · nhà hàng 10 bàn · mô phỏng 2D di động, không phải Gazebo hay phần cứng','Serveロボット · 10卓レストラン · ポータブル2D、Gazebo・実機ではない','Serve robot · 10-table restaurant · portable 2D, not Gazebo or hardware')});
+/** IR-SIM 2D FD07 on the two-robot Serve fleet: runs only from a receipt the Assembly page compiled for the open fleet design. A customer walks across the aisle (server-owned scenario fixture). */
+presets.push({id:'irsim-fd07',mode:'simulation',scenarioId:'IR-FD07',scenarioRevision:1,backendSetId:IRSIM_SET,seed:7,project:structuredClone(fleetDesign.runtimeProject) as LabProjectV2,assets:[],names:{robot01:'Serve-1',robot02:'Serve-2'},roles:{entities:['amr'],points:['kitchen','table','parking']},
+ engineering:{project:structuredClone(fleetDesign) as unknown as import('../shared/engineering').EngineeringProject,receipt:null},
+ title:()=>tr('IR-SIM 2D · hai robot FD07','IR-SIM 2D · 2台FD07','IR-SIM 2D · two robots FD07'),summary:()=>tr('Hai robot Serve khác bánh xe và LiDAR · một vùng lối đi đặt trước · khách đi ngang · mô phỏng 2D, không phải phần cứng','車輪とLiDARが異なるServe 2台 · 予約通路ゾーン · 横切る客 · ポータブル2D、実機ではない','Two Serve robots with different wheels and LiDARs · one reserved aisle zone · a customer walks across · portable 2D, not hardware')});
 export const presetById=(id:string)=>presets.find(p=>p.id===id);
 /** Display name of an entity, point, cup or job; unknown ids are shown as-is, never invented. */
 export function nameOf(preset:TwinPreset|undefined,id:string):string {

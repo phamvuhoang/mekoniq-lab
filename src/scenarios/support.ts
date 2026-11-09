@@ -1,7 +1,8 @@
 // Support matrix of a campaign fixture, read from the runtime's own health answer (UX-19, SIM-10). The Lab never decides a scenario is
 // "available": every row carries the runtime's reason, and no runtime answer is `unknown`, never a guess.
 import type {TwinHealth} from './controls';
-export interface CampaignEntry {id:string;seed:number;repeat:number;mock:{backendSetId:string};simulation:{backendSetId:string;requires:string[]}}
+/** `mock` is absent for a simulation-only scenario (the IR-SIM 2D variants IR-*): it gets no mock row at all, never a row that pretends a mock run exists. */
+export interface CampaignEntry {id:string;seed:number;repeat:number;mock?:{backendSetId:string};simulation:{backendSetId:string;requires:string[]}}
 export interface CampaignFixture {schemaVersion:1;id:string;revision:number;title:string;note?:string;scenarios:CampaignEntry[]}
 export interface SupportRow {scenarioId:string;mode:'mock'|'simulation';backendSetId:string;status:'available'|'unavailable'|'unknown';reasons:string[]}
 export interface SetOption {id:string;mode:string;selectable:boolean;reasons:string[]}
@@ -18,8 +19,8 @@ export function backendSetOptions(health:TwinHealth|null):SetOption[]{
  });
 }
 export function supportMatrix(health:TwinHealth|null,fixture:CampaignFixture):SupportRow[] {
- return fixture.scenarios.flatMap(s=>(['mock','simulation'] as const).map((mode):SupportRow=>{
-  const backendSetId=s[mode].backendSetId;
+ return fixture.scenarios.flatMap(s=>(s.mock?['mock','simulation'] as const:['simulation'] as const).map((mode):SupportRow=>{
+  const backendSetId=s[mode]!.backendSetId;
   if(!health)return {scenarioId:s.id,mode,backendSetId,status:'unknown',reasons:['RUNTIME_UNREACHABLE']};
   const reasons:string[]=[];
   if(!health.scenarioIds.includes(s.id))reasons.push('SCENARIO_NOT_OFFERED');

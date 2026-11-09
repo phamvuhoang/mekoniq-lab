@@ -27,6 +27,16 @@ test('the support matrix follows runtime scenario requirements rather than unuse
  const rows=supportMatrix(h,{schemaVersion:1,id:'food',revision:1,title:'Food',scenarios:[{id:'FD01',seed:1,repeat:1,mock:{backendSetId:'mock-default'},simulation:{backendSetId:'simulation-default',requires:['gazebo_nav2']}}]});
  expect(rows.find(r=>r.mode==='mock')).toMatchObject({status:'available',reasons:[]});
 });
+test('C02 IR-SIM variants are simulation-only rows: no mock row is invented, and an older runtime that does not offer IR-FD07 says so',async()=>{
+ const {supportMatrix}=await import('../../src/scenarios/support');
+ const entry={id:'IR-FD07',seed:7,repeat:1,simulation:{backendSetId:'engineering-irsim-2d-v1',requires:['irsim_2d']}};
+ const irsim={id:'irsim_2d',installed:true,enabled:true,compatible:true,reachable:true,commissioned:true};
+ const h={...health,scenarioIds:['IR-FD01','IR-FD07'],backendSets:[...health.backendSets,{id:'engineering-irsim-2d-v1',mode:'simulation',access:'simulated',backends:['irsim_2d']}],backends:[...health.backends,irsim]} as typeof health;
+ const rows=supportMatrix(h,{schemaVersion:1,id:'irsim',revision:1,title:'IR',scenarios:[entry]});
+ expect(rows).toEqual([{scenarioId:'IR-FD07',mode:'simulation',backendSetId:'engineering-irsim-2d-v1',status:'available',reasons:[]}]);
+ const old=supportMatrix({...h,scenarioIds:['IR-FD01']} as typeof health,{schemaVersion:1,id:'irsim',revision:1,title:'IR',scenarios:[entry]});
+ expect(old).toEqual([{scenarioId:'IR-FD07',mode:'simulation',backendSetId:'engineering-irsim-2d-v1',status:'unavailable',reasons:['SCENARIO_NOT_OFFERED']}]);
+});
 test('workspace renders an actionable refresh when readiness expires',async()=>{
  vi.stubGlobal('innerWidth',600);vi.stubGlobal('document',{getElementById:()=>null});
  const {TwinWorkspace}=await import('../../src/ui/workspace');

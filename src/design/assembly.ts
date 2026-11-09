@@ -1,6 +1,7 @@
 import reference from '../../fixtures/engineering/reference-catalog.json' with {type:'json'};
 import serve from '../../fixtures/engineering/serve-demo-v1/serve-components.json' with {type:'json'};
 import serveDesign from '../../fixtures/engineering/serve-demo-v1/serve-project.json' with {type:'json'};
+import fleetDesign from '../../fixtures/engineering/serve-demo-v1/serve-fleet-project.json' with {type:'json'};
 import type {ComponentRevision,EngineeringProject,Problem} from '../shared/engineering';
 import {componentDigest,requiredDigests,type EngineeringArchiveFiles} from '../project/engineering-archive';
 import {canonicalJson,sha256Hex} from '../twin/hash';
@@ -50,6 +51,8 @@ export function mergeCatalog(into:AssemblyCatalog,from:AssemblyCatalog):void {
 export const referenceProject=():EngineeringProject=>structuredClone(reference.project) as unknown as EngineeringProject;
 /** The Serve demo (portable IR-SIM 2D profile), synced byte for byte from source robotics/navigation-2d/fixtures/serve-demo-v1. Illustrative geometry. */
 export const serveProject=():EngineeringProject=>structuredClone(serveDesign) as unknown as EngineeringProject;
+/** The two-robot Serve fleet (robot01 Serve, robot02 wider chassis/wheels and a 180-beam LiDAR), same source fixture set; its parts are in the same catalog. */
+export const fleetProject=():EngineeringProject=>structuredClone(fleetDesign) as unknown as EngineeringProject;
 export const serveCatalog=():AssemblyCatalog=>{
   const catalog={...structuredClone({components:serve.components,models:serve.models}),blobs:{},extras:{}} as unknown as AssemblyCatalog;
   for (const [digest,model] of Object.entries(catalog.models)) {const bytes=new TextEncoder().encode(canonicalJson(model));if (sha256Hex(bytes)===digest) catalog.blobs[digest]={bytes,mediaType:'application/json',license:'internal'};}
