@@ -20,7 +20,9 @@ export function evidence(){
 export const project=restaurant.project;
 export function report(over:Record<string,unknown>={}):RunReport{
  return {manifest:{runId:'11111111-1111-4111-8111-111111111111',sourceCommit:'s'.repeat(40),mode:'simulation',access:'simulated',backendSetId:'engineering-irsim-2d-v1',backends:[{id:'irsim_2d',version:'2.12.0',model:'irsim',dynamics:false}],clock:{tickMs:20},seed:5,
-  scenario:{id:'IR-FD01',revision:1,hash:'h'},project:{id:project.id,revision:project.revision,hash:hashJson(project)},world:{id:project.world.id,revision:project.world.revision,hash:hashJson(project.world)},assets:[]},
+  scenario:{id:'IR-FD01',revision:1,hash:'h'},project:{id:project.id,revision:project.revision,hash:hashJson(project)},world:{id:project.world.id,revision:project.world.revision,hash:hashJson(project.world)},assets:[],
+  // what the source runner states in its manifest about the evidence it recorded (scene, robot models, policy): cross-checked against navigation2d
+  models:[{id:'irsim_2d',revision:'2.12.0',hash:D('a'),provenance:'simulated_plant'},{id:'navigation-model:amr-1',revision:'1',hash:D('b'),provenance:'projected'}],profiles:[{id:'irsim-2d-default-v1',revision:1,hash:D('c'),provenance:'default'}]},
   outcome:{status:'completed',served:'1',tick:400,simTimeNs:'8000000000'},metrics:{distanceM:{'amr-1':4},collision:{available:true,contacts:0,minSeparationM:null},navigation:{sensorPublications:{expected:81,recorded:81,complete:true}}} as never,
   businessEvents:[],effects:[],faults:[],reconciliations:[],coverage:{},limitations:[],navigation2d:evidence(),...over} as unknown as RunReport;
 }

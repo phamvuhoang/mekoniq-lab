@@ -4,7 +4,7 @@ import {expect,test,vi} from 'vitest';
 vi.hoisted(()=>{(globalThis as Record<string,unknown>).localStorage={getItem:()=>'en',setItem:()=>{}};});
 import {navigationEvidenceView,importNavigationEvidence,navigationRows} from '../../src/reports/navigation2d';
 import type {RunReport} from '../../src/scenarios/controls';
-import {chunks,evidence,project,report} from '../support/navigation-report';
+import {chunks,D,evidence,project,report} from '../support/navigation-report';
 import {reportCsv,reportHtml} from '../../src/reports/metrics';
 import {navigationHtml} from '../../src/ui/report-panel';
 
@@ -83,4 +83,32 @@ test('exports keep each assertion with its own result and say what the evidence 
  expect(reportCsv(r)).toContain('navigation_assertion,,,,irsim_2d,REPEATABILITY_CROSS_PLATFORM,no platform qualified,not_run');
  const html=reportHtml(r);expect(html).toContain('Navigation evidence (IR-SIM 2D)');expect(html).toContain('irsim_2d · complete');expect(html).toContain('not Gazebo, native or hardware evidence');
  const old=report();delete (old as {navigation2d?:unknown}).navigation2d;expect(reportHtml({...old,telemetry:r.telemetry} as RunReport)).not.toContain('Navigation evidence');
+});
+test('review5 #4: the report envelope and its navigation evidence must name the same run; each disagreement is named and no pass survives',()=>{
+ type M=RunReport['manifest'];
+ const ident={compilerVersion:'1',sceneSchemaHash:D('5'),evidenceFormat:'navigation-evidence-ndjson-gzip-v1',os:'darwin 25',arch:'arm64',node:'v24.22.2'};
+ const man=(f:(m:M)=>void)=>{const r=report();f(r.manifest);return r;};
+ const cases:[string,RunReport][]=[
+  ['runId',man(m=>{m.runId='22222222-2222-4222-8222-222222222222';})],
+  ['provider',man(m=>{m.backends=[{id:'mock_amr',version:'1',model:'mock',dynamics:false}];})],
+  ['provider',man(m=>{m.backends=[{...m.backends[0]!,version:'9.9.9'}];})],
+  ['seed',man(m=>{m.seed=6;})],
+  ['tickMs',man(m=>{m.clock={tickMs:50};})],
+  ['sceneDigest',man(m=>{m.models=m.models!.map(x=>x.id==='irsim_2d'?{...x,hash:D('9')}:x);})],
+  ['sceneDigest',man(m=>{m.models=m.models!.filter(x=>x.id!=='irsim_2d');})],
+  ['modelDigests',man(m=>{m.models=m.models!.map(x=>x.id.startsWith('navigation-model:')?{...x,hash:D('9')}:x);})],
+  ['modelDigests',man(m=>{m.models=[...m.models!,{id:'navigation-model:amr-2',revision:'1',hash:D('8'),provenance:'projected'}];})],
+  ['policy',man(m=>{m.profiles=[{...m.profiles![0]!,hash:D('9')}];})],
+  ['policy',man(m=>{m.profiles=[];})],
+  ['sourceCommit',report({navigation2d:{...evidence(),identity:{...ident,sourceCommit:'t'.repeat(40)}}})],
+  ['businessEpochMs',man(m=>{(m.clock as Record<string,unknown>).businessEpochMs=1;})],
+  ['outcomeTick',report({outcome:{status:'completed',served:'1',tick:500,simTimeNs:'10000000000'}})],
+  ['outcomeTick',report({outcome:{status:'completed',served:'1',tick:399,simTimeNs:'7980000000'}})],
+  ['simTimeNs',report({outcome:{status:'completed',served:'1',tick:400,simTimeNs:'8000000001'}})],
+ ];
+ // every case is checked (not stopped at the first): the list names each field whose disagreement went unnoticed
+ const missed=cases.map(([field,r],i)=>{const v=navigationEvidenceView(r);return !v.complete&&v.reasons.includes(`IDENTITY_MISMATCH:${field}`)&&!navigationRows(r).some(a=>a.result==='pass')?null:`${i}:${field}`;}).filter(Boolean);
+ expect(missed).toEqual([]);
+ // the agreeing envelope (sourceCommit included) stays complete
+ expect(navigationEvidenceView(report({navigation2d:{...evidence(),identity:{...ident,sourceCommit:'s'.repeat(40)}}}))).toMatchObject({complete:true,reasons:[]});
 });

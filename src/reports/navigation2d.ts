@@ -33,11 +33,33 @@ export function boundNavigationScene(report:RunReport|null,scene:NavigationScene
  return pending||scene.sceneDigest===want?{scene,reason:null}:{scene:null,reason:'NAVIGATION_SCENE_MISMATCH'};
 }
 const contiguous=(chunks:{firstTick:number;lastTick:number}[],from:number,to:number)=>{let next=from;for(const c of [...chunks].sort((a,b)=>a.firstTick-b.firstTick)){if(c.firstTick!==next||c.lastTick<c.firstTick)return false;next=c.lastTick+1;}return next===to+1;};
+const sorted=(xs:readonly string[])=>JSON.stringify([...xs].sort());
+/** Every field the report envelope and its evidence both state (as the source runner writes them) must agree: else the evidence is not this run's. */
+function identityMismatches(r:RunReport,n:NavigationRunEvidenceV1):string[]{
+ const m=r.manifest,models=m.models??[],plant=models.filter(x=>x.id===n.engine.id&&x.provenance==='simulated_plant'),robots=models.filter(x=>x.id.startsWith('navigation-model:'));
+ const policy=(m.profiles??[]).filter(p=>p.id===n.policyRef.id),epoch=(m.clock as {businessEpochMs?:unknown}).businessEpochMs;
+ const tick=r.outcome.tick,ns=(()=>{try{return BigInt(r.outcome.simTimeNs);}catch{return null;}})();
+ const sensorRobots=new Set(n.seed.sensorSeeds.map(s=>`navigation-model:${s.robotId}`));
+ return Object.entries({
+  runId:m.runId!==n.runId,
+  provider:!m.backends.some(b=>b.id===n.engine.id&&b.version===n.engine.version),
+  seed:m.seed!==n.seed.runSeed,
+  tickMs:m.clock.tickMs!==n.clock.tickMs,
+  sourceCommit:n.identity?.sourceCommit!==undefined&&n.identity.sourceCommit!==m.sourceCommit,
+  businessEpochMs:epoch!==undefined&&epoch!==n.clock.businessEpochMs,
+  sceneDigest:plant.length!==1||plant[0]!.hash!==n.sceneDigest,
+  modelDigests:sorted(robots.map(x=>x.hash))!==sorted(n.modelDigests)||[...sensorRobots].some(id=>!robots.some(x=>x.id===id)),
+  policy:policy.length!==1||policy[0]!.hash!==n.policyRef.hash||policy[0]!.revision!==n.policyRef.revision,
+  // the run's outcome is the moment the evidence describes: its tick is the recording's horizon (a run tick off the last durable tick is EVIDENCE_PENDING/AHEAD)
+  outcomeTick:tick!==n.clock.tickHorizon,
+  simTimeNs:ns===null||ns!==BigInt(tick)*BigInt(n.clock.tickMs)*1_000_000n,
+ }).filter(([,bad])=>bad).map(([f])=>f);
+}
 export function navigationEvidenceView(report:RunReport):NavigationEvidenceView{
  if(report.navigation2d===undefined)return {supported:false,provider:null,complete:false,reasons:['NAVIGATION_EVIDENCE_ABSENT']};
  const n=navigationEvidence(report);
  if(!n)return {supported:false,provider:null,complete:false,reasons:['NAVIGATION_EVIDENCE_SCHEMA_UNKNOWN']};
- const reasons:string[]=[],h=n.clock.tickHorizon;
+ const reasons:string[]=identityMismatches(report,n).map(f=>`IDENTITY_MISMATCH:${f}`),h=n.clock.tickHorizon;
  if(!n.completeness)reasons.push('COMPLETENESS_UNKNOWN');
  else if(n.completeness.status!=='complete')reasons.push(...n.completeness.reasons.length?n.completeness.reasons:['EVIDENCE_INCOMPLETE']);
  else if(n.completeness.reasons.length)reasons.push('COMPLETENESS_CONTRADICTORY',...n.completeness.reasons);
