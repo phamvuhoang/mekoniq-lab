@@ -51,6 +51,8 @@ export class TwinWorkspace {
  private navigation:NavigationSceneV1|null=null;private sceneLoad=0;
  /** The scene this frame may draw: bound to the shown report's own evidence (an opened report is never live). */
  private scene(){return boundNavigationScene(this.report,this.navigation,!this.archived);}
+ /** An open IR-SIM report: its navigation layers are drawn, or the reason they are not is shown (never silently absent). */
+ private irsimReport(){return !!this.report&&(this.report.navigation2d!==undefined||this.report.manifest.backends.some(b=>b.id==='irsim_2d'));}
  /** Replace the scene with the one of `bundle` (or none); a later load or create() wins over an earlier one. */
  private loadScene(bundle:string|undefined){this.navigation=null;const token=++this.sceneLoad;if(bundle)void loadNavigationScene(this.rt,bundle).catch(()=>null).then(s=>{if(token===this.sceneLoad){this.navigation=s;this.rerender();}});}
  private runSpeed=16;private evidenceStore=new EvidenceStore();private saved:SavedEvidence[]=[];private savedLoaded=false;private archived=false;
@@ -70,7 +72,7 @@ export class TwinWorkspace {
  private refOf(p:TwinPreset){try{return p.engineering?engineeringRefFor(p.engineering.project,p.engineering.receipt):undefined;}catch{return null;}}
  private clock(){return this.view?clockControls(this.view,this.health):undefined;}
  private frame():TwinFrame {
-  const v=this.view,base={preset:this.runPreset??this.resolve(this.preset),report:this.report,navigation:this.runPreset?.engineering?this.scene().scene:null};
+  const v=this.view,base={preset:this.runPreset??this.resolve(this.preset),report:this.report,navigation:this.scene().scene};
   if(!v)return {...base,view:v};
   if(this.replay){const r=this.replay,projection=r.rp.project(v,r.tick);return {...base,...projection};}
   const now=performance.now();
@@ -168,7 +170,7 @@ ${r?`${item(tr('Trạng thái','状態','Status'),statusText(r.status),'run-stat
   const presetsHtml=`<div class="twin-presets" role="group" aria-label="${tr('Preset kịch bản','シナリオプリセット','Scenario presets')}">${presets.map(x=>`<button class="preset-option" data-action="twin-preset" data-value="${x.id}" aria-pressed="${x.id===this.preset.id}" aria-label="${esc(x.title())}" aria-describedby="preset-${x.id}-summary">${icon(x.id==='coffee'?'coffee':'robot',20)}<span><b>${esc(x.title())}</b><small id="preset-${x.id}-summary">${esc(x.summary())}</small></span></button>`).join('')}</div>`;
   // IR-SIM runs add safety/observed/scan layers, each with its provenance; other runs keep the four legacy layers
   const shown=LAYERS.filter(l=>f.navigation||!['safety','observed','scan'].includes(l));
-  const layers=`<div class="twin-layers" role="group" aria-label="${tr('Lớp hiển thị','表示レイヤー','Layers')}">${shown.map(l=>`<button data-action="twin-layer" data-value="${l}" aria-pressed="${this.vs.layers[l]}">${layerLabel(l)}</button>`).join('')}</div>${f.navigation?`<ul class="layer-provenance" data-testid="layer-provenance">${shown.filter(l=>l!=='frames').map(l=>`<li data-layer="${l}"><b>${layerLabel(l)}</b>: ${esc(layerProvenance(l))}</li>`).join('')}</ul>`:''}${this.runPreset?.engineering&&!f.navigation?`<p class="source-note" data-testid="navigation-scene-unavailable" role="status">${icon('info',15)}${tr('Lớp hình học điều hướng không khả dụng','ナビゲーション形状レイヤーは利用できません','Navigation geometry layers unavailable')}: ${esc(this.scene().reason??'')}</p>`:''}`;
+  const layers=`<div class="twin-layers" role="group" aria-label="${tr('Lớp hiển thị','表示レイヤー','Layers')}">${shown.map(l=>`<button data-action="twin-layer" data-value="${l}" aria-pressed="${this.vs.layers[l]}">${layerLabel(l)}</button>`).join('')}</div>${f.navigation?`<ul class="layer-provenance" data-testid="layer-provenance">${shown.filter(l=>l!=='frames').map(l=>`<li data-layer="${l}"><b>${layerLabel(l)}</b>: ${esc(layerProvenance(l))}</li>`).join('')}</ul>`:''}${(this.runPreset?.engineering||this.irsimReport())&&!f.navigation?`<p class="source-note" data-testid="navigation-scene-unavailable" role="status">${icon('info',15)}${tr('Lớp hình học điều hướng không khả dụng','ナビゲーション形状レイヤーは利用できません','Navigation geometry layers unavailable')}: ${esc(this.scene().reason??'')}</p>`:''}`;
   const viewSwitch=`<div class="viewer-switch" role="group" aria-label="${tr('Kiểu xem','表示形式','View')}"><button data-action="twin-view" data-value="3d" aria-pressed="${this.vs.view==='3d'}" ${this.webglFailed?'disabled':''}>3D</button><button data-action="twin-view" data-value="2d" aria-pressed="${this.vs.view==='2d'}">2D</button></div>`;
   const legendHtml=`<ul class="twin-legend" data-testid="twin-legend" aria-label="${tr('Chú giải','凡例','Legend')}">${legend().map(x=>`<li><i class="mark ${x.mark}" aria-hidden="true"></i><b>${x.label}</b><small>${x.note}</small></li>`).join('')}</ul>`;
   const list=`<ul class="entity-list" id="twin-entity-list" data-testid="entity-list" aria-label="${tr('Đối tượng trong twin','ツイン内の対象','Twin objects')}">${this.entityList(f)}</ul>`;
@@ -235,7 +237,9 @@ ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớ
   let project:ReturnType<typeof validateProjectV2>;try{project=validateProjectV2(input.project);}catch{throw new TwinRuntimeError('RECLAIM_INPUTS_INVALID',[],502);}
   const labels=presets.find(p=>p.scenarioId===input.scenarioId);
   return {id:labels?.id??input.scenarioId,title:labels?.title??(()=>input.scenarioId),summary:labels?.summary??(()=>''),assets:labels?.assets??[],names:labels?.names??{},roles:labels?.roles??{entities:[],points:[]},
-   mode:input.mode,project,seed:input.seed,scenarioId:input.scenarioId,scenarioRevision:input.scenarioRevision,backendSetId:input.backendSetId};
+   mode:input.mode,project,seed:input.seed,scenarioId:input.scenarioId,scenarioRevision:input.scenarioRevision,backendSetId:input.backendSetId,
+   // the locked engineering design (no receipt: a reclaimed run is read-only and never recompiled from here)
+   ...input.engineering?{engineering:{project:structuredClone(input.engineering.project),receipt:null}}:{}};
  }
  private async create(p:TwinPreset,start=true){
   if(!this.health)throw new TwinRuntimeError('RUNTIME_UNAVAILABLE',[],0);

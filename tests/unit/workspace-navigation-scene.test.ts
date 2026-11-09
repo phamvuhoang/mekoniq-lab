@@ -55,3 +55,37 @@ test('a bundle whose scene is not the one the evidence names is refused as a mis
  expect(h.frame().navigation).toBeNull();
  expect(w.html()).toContain('NAVIGATION_SCENE_MISMATCH');
 });
+test('review5 #5: a reclaimed IR-SIM run shows the scene its locked bundle holds; a missing one is unavailable with the reason, never silently dropped',async()=>{
+ const {presets}=await import('../../src/scenarios/catalog');
+ const ir=presets.find(p=>p.engineering)!,m=runA().manifest;
+ const reclaim=(bundles:Record<string,NavigationSceneV1>)=>{
+  const view={run:{schemaVersion:2,id:m.runId,mode:'simulation',access:'simulated',backendSetId:m.backendSetId,backends:['irsim_2d'],status:'completed',runRevision:0,eventCursor:null,telemetryCursor:null,fidelity:'modeled',ageMs:0,sourceCommit:m.sourceCommit,scenarioId:m.scenario.id,scenarioRevision:1,seed:m.seed},
+   tick:400,simTimeNs:'8000000000',model:'irsim',entities:[],workload:[],awaiting:[],attention:[],served:'1',coffee:null,controlAccess:'view_reconcile',
+   lockedInput:{project:structuredClone(project),scenarioId:m.scenario.id,scenarioRevision:1,seed:m.seed,mode:'simulation',access:'simulated',backendSetId:m.backendSetId,engineering:{ref:{bundleDigest:BUNDLE_A,projectDigest:D('3')},project:ir.engineering!.project,runtimeProjection:{project:structuredClone(project),assets:[]}}}};
+  const enc=new TextEncoder(),rt={paired:true,reclaim:async()=>view,report:async()=>runA(),engineeringManifest:async(digest:string)=>{if(!bundles[digest])throw new Error('BUNDLE_NOT_FOUND');return {files:[{path:'navigation-scene.json',sha256:digest}]};},
+   engineeringBlob:async(sha:string)=>enc.encode(JSON.stringify(bundles[sha]))} as unknown as TwinRuntime;
+  const w=new TwinWorkspace(()=>{},rt),h=w as unknown as Harness;workspaces.push(w);
+  Object.assign(h,{health:{sourceCommit:'d'.repeat(40),schemaHash:'s',protocolMajors:[2],backends:[],backendSets:[],scenarioIds:[]},openStreams:()=>{}});
+  w.click('twin-reclaim',m.runId);return {w,h};
+ };
+ const {h}=reclaim({[BUNDLE_A]:A});
+ await vi.waitFor(()=>expect(h.busy).toBe(false));
+ expect(h.frame().preset.engineering).toEqual({project:ir.engineering!.project,receipt:null});
+ await vi.waitFor(()=>expect(h.frame().navigation?.sceneDigest).toBe(A.sceneDigest));
+ const gone=reclaim({});
+ await vi.waitFor(()=>expect(gone.h.busy).toBe(false));await new Promise(r=>setTimeout(r,10));
+ expect(gone.h.frame().navigation).toBeNull();
+ expect(gone.w.html()).toContain('NAVIGATION_SCENE_UNAVAILABLE');
+});
+test('review5 #5: a digest-bound scene is shown whatever preset the report maps to (no engineering preset for its scenario)',async()=>{
+ const enc=new TextEncoder(),rt={paired:true,engineeringManifest:async()=>({files:[{path:'navigation-scene.json',sha256:BUNDLE_A}]}),engineeringBlob:async()=>enc.encode(JSON.stringify(A))} as unknown as TwinRuntime;
+ const w=new TwinWorkspace(()=>{},rt),h=w as unknown as Harness;workspaces.push(w);
+ const r=runA();r.manifest.scenario={...r.manifest.scenario,id:'IR-UNLISTED'};
+ const saved=captureEvidence(r,structuredClone(project) as never);Object.assign(h,{saved:[saved]});
+ w.click('twin-open-evidence',saved.id);
+ await vi.waitFor(()=>expect(h.frame().navigation?.sceneDigest).toBe(A.sceneDigest));
+ // and the same report whose bundle is gone states why
+ const w2=new TwinWorkspace(()=>{},{paired:true,engineeringManifest:async()=>{throw new Error('BUNDLE_NOT_FOUND');}} as unknown as TwinRuntime),h2=w2 as unknown as Harness;workspaces.push(w2);
+ Object.assign(h2,{saved:[saved]});w2.click('twin-open-evidence',saved.id);await new Promise(res=>setTimeout(res,10));
+ expect(h2.frame().navigation).toBeNull();expect(w2.html()).toContain('NAVIGATION_SCENE_UNAVAILABLE');
+});
