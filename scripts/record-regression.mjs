@@ -37,6 +37,8 @@ function summarize(kind,text){
  if(kind==='measurement')return {durationMs:j.durationMs,minimumDurationMet:j.minimumDurationMet,profiles:j.results.map(p=>({id:p.id,p95Ms:p.frameIntervals.p95Ms,paintP95Ms:p.workspacePaint.p95Ms,meetsTarget:p.meetsTarget}))};
  return kind==='vitest'?{passed:j.numPassedTests,failed:j.numFailedTests,skipped:j.numPendingTests+(j.numTodoTests??0),total:j.numTotalTests}:{expected:j.stats.expected,unexpected:j.stats.unexpected,skipped:j.stats.skipped,flaky:j.stats.flaky};
 }
+// pytest must not leave bytecode under source's tool roots: the Lab IR-SIM launcher fails closed on any __pycache__ in the pinned closure
+const NO_BYTECODE={PYTHONDONTWRITEBYTECODE:'1'};
 // no single step may hang the recording: a launcher that never exits is a failed step, not a two-hour wait
 const STEP_TIMEOUT_MS=30*60*1000;
 function run(id,repo,cmd,args,{kind=null,files=[],extraEnv={}}={}){
@@ -63,14 +65,14 @@ run('source-unit','source',process.execPath,[V,'run','tests/unit','--reporter=js
 run('source-contracts','source',process.execPath,[V,'run','tests/contracts','--reporter=json',out('source-contracts.json')],{kind:'vitest',files:['source-contracts.json']});
 if(suite==='physical-robot-lab'){
  run('source-engineering','source',process.execPath,[V,'run','tests/integration/engineering','tests/integration/lab-','tests/security/engineering','tests/unit/engineering','tests/contracts','--reporter=json',out('source-engineering.json')],{kind:'vitest',files:['source-engineering.json']});
- if(existsSync(python))run('source-pytest-simulation','source',python,['-m','pytest','robotics/simulation/tests','-q',`--junitxml=${OUT}/source-pytest-simulation.xml`],{kind:'junit',files:['source-pytest-simulation.xml']});
+ if(existsSync(python))run('source-pytest-simulation','source',python,['-m','pytest','robotics/simulation/tests','-q',`--junitxml=${OUT}/source-pytest-simulation.xml`],{kind:'junit',files:['source-pytest-simulation.xml'],extraEnv:NO_BYTECODE});
  else notRun.push({id:'source-pytest-simulation',reason:scrub(`Python executable missing: ${python}`)});
 }
 if(ci){
  run('source-build','source','pnpm',['-s','build']);
  run('source-adapters','source',process.execPath,[V,'run','tests/adapters','--reporter=json',out('source-adapters.json')],{kind:'vitest',files:['source-adapters.json']});
  run('source-integration','source',process.execPath,[V,'run','tests/integration','--reporter=json',out('source-integration.json')],{kind:'vitest',files:['source-integration.json'],extraEnv:{LAB_V2_CLEAN_EXPORT:'1'}});
- if(existsSync(python))run('source-pytest','source',python,['-m','pytest','robotics/agent/tests','tests/hardware','tests/contracts/test_schema_python.py','-q',`--junitxml=${OUT}/source-pytest.xml`],{kind:'junit',files:['source-pytest.xml']});
+ if(existsSync(python))run('source-pytest','source',python,['-m','pytest','robotics/agent/tests','tests/hardware','tests/contracts/test_schema_python.py','-q',`--junitxml=${OUT}/source-pytest.xml`],{kind:'junit',files:['source-pytest.xml'],extraEnv:NO_BYTECODE});
  else notRun.push({id:'source-pytest',reason:scrub(`Python executable missing: ${python}; provide LAB_PYTHON or create source/.venv with requirements-dev.txt`)});
 }
 run('lab-check-source','lab','pnpm',['-s','check:source']);
