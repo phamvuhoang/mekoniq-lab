@@ -89,3 +89,10 @@ test('review5 #5: a digest-bound scene is shown whatever preset the report maps 
  Object.assign(h2,{saved:[saved]});w2.click('twin-open-evidence',saved.id);await new Promise(res=>setTimeout(res,10));
  expect(h2.frame().navigation).toBeNull();expect(w2.html()).toContain('NAVIGATION_SCENE_UNAVAILABLE');
 });
+test('review7 #3: the navigation verdict is the full report\'s at every replay cursor (never the cursor projection, never stale)',async()=>{
+ const {w}=open({[BUNDLE_A]:A});
+ const verdict=()=>/data-testid="navigation-evidence" data-supported="(\w+)" data-complete="(\w+)"/.exec(w.html())?.slice(1);
+ expect(verdict()).toEqual(['true','true']);// opened at its outcome tick: complete
+ w.click('twin-replay');// replay from tick 0
+ for(const tick of ['0','5','200','400']){w.input('twin-replay-cursor',tick);expect(verdict(),tick).toEqual(['true','true']);expect(w.html(),tick).not.toContain('IDENTITY_MISMATCH');}
+});

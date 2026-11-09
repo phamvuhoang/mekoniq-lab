@@ -99,6 +99,8 @@ test('Serve on IR-SIM 2D: validate, run IR-FD01 to completion, report and replay
  await page.locator('#twin-replay-cursor').fill('500');
  await expect(page.getByTestId('replay-time')).toContainText('tick 500');
  await expect(page.getByTestId('replay-entities')).toContainText('amr-1');
+ // review7 #3: the evidence verdict is the whole run's at every cursor
+ await expect(nav).toHaveAttribute('data-complete','true');await expect(nav).not.toContainText('IDENTITY_MISMATCH');
  await capture(page,'twin-replay');
  await page.getByRole('button',{name:'Exit replay'}).click();
  expect(actions).toBe(0);
