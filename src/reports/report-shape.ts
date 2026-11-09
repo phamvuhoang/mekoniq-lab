@@ -27,11 +27,15 @@ const level:S={enum:['unsupported','modeled','verified']},digest:S={type:'string
 const closed=(s:S):S=>({...s,additionalProperties:false});
 const capabilities=closed(obj(Object.fromEntries(['geometry','rigidBody','actuator','sensor','grasp','process','calibration'].map(k=>[k,level]))));
 const engineeringEvidence=closed(obj({status:{enum:['pass','fail','not_run']},reasons:arr(str),capabilities,caseResults:arr({}),artifactRefs:closed(obj({sampleCount:integer,firstSimTimeNs:nullable(decimal),lastSimTimeNs:nullable(decimal),samplesSha256:digest,artifacts:arr(str)}))}));
+// IR-SIM navigation metrics as the source reports them (navigation2d runner): every field the Lab renders or decides on has its type, counts are non-negative safe integers
+const episode=obj({pair:{...arr(str),minItems:2,maxItems:2},source:str,fromTick:integer,toTick:integer});
+const navigation=obj({horizon:nullable(integer),coverage:{enum:['complete','incomplete']},reasons:arr(str),distanceM:nullable(record(num)),driveDistanceM:nullable(record(num)),collisionEpisodes:nullable(integer),safetyEnvelopeEpisodes:nullable(integer),
+ episodes:arr(episode),minClearanceM:nullable(num),minSeparationM:nullable(num),sensorPublications:obj({expected:integer,recorded:integer,complete:bool})},[]);
 const shape=obj({
  manifest:obj({engineering:closed(obj({bundleDigest:digest,projectDigest:digest})),runId:str,sourceCommit:str,mode:{enum:['mock','simulation']},access:str,backendSetId:str,backends:arr(obj({id:str,version:str,model:str,dynamics:bool})),clock:obj({tickMs:{...integer,minimum:1,maximum:3600000},native:obj({provider:{const:'gazebo_nav2'},originNs:decimal,businessEpochMs:integer})},['tickMs']),seed:integer,scenario:identity,project:identity,world:identity,assets:arr(obj({id:str,revision:integer,contentHash:str,resolved:bool})),models:arr(obj({id:str,revision:{type:['string','number']},hash:str,provenance:str})),recipes:arr(identity),profiles:arr(obj({id:str,revision:integer,hash:str,provenance:str})),armCollisionScene:obj({hash:str,profile:nullable(obj({revision:integer},['revision'])),profileHash:nullable(str),world:obj({}),worldHash:str,robotGeometry:arr(obj({id:str,radiusM:nullable(num)}))})},['runId','sourceCommit','mode','access','backendSetId','backends','clock','seed','scenario','project','world','assets']),
  engineeringEvidence,
  outcome:obj({status:str,served:decimal,tick:integer,simTimeNs:decimal}),
- metrics:obj({maxConcurrentMovers:integer,distanceM:record(num),collision:obj({available:bool,reason:str,contacts:nullable(integer),minSeparationM:nullable(num)},['available','contacts','minSeparationM'])},['distanceM','collision']),
+ metrics:obj({maxConcurrentMovers:integer,distanceM:record(num),collision:obj({available:bool,reason:str,contacts:nullable(integer),minSeparationM:nullable(num)},['available','contacts','minSeparationM']),navigation},['distanceM','collision']),
  businessEvents:arr(obj({sequence:decimal,at:date,type:str,kind:str,id:str,state},['sequence','at','type','kind','id'])),
  effects:arr(obj({id:str,type:str,status:str,attempts:integer,payload:obj({commandId:nullable(str)},[])})),faults:arr(obj({tick:integer,faultId:str,entityId:nullable(str)})),
  attention:arr(obj({reason:str,tick:integer,robotId:str,subjectId:str,commandId:str},['reason','tick'])),
