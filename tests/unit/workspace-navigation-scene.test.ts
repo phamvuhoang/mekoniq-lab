@@ -96,3 +96,14 @@ test('review7 #3: the navigation verdict is the full report\'s at every replay c
  w.click('twin-replay');// replay from tick 0
  for(const tick of ['0','5','200','400']){w.input('twin-replay-cursor',tick);expect(verdict(),tick).toEqual(['true','true']);expect(w.html(),tick).not.toContain('IDENTITY_MISMATCH');}
 });
+test('review7 #4: in 3D a layer the 3D view does not draw is disabled with a visible reason and never shown as on',async()=>{
+ const {w,h}=open({[BUNDLE_A]:A});
+ await vi.waitFor(()=>expect(h.frame().navigation?.sceneDigest).toBe(A.sceneDigest));
+ w.click('twin-layer','contacts');// on in 2D
+ w.click('twin-view','3d');
+ const html=w.html(),button=(l:string)=>new RegExp(`<button data-action="twin-layer" data-value="${l}"[^>]*>`).exec(html)?.[0]??'';
+ for(const l of ['contacts','scan']){expect(button(l),l).toContain('disabled');expect(button(l),l).toContain('aria-pressed="false"');}
+ for(const l of ['footprint','safety','path','observed','frames'])expect(button(l),l).not.toContain('disabled');
+ expect(html).toContain('data-testid="layers-2d-only"');expect(html).toContain('Drawn on the 2D plan only');
+ w.click('twin-layer','scan');expect((h as unknown as {vs:{layers:Record<string,boolean>}}).vs.layers.scan).toBe(false);// a 2D-only layer cannot be switched in 3D
+});

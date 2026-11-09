@@ -4,6 +4,9 @@ import {tr} from '../i18n';
 export type Layer='footprint'|'safety'|'path'|'observed'|'scan'|'contacts'|'frames';
 export type Layers=Record<Layer,boolean>;
 export const LAYERS:Layer[]=['footprint','safety','path','observed','scan','contacts','frames'];
+/** What the 3D view draws; the rest (clearance/contact markers, LiDAR points) is drawn on the 2D plan only and is disabled in 3D with ONLY_2D_REASON. */
+export const THREE_D_LAYERS:readonly Layer[]=['footprint','safety','path','observed','frames'];
+export const ONLY_2D_REASON=()=>tr('Chỉ vẽ trên mặt bằng 2D; chuyển sang 2D để xem lớp này.','2D平面図でのみ描画されます。表示するには2Dに切り替えてください。','Drawn on the 2D plan only; switch to 2D to see this layer.');
 export const defaultLayers=():Layers=>({footprint:true,safety:false,path:true,observed:false,scan:false,contacts:false,frames:false});
 export const layerLabel=(l:Layer)=>({footprint:tr('Vùng chiếm chỗ','フットプリント','Footprint'),safety:tr('Vùng an toàn','安全エンベロープ','Safety envelope'),path:tr('Đường đi','経路','Path'),observed:tr('Đường đã đi','走行軌跡','Observed path'),scan:'LiDAR',contacts:tr('Tiếp xúc','接触','Contacts'),frames:tr('Khung tọa độ','座標系','Frames')})[l];
 /** Where an IR-SIM layer's data comes from, with units; shown beside the layer, never implied by color. */

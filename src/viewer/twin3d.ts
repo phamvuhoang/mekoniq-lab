@@ -2,11 +2,27 @@
 // motion holds. Any WebGL failure returns null or calls onFail and the workspace stays on the 2D plan with the same selection.
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {sceneEntities,type TwinFrame,type ViewState} from '../twin/scene';
+import {observedSegments,sceneEntities,type TwinFrame,type ViewState} from '../twin/scene';
 import {amrFootprint,assetOf} from '../twin/amr';
 import {footprintInMap} from '../twin/lidar';
 export interface Twin3d {canvas:HTMLCanvasElement;/** Move into a re-rendered stage and size from it. */attach(host:HTMLElement):void;update(f:TwinFrame,vs:ViewState):void;dispose():void}
 const LIME=0xb4f375,NAVY=0x182a33;
+const COLOR:Record<string,number>={footprint:0x9dccff,safety:0xf0b45a,observed:0x5ad1c6};
+export interface OverlayShape {layer:'path'|'footprint'|'safety'|'observed';entityId:string;loop:boolean;z:number;points:[number,number][]}
+/** The plan overlays of the 3D view, from the same frame data and helpers the 2D plan uses (no data of its own). Pure: what update() draws. */
+export function overlayShapes(f:TwinFrame,vs:ViewState):OverlayShape[]{
+ const out:OverlayShape[]=[];
+ for(const r of f.view?.entities??[]){
+  if(vs.layers.path&&r.path.length)out.push({layer:'path',entityId:r.id,loop:false,z:0.02,points:[[r.pose.x,r.pose.y],...r.path.map(([x,y])=>[x!,y!] as [number,number])]});
+  // IR-SIM runs: the compiled footprint on the drive frame (T_map_base x T_base_drive); other runs: the Lab asset footprint
+  const model=f.navigation?.robots.find(x=>x.robotId===r.id)?.model,poly=vs.layers.footprint?model?footprintInMap(model,r.pose):f.navigation?null:amrFootprint(assetOf(f.preset.project,f.preset.assets,r.id),r.pose):null;
+  if(poly)out.push({layer:'footprint',entityId:r.id,loop:true,z:0.03,points:poly});
+  // IR-SIM only, as on the 2D plan: the compiled footprint offset by the policy safety margin, and the observed telemetry path (never joined across a gap)
+  if(vs.layers.safety&&model&&f.navigation)out.push({layer:'safety',entityId:r.id,loop:true,z:0.035,points:footprintInMap(model,r.pose,f.navigation.policy.parameters.safetyMarginM)});
+  if(vs.layers.observed&&model&&f.navigation)for(const seg of observedSegments(f,r.id))out.push({layer:'observed',entityId:r.id,loop:false,z:0.025,points:seg});
+ }
+ return out;
+}
 export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:()=>void):Twin3d|null {
  let renderer:THREE.WebGLRenderer;
  try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});}catch{return null;}
@@ -49,13 +65,12 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
     const h=e.kind==='amr'?0.225:e.kind==='coffee_machine'?1.125:e.kind==='arm'?1.25:e.kind==='cup'?(e.status?.startsWith('robot')?0.52:e.status?.startsWith('customer')?0.8:1.0):1.05;
     m.position.copy(at(e.x,e.y,h));m.userData.entityId=e.id;dynamic.add(m);
    }
-   for(const r of f.view?.entities??[]){
-    if(vs.layers.path&&r.path.length){dynamic.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([[r.pose.x,r.pose.y],...r.path].map(([x,y])=>at(x!,y!,0.02))),new THREE.LineDashedMaterial({color:LIME,dashSize:0.08,gapSize:0.06})).computeLineDistances());}
-    // IR-SIM runs: the compiled footprint on the drive frame (T_map_base x T_base_drive); other runs: the Lab asset footprint
-    const model=f.navigation?.robots.find(x=>x.robotId===r.id)?.model,poly=vs.layers.footprint?model?footprintInMap(model,r.pose):f.navigation?null:amrFootprint(assetOf(f.preset.project,f.preset.assets,r.id),r.pose):null;
-    if(poly)dynamic.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(poly.map(([x,y])=>at(x,y,0.03))),new THREE.LineBasicMaterial({color:0x9dccff})));
-    if(vs.layers.frames){const ax=new THREE.AxesHelper(0.4);ax.position.copy(at(r.pose.x,r.pose.y,0.5));ax.rotation.y=r.pose.yawRad;dynamic.add(ax);}
+   for(const sh of overlayShapes(f,vs)){
+    const pts=sh.points.map(([x,y])=>at(x,y,sh.z)),g=new THREE.BufferGeometry().setFromPoints(pts);
+    if(sh.layer==='path')dynamic.add(new THREE.Line(g,new THREE.LineDashedMaterial({color:LIME,dashSize:0.08,gapSize:0.06})).computeLineDistances());
+    else dynamic.add(sh.loop?new THREE.LineLoop(g,new THREE.LineBasicMaterial({color:COLOR[sh.layer]})):new THREE.Line(g,new THREE.LineBasicMaterial({color:COLOR[sh.layer]})));
    }
+   for(const r of f.view?.entities??[])if(vs.layers.frames){const ax=new THREE.AxesHelper(0.4);ax.position.copy(at(r.pose.x,r.pose.y,0.5));ax.rotation.y=r.pose.yawRad;dynamic.add(ax);}
    if(vs.layers.frames)dynamic.add(new THREE.AxesHelper(0.6));
    resize();
   },
