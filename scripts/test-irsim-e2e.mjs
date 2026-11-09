@@ -15,6 +15,7 @@ const args=process.argv.slice(2).filter(a=>a!=='--'),specs=args.filter(a=>a.ends
 const workers=()=>{try{return execFileSync('pgrep',['-f','irsim_worker'],{encoding:'utf8'}).trim().split('\n').filter(Boolean);}catch{return [];}};
 const {CI:_ci,...env}=process.env;// Playwright must reuse the launcher's UI, not start its own
 env.LAB_IRSIM_SCREENSHOTS=resolve(process.env.LAB_IRSIM_SCREENSHOTS??join(root,'test-results/irsim-evidence'));await mkdir(env.LAB_IRSIM_SCREENSHOTS,{recursive:true});
+if(specs.length>1){console.error(`ONE_SPEC_PER_LAUNCHER: the launcher's pairing code is one-use, so only the first of ${specs.join(', ')} could pair; run them one at a time.`);process.exit(2);}
 const work=await mkdtemp(join(tmpdir(),'mekoniq-irsim-e2e-')),before=new Set(workers());
 let launcher,runner;
 const stop=()=>{runner?.kill('SIGTERM');launcher?.kill('SIGINT');};
