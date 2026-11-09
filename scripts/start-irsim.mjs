@@ -33,6 +33,7 @@ let prefix;const pycachePrefix=()=>prefix??=mkdtempSync(join(tmpdir(),'mekoniq-p
 /** A preflight child in its own process group, handed to the launcher's `track` at spawn (so Ctrl-C stops it and whatever it started). */
 // spawn, not execFile: execFile does not honour `detached`, so its child would share the launcher's group
 const spawnProbe=(python,args,{timeout,env},track)=>new Promise((ok,fail)=>{
+ if(track.stopping?.())return fail(new Error('START_ABORTED'));// nothing is spawned once the launcher is stopping
  const c=spawn(python,args,{env,detached:true,stdio:['ignore','pipe','ignore']});c.groupKill=true;track(c);let stdout='';
  const t=setTimeout(()=>{try{process.kill(-c.pid,'SIGKILL');}catch{/* gone */}},timeout);
  c.stdout.on('data',d=>{stdout+=d;});c.once('error',e=>{clearTimeout(t);fail(e);});

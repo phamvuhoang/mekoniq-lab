@@ -139,3 +139,28 @@ test('a lock offering protocols 1 and 2 stays compatible with the S01 v1 health'
  expect(verifyRuntime(lock,{sourceCommit:'a',schemaHash:'s',protocolMajor:1})).toEqual({ok:true,reasons:[]});
  expect(verifyRuntime({...lock,protocolMajors:[2]},{sourceCommit:'a',schemaHash:'s',protocolMajor:1})).toEqual({ok:false,reasons:['CONTRACT_MISMATCH']});
 });
+test('review7 #2: a signal before ready latches 130/143 at once; startup never goes on to spawn the UI or print Ready, and what it started is gone',()=>withRoot(async(root,tmp)=>{
+ const artifact=join(tmp,'export'),m=await exported(artifact),pidFile=join(tmp,'runtime.pid');
+ // a runtime that ignores SIGTERM (so teardown takes the bounded wait) and only gets ready a little later
+ const js=`import {createServer} from 'node:http';import {writeFileSync} from 'node:fs';
+const a=process.argv,port=Number(a[a.indexOf('--port')+1]);writeFileSync(${JSON.stringify(pidFile)},String(process.pid));process.on('SIGTERM',()=>{});process.on('SIGINT',()=>{});
+const health={protocolMajors:[1,2],sourceCommit:'${m.sourceCommit}',schemaHash:'${m.schemaHash}',scenarioIds:['FD01','BV01'],backends:${JSON.stringify(MOCK.map(id=>({id,enabled:true})))}};
+const s=createServer((q,r)=>{r.setHeader('Content-Type','application/json');r.end(JSON.stringify(health));});
+setTimeout(()=>s.listen(port,'127.0.0.1',()=>console.log('Pairing token (expires in 5 minutes; one use): fake-one-use-token')),800);`;
+ await writeFile(join(artifact,'runtime.mjs'),js);await writeFile(join(artifact,'manifest.json'),JSON.stringify({...m,artifactSha256:sha(js)}));await installRuntime(artifact,root);
+ for(const [signal,code] of [['SIGINT',130],['SIGTERM',143]] as const){
+  await rm(pidFile,{force:true});
+  const up=await freePort(),r=run(['--root',root,'--data-dir',join(tmp,'runs'),'--ui-port',String(up),'--runtime-port',String(await freePort())]);
+  let pid=NaN;for(let i=0;i<200&&!Number.isInteger(pid);i++){await new Promise(res=>setTimeout(res,25));pid=await readFile(pidFile,'utf8').then(Number,()=>NaN);}
+  expect(Number.isInteger(pid),signal).toBe(true);
+  r.child.kill(signal);
+  // during the whole teardown (the runtime ignores SIGTERM: ~5 s) the UI port must never come up: no UI is spawned after the signal
+  let uiSeen=false,done=false;void r.exit.then(()=>{done=true;});
+  while(!done){if(await listening(up))uiSeen=true;await new Promise(res=>setTimeout(res,50));}
+  expect(await r.exit,signal).toBe(code);expect(uiSeen,signal).toBe(false);
+  expect(r.out,signal).not.toMatch(/Ready in/);expect(r.out,signal).not.toMatch(/UI pid/);
+  expect(await listening(up),signal).toBe(false);
+  const survived=alive(pid);if(survived)process.kill(pid,'SIGKILL');
+  expect(survived,signal).toBe(false);
+ }
+}),60000);
