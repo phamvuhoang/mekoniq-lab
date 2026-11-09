@@ -40,12 +40,17 @@ const waitFor=(child,name,until,ms)=>new Promise((ok,fail)=>{
 /**
  * One launcher loop for the mock and the IR-SIM launchers: checks, then the pinned runtime and the UI as the only processes it owns, stopped on Ctrl-C.
  * `prepare` runs after the runtime pin is verified and before anything is spawned; it returns extra runtime argv/env (IR-SIM: the verified tool paths).
+ * Every child it starts (a preflight probe) is handed to its `track` at spawn time, so a signal, an error or the exit stops it too (its whole group when
+ * `groupKill`). A signal before ready aborts the start: exit 130 (SIGINT) / 143 (SIGTERM), never 0; Ctrl-C after ready is the normal stop (exit 0).
  */
 export async function launch({argv=process.argv.slice(2),prepare=async()=>({args:[],env:{}}),check=checkHealth,banner}={}){
- const started=performance.now(),owned=[];
- let stopping;
- const stop=()=>stopping??=Promise.all(owned.filter(c=>c.exitCode===null&&c.signalCode===null).map(c=>new Promise(r=>{const k=setTimeout(()=>c.kill('SIGKILL'),5000);c.once('exit',()=>{clearTimeout(k);r();});c.kill('SIGTERM');})));
- for(const s of ['SIGINT','SIGTERM'])process.on(s,()=>{if(stopping)return;console.log('\nStopping the runtime and UI this launcher started…');void stop().then(()=>process.exit(0));});
+ const started=performance.now(),owned=[],track=(c)=>{owned.push(c);return c;};
+ let stopping,ready=false;
+ const live=(c)=>c.exitCode===null&&c.signalCode===null;
+ const signal=(c,sig)=>{try{if(c.groupKill&&c.pid)process.kill(-c.pid,sig);else c.kill(sig);}catch{/* already gone */}};
+ const stop=()=>stopping??=Promise.all(owned.filter(live).map(c=>new Promise(r=>{const k=setTimeout(()=>signal(c,'SIGKILL'),5000);c.once('exit',()=>{clearTimeout(k);if(c.groupKill)signal(c,'SIGKILL');r();});signal(c,'SIGTERM');})));
+ for(const [s,code] of [['SIGINT',130],['SIGTERM',143]])process.on(s,()=>{if(stopping)return;console.log(ready?'\nStopping the runtime and UI this launcher started…':`\n${s} before ready: start aborted, stopping what this launcher started…`);void stop().then(()=>process.exit(ready?0:code));});
+ process.once('exit',()=>{for(const c of owned)if(live(c))signal(c,'SIGKILL');});
  try{
   assertNode();assertPlatform();
   const o=options(argv);
@@ -56,7 +61,7 @@ export async function launch({argv=process.argv.slice(2),prepare=async()=>({args
   if(!(lock.protocolMajors??[lock.protocolMajor]).includes(2))throw new Error(`RUNTIME_PROTOCOL_V2_REQUIRED: pinned artifact offers protocol ${lock.protocolMajor} only. ${PREVIEW}`);
   const vite=join(lab,'node_modules/vite/bin/vite.js');
   await access(vite).catch(()=>{throw new Error('DEPENDENCIES_NOT_INSTALLED: run pnpm install --frozen-lockfile once (the launcher never downloads).');});
-  const extra=await prepare(o,lock);
+  const extra=await prepare(o,lock,track);
   await portFree(o.runtimePort);await portFree(o.uiPort);
   const rt=spawn(process.execPath,[file,'--port',String(o.runtimePort),'--data-dir',o.dataDir,...extra.args],{cwd:o.root,stdio:['ignore','pipe','inherit'],env:{...process.env,...extra.env}});owned.push(rt);
   let out='';rt.stdout.on('data',c=>{out+=c;});
@@ -70,11 +75,11 @@ Source ${lock.sourceCommit} · artifact ${lock.artifactSha256.slice(0,12)} · pr
 Backends: ${extra.backends??MOCK_BACKENDS.join(', ')} · journal ${o.dataDir}
 Owned processes: runtime pid ${rt.pid}, UI pid ${ui.pid}
 Open http://127.0.0.1:${o.uiPort} and enter this one-use pairing code (expires in 5 minutes): ${token}
-Ready in ${Math.round(performance.now()-started)} ms. Press Ctrl-C to stop.`);
+Ready in ${Math.round(performance.now()-started)} ms. Press Ctrl-C to stop.`);ready=true;
   if(o.bootOnly){await stop();return;}
   const code=await new Promise(r=>{for(const c of owned)c.once('exit',x=>r(x));});
   if(!stopping){console.error(`A launcher process exited unexpectedly (${code}); stopping the other one.`);await stop();process.exitCode=1;}
- }catch(e){console.error(e.message);await stop();process.exitCode=1;}
+ }catch(e){if(stopping)return;console.error(e.message);await stop();process.exitCode=1;}// a signal is already stopping everything: its exit code stands
 }
 const main=()=>launch();
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await main();

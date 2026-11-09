@@ -6,7 +6,7 @@
 // Options: --source <dir> (default ../source) --irsim-python <path> (default <source>/.venv-irsim/bin/python) --linkforge-python <path>
 // (default <source>/.venv-linkforge/bin/python), plus every lab:mock option (--ui-port 4175 --runtime-port 4176 --data-dir --root --boot-only).
 // The source runtime accepts browser traffic only from 127.0.0.1:4175/4176, so other ports serve only non-browser checks.
-import {execFile} from 'node:child_process';
+import {execFile,spawn} from 'node:child_process';
 import {mkdir,readFile,writeFile,access,constants,stat} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -25,10 +25,18 @@ export function checkIRSimHealth(health,lock){
 // Reads the venv's installed distributions with the standard library only (isolated mode: no user site, no cwd on sys.path).
 const PROBE="import sys,json,importlib.metadata as m\nprint(json.dumps({'version':list(sys.version_info[:2]),'impl':sys.implementation.name,'dists':{d.metadata['Name'].lower().replace('_','-'):d.version for d in m.distributions()}}))";
 const pins=(text)=>[...text.matchAll(/^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;\\]+)/gm)].map(([,n,v])=>[n.toLowerCase().replace(/[_.]/g,'-'),v]);
+/** A preflight child in its own process group, handed to the launcher's `track` at spawn (so Ctrl-C stops it and whatever it started). */
+// spawn, not execFile: execFile does not honour `detached`, so its child would share the launcher's group
+const spawnProbe=(python,args,{timeout,env},track)=>new Promise((ok,fail)=>{
+ const c=spawn(python,args,{env,detached:true,stdio:['ignore','pipe','ignore']});c.groupKill=true;track(c);let stdout='';
+ const t=setTimeout(()=>{try{process.kill(-c.pid,'SIGKILL');}catch{/* gone */}},timeout);
+ c.stdout.on('data',d=>{stdout+=d;});c.once('error',e=>{clearTimeout(t);fail(e);});
+ c.once('close',(code)=>{clearTimeout(t);try{process.kill(-c.pid,'SIGKILL');}catch{/* the group is empty */}code===0?ok({stdout}):fail(new Error(`PROBE_EXIT:${code}`));});
+});
 /** CPython 3.11 whose installed distributions include every `name==version` of the lock. Returns null when it matches, else the reason code. */
-export async function venvProblem(python,lockText){
+export async function venvProblem(python,lockText,track=()=>{}){
  try{await access(python,constants.X_OK);if(!(await stat(python)).isFile())return 'PYTHON_MISSING';}catch{return 'PYTHON_MISSING';}
- let probe;try{probe=JSON.parse((await run(python,['-I','-c',PROBE],{timeout:20000,env:{PATH:'/usr/bin:/bin',LANG:'C.UTF-8'}})).stdout);}catch{return 'PYTHON_UNUSABLE';}
+ let probe;try{probe=JSON.parse((await spawnProbe(python,['-I','-c',PROBE],{timeout:20000,env:{PATH:'/usr/bin:/bin',LANG:'C.UTF-8'}},track)).stdout);}catch{return 'PYTHON_UNUSABLE';}
  if(probe.impl!=='cpython'||probe.version?.join('.')!=='3.11')return `PYTHON_UNSUPPORTED:${probe.impl}-${probe.version?.join('.')}`;
  const installed=Object.fromEntries(Object.entries(probe.dists??{}).map(([k,v])=>[k.replace(/[_.]/g,'-'),v]));
  const wrong=pins(lockText).filter(([n,v])=>installed[n]!==v).map(([n,v])=>`${n}==${v}${installed[n]?` (found ${installed[n]})`:' (missing)'}`);
@@ -43,14 +51,14 @@ export function irsimOptions(argv){
  return o;
 }
 /** Every check before a process is spawned; returns the runtime argv and env for the verified tools. */
-export async function prepareIRSim(o,launch_,lock){
+export async function prepareIRSim(o,launch_,lock,track=()=>{}){
  const manifest=await installedManifest(launch_.root,lock),p=manifest.portableSimulationTools;
  if(!p)throw new Error('PORTABLE_TOOLS_NOT_IN_ARTIFACT: the pinned runtime predates portable simulation; import an export that carries portableSimulationTools.');
  const mismatch=await verifyPortableTree(p,o.source);
  if(mismatch.length)throw new Error(`PORTABLE_TOOLS_MISMATCH: ${mismatch.slice(0,5).join(', ')}${mismatch.length>5?` (+${mismatch.length-5})`:''}. The tools in ${o.source} are not the pinned closure ${p.closure.digest.slice(0,12)}.`);
  const tool=(id)=>p.tools.find(t=>t.id===id),root=(id)=>join(o.source,tool(id).root);
  for(const [id,python,code] of [['irsim_worker',o.irsimPython,'IRSIM'],['linkforge_worker',o.linkforgePython,'LINKFORGE']]){
-  const problem=await venvProblem(python,await readFile(join(o.source,tool(id).lock.path),'utf8'));
+  const problem=await venvProblem(python,await readFile(join(o.source,tool(id).lock.path),'utf8'),track);
   if(problem)throw new Error(`${code}_${problem}: ${python}. Provision it explicitly from ${tool(id).lock.path} (the launcher never installs).`);
  }
  // the server-owned component catalog of this launcher: the Serve fixture's components, taken from the verified closure
@@ -67,5 +75,5 @@ export async function prepareIRSim(o,launch_,lock){
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  let o;try{o=irsimOptions(process.argv.slice(2));}catch(e){console.error(e.message);process.exit(1);}
- await launch({argv:o.rest,prepare:(l,lock)=>prepareIRSim(o,l,lock),check:checkIRSimHealth,banner:'Mekoniq Robot Lab — IR-SIM 2D twin (portable simulation; no robot hardware, not a native/Gazebo run)'});
+ await launch({argv:o.rest,prepare:(l,lock,track)=>prepareIRSim(o,l,lock,track),check:checkIRSimHealth,banner:'Mekoniq Robot Lab — IR-SIM 2D twin (portable simulation; no robot hardware, not a native/Gazebo run)'});
 }

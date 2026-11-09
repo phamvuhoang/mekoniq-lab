@@ -143,3 +143,21 @@ test('boot: verified tools reach the runtime as operator argv with both flags; a
  const down=run(['--root',root,'--source',src,'--data-dir',data,'--runtime-port',String(await freePort()),'--ui-port',String(up),'--irsim-python',ok,'--linkforge-python',ok]);
  expect(await down.exit).toBe(1);expect(down.err).toContain('IRSIM_PROVIDER_UNAVAILABLE:IRSIM_WORKER_UNAVAILABLE');expect(down.out).not.toMatch(/Ready in/);expect(await listening(up)).toBe(false);
 }),60000);
+test('review5 #7: Ctrl-C during the venv preflight stops the probe and its children, and the launcher exits non-zero',()=>withTmp(async(tmp)=>{
+ const root=join(tmp,'lab'),src=join(tmp,'source'),tools=await sourceTree(src);await installed(root,tmp,tools);
+ // a probe that never answers: records its own pid and a grandchild's, then waits
+ const slow=join(tmp,'slow-python');await writeFile(slow,`#!/bin/sh\nsleep 60 &\necho $! > ${join(tmp,'grandchild.pid')}\necho $$ > ${join(tmp,'probe.pid')}\nwait\n`);await chmod(slow,0o755);
+ const alive=(pid:number)=>{try{process.kill(pid,0);return true;}catch{return false;}};
+ for(const signal of ['SIGINT','SIGTERM'] as const){
+  await rm(join(tmp,'probe.pid'),{force:true});await rm(join(tmp,'grandchild.pid'),{force:true});
+  const child=spawn(process.execPath,[launcher,'--root',root,'--source',src,'--data-dir',join(tmp,'runs'),'--runtime-port',String(await freePort()),'--ui-port',String(await freePort()),'--irsim-python',slow,'--linkforge-python',slow],{cwd:lab,stdio:['ignore','pipe','pipe']});
+  const exit=new Promise<number|null>(r=>child.once('exit',c=>r(c)));
+  let pids:number[]=[];
+  for(let i=0;i<100&&pids.length<2;i++){await new Promise(r=>setTimeout(r,100));pids=await Promise.all(['probe.pid','grandchild.pid'].map(f=>readFile(join(tmp,f),'utf8').then(Number,()=>NaN))).then(x=>x.filter(Number.isInteger));}
+  expect(pids,signal).toHaveLength(2);expect(pids.every(alive)).toBe(true);
+  child.kill(signal);
+  expect(await exit,signal).toBe(signal==='SIGINT'?130:143);
+  for(let i=0;i<50&&pids.some(alive);i++)await new Promise(r=>setTimeout(r,100));
+  expect(pids.filter(alive),signal).toEqual([]);
+ }
+}),60000);
