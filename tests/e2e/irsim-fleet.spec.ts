@@ -1,6 +1,9 @@
 // C02 two-robot journey against the real pinned runtime and the real IR-SIM worker (scripts/test-irsim-e2e.mjs, lab:irsim): open the two-robot Serve fleet,
-// compile, run IR-FD07 (robot01 and robot02 with their own wheels and LiDARs, one reserved aisle zone, a customer walking across) to completion, then read the
-// report: every metric shown comes from the durable trace (navigation2d), never from the animation. Without the launcher's pairing code this FAILS (never skipped).
+// compile, run IR-FD07 to completion, then read the report. What this proves: robot01 and robot02 (their own wheels and LiDARs) both deliver through the source,
+// one at a time (the venue-movement reservation serializes them); the aisle zone is reserved and released per leg (never contended in this scenario) and a customer
+// walks away from both routes. The zone and the customer are server-side only and not drawn by the Lab. Zone contention is proven by the source campaign's
+// contention rig (IR-RIG-ZONE), not here. Every metric read comes from the durable trace (navigation2d), never from the animation.
+// Without the launcher's pairing code this FAILS (never skipped).
 import {test,expect} from '@playwright/test';
 const token=process.env.LAB_TEST_PAIRING_TOKEN;
 interface Report {manifest:{scenario:{id:string};backends:{id:string}[];models:{id:string;hash:string}[]};outcome:{status:string;served:string;tick:number};
@@ -39,7 +42,9 @@ test('Two Serve robots on IR-SIM 2D: compile the fleet, run IR-FD07 to completio
 
  const runId=(await page.getByTestId('run-id').textContent())!.trim();
  const r=await page.evaluate(async id=>(await fetch(`/lab/v2/runs/${id}/report`,{credentials:'same-origin'})).json(),runId) as Report;
- // the run: IR-FD07 on the IR-SIM plant, both orders served after their handoffs, within the 12,000-tick bound
+ // the run: IR-FD07 on the IR-SIM plant, both orders served after their handoffs, within the 12,000-tick bound; the preset says what is not drawn
+ await expect(page.locator('#preset-irsim-fd07-summary')).toContainText('server-side only and not drawn here');
+ expect(r.metrics.maxConcurrentMovers).toBe(1);
  expect(r.manifest.scenario.id).toBe('IR-FD07');expect(r.manifest.backends.map(b=>b.id)).toEqual(['irsim_2d']);expect(r.navigation2d?.engine.id).toBe('irsim_2d');
  expect(r.outcome).toMatchObject({status:'completed',served:'2'});expect(r.outcome.tick).toBeLessThanOrEqual(12000);
  expect(r.entities.map(e=>e.id).sort()).toEqual(['robot01','robot02']);

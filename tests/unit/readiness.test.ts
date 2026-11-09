@@ -70,3 +70,12 @@ test('reset ready runs refresh their locked inputs and remove Start at readiness
   expect(rendered).toContain('data-action="twin-start"');
  }finally{w.leave();vi.useRealTimers();}
 });
+test('C02 fix pass F11: the IR-FD07 preset says in VI/JA/EN that the source moves one robot at a time and that the zone and the customer are not drawn by the Lab',async()=>{
+ vi.stubGlobal('document',{documentElement:{}});const {presetById}=await import('../../src/scenarios/catalog');const {setLocale}=await import('../../src/i18n');
+ const p=presetById('irsim-fd07')!,texts:Record<string,string>={};
+ for(const l of ['vi','ja','en'] as const){setLocale(l);texts[l]=p.summary();}
+ setLocale('en');
+ expect(texts.en).toMatch(/one robot at a time.*server-side only and not drawn here/);
+ expect(texts.vi).toMatch(/lần lượt từng robot.*không vẽ ở đây/);expect(texts.ja).toMatch(/1台ずつ.*描画されない/);
+ expect(new Set(Object.values(texts)).size).toBe(3);
+});
