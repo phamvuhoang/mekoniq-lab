@@ -1,4 +1,4 @@
-// Synced from source packages/contracts/generated/navigation2d.ts @ c5a9d73fd8247a31751aa62df6b3aaa3c7392a66 (sha256 24492a143d7e1668dca74ab6a2bc0c6e3da7f8af504e0ace12798a79bfb89618). Run node scripts/sync-engineering-contracts.mjs; do not edit.
+// Synced from source packages/contracts/generated/navigation2d.ts @ 2a15649714b9f56d2dead5c7a24b884db40bce5c (sha256 21090dded5fb47f5aa43a60d7030f7d3e40345a81446d0e27597d638c2700d74). Run node scripts/sync-engineering-contracts.mjs; do not edit.
 /* Generated from the navigation/validation schemas. Run pnpm contracts:generate; do not edit. */
 import type { Digest, EngineeringId, Link, Joint, Pose, Scalar, SensorModel, SourceRef } from './engineering';
 /**
@@ -9,6 +9,11 @@ import type { Digest, EngineeringId, Link, Joint, Pose, Scalar, SensorModel, Sou
  * via the `definition` "Vec2".
  */
 export type Vec2 = number[];
+/**
+ * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
+ * via the `definition` "NavigationSceneV1".
+ */
+export type NavigationSceneV1 = NavigationSceneV11;
 /**
  * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
  * via the `definition` "IRSimResponseV1".
@@ -139,6 +144,151 @@ export type IRSimRequestV1 =
     }
   | {
       protocol: 'mekoniq-irsim/1';
+      requestId: string;
+      runId: string;
+      expectedTick: number;
+      op: 'stop';
+      payload: {
+        reason: string;
+      };
+    };
+/**
+ * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
+ * via the `definition` "NavigationRunEvidenceV1".
+ */
+export type NavigationRunEvidenceV1 = NavigationRunEvidenceV11;
+/**
+ * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
+ * via the `definition` "Sim3DResponseV1".
+ */
+export type Sim3DResponseV1 =
+  | {
+      protocol: 'mekoniq-sim3d/1';
+      requestId: string;
+      runId: string;
+      bootId: string;
+      tick: number;
+      ok: true;
+      result:
+        | Sim3DSnapshotV1
+        | {
+            state: 'created' | 'running' | 'paused' | 'stopped' | 'failed';
+          }
+        | {
+            packageVersion: string;
+            pythonVersion: string;
+            lockDigest: Digest;
+            /**
+             * @minItems 0
+             * @maxItems 16
+             */
+            ops: string[];
+            engineVersion?: string;
+            executableSha256?: Digest;
+          };
+    }
+  | {
+      protocol: 'mekoniq-sim3d/1';
+      requestId: string;
+      runId: string;
+      bootId: string;
+      tick: number;
+      ok: false;
+      error: {
+        code: string;
+        detail: string;
+      };
+    };
+/**
+ * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
+ * via the `definition` "Sim3DRequestV1".
+ */
+export type Sim3DRequestV1 =
+  | {
+      protocol: 'mekoniq-sim3d/1';
+      requestId: string;
+      runId: string;
+      expectedTick: number;
+      op: 'describe';
+      payload: {};
+    }
+  | {
+      protocol: 'mekoniq-sim3d/1';
+      requestId: string;
+      runId: string;
+      expectedTick: number;
+      op: 'create';
+      payload: {
+        sceneRef: string;
+        seed: number;
+      };
+    }
+  | {
+      protocol: 'mekoniq-sim3d/1';
+      requestId: string;
+      runId: string;
+      expectedTick: number;
+      op: 'start';
+      payload: {};
+    }
+  | {
+      protocol: 'mekoniq-sim3d/1';
+      requestId: string;
+      runId: string;
+      expectedTick: number;
+      op: 'step';
+      payload: {
+        targetTick: number;
+        /**
+         * @minItems 0
+         * @maxItems 2
+         */
+        velocities: {
+          robotId: EngineeringId;
+          vMps: number;
+          omegaRadps: number;
+        }[];
+        /**
+         * @minItems 0
+         * @maxItems 16
+         */
+        actorUpdates: {
+          actorId: EngineeringId;
+          /**
+           * @minItems 3
+           * @maxItems 3
+           */
+          poseMap: number[];
+        }[];
+        singleStep?: boolean;
+      };
+    }
+  | {
+      protocol: 'mekoniq-sim3d/1';
+      requestId: string;
+      runId: string;
+      expectedTick: number;
+      op: 'pause';
+      payload: {};
+    }
+  | {
+      protocol: 'mekoniq-sim3d/1';
+      requestId: string;
+      runId: string;
+      expectedTick: number;
+      op: 'resume';
+      payload: {};
+    }
+  | {
+      protocol: 'mekoniq-sim3d/1';
+      requestId: string;
+      runId: string;
+      expectedTick: number;
+      op: 'getState';
+      payload: {};
+    }
+  | {
+      protocol: 'mekoniq-sim3d/1';
       requestId: string;
       runId: string;
       expectedTick: number;
@@ -347,10 +497,19 @@ export interface NavigationPolicyV1 {
   };
 }
 /**
+ * Heights and materials a 3D plant needs and the 2D scene does not carry. Versioned input of the compiler, so it has a digest through the scene.
+ *
  * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
- * via the `definition` "NavigationSceneV1".
+ * via the `definition` "World3DV1".
  */
-export interface NavigationSceneV1 {
+export interface World3DV1 {
+  obstacleHeightM: number;
+  wallHeightM: number;
+  floorFriction: number;
+  casterFriction: number;
+  provenance: 'assumed' | 'measured';
+}
+export interface NavigationSceneV11 {
   schemaVersion: 1;
   documentType: 'navigation-scene';
   sceneDigest: Digest;
@@ -454,11 +613,17 @@ export interface NavigationSceneV1 {
   clock: {
     tickMs: 20;
   };
-  engine: {
-    id: 'irsim_2d';
-    version: '2.12.0';
-    collisionMode: 'stop';
-  };
+  engine:
+    | {
+        id: 'irsim_2d';
+        version: '2.12.0';
+        collisionMode: 'stop';
+      }
+    | {
+        id: 'webots_3d';
+        version: 'R2025a';
+        basicTimeStepMs: 1 | 2 | 4 | 5 | 10 | 20;
+      };
   policy: NavigationPolicyV1;
   /**
    * @minItems 0
@@ -470,6 +635,7 @@ export interface NavigationSceneV1 {
    * @maxItems 100
    */
   limitations: string[];
+  world3d?: World3DV1;
 }
 /**
  * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
@@ -597,11 +763,7 @@ export interface IRSimSnapshotV1 {
     collisionIds: string[];
   }[];
 }
-/**
- * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
- * via the `definition` "NavigationRunEvidenceV1".
- */
-export interface NavigationRunEvidenceV1 {
+export interface NavigationRunEvidenceV11 {
   schemaVersion: 1;
   documentType: 'navigation-run-evidence';
   runId: string;
@@ -621,13 +783,23 @@ export interface NavigationRunEvidenceV1 {
     id: 'grid-diff-v1';
     version: string;
   };
-  engine: {
-    id: 'irsim_2d';
-    version: string;
-    pythonVersion: string;
-    platform: string;
-    lockDigest: Digest;
-  };
+  engine:
+    | {
+        id: 'irsim_2d';
+        version: string;
+        pythonVersion: string;
+        platform: string;
+        lockDigest: Digest;
+      }
+    | {
+        id: 'webots_3d';
+        engineVersion: 'R2025a';
+        executableSha256: Digest;
+        basicTimeStepMs: 1 | 2 | 4 | 5 | 10 | 20;
+        pythonVersion: string;
+        platform: string;
+        lockDigest: Digest;
+      };
   /**
    * Optional (added with B05): the versions a rerun must match besides the engine and lock.
    */
@@ -648,7 +820,7 @@ export interface NavigationRunEvidenceV1 {
   seed: {
     runSeed: number;
     engineSeed: number;
-    engineSeedAlgorithm: 'irsim-env-seed-v1';
+    engineSeedAlgorithm: 'irsim-env-seed-v1' | 'webots-worldinfo-seed-v1';
     /**
      * @minItems 0
      * @maxItems 32
@@ -793,4 +965,131 @@ export interface NavigationRunEvidenceV1 {
      */
     runTick?: number | null;
   };
+}
+/**
+ * One verdict of an independent algorithm check. The verdict is decided in TypeScript from the checker output; the Python checker never grades itself.
+ *
+ * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
+ * via the `definition` "AlgorithmResultV1".
+ */
+export interface AlgorithmResultV1 {
+  schemaVersion: 1;
+  checkerId: 'rtb_kinematics' | 'pid_reference';
+  caseId: string;
+  verdict: 'pass' | 'fail' | 'not_run';
+  metrics: {
+    [k: string]: number | null;
+  };
+  oracleProfileDigest: Digest;
+  inputDigest: Digest;
+  toolVersions: {
+    [k: string]: string;
+  };
+  /**
+   * @minItems 0
+   * @maxItems 100
+   */
+  reasons: string[];
+}
+/**
+ * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
+ * via the `definition` "Pose3DV1".
+ */
+export interface Pose3DV1 {
+  z: number;
+  roll: number;
+  pitch: number;
+}
+/**
+ * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
+ * via the `definition` "WheelStateV1".
+ */
+export interface WheelStateV1 {
+  leftRadS: number;
+  rightRadS: number;
+}
+/**
+ * Every field of the IR-SIM robot state, plus the 3D pose and wheel speeds. Contact with the floor is never a collisionId.
+ *
+ * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
+ * via the `definition` "Sim3DRobotStateV1".
+ */
+export interface Sim3DRobotStateV1 {
+  robotId: EngineeringId;
+  /**
+   * @minItems 3
+   * @maxItems 3
+   */
+  poseDriveMap: number[];
+  /**
+   * @minItems 2
+   * @maxItems 2
+   */
+  bodyVelocity: number[];
+  /**
+   * @minItems 0
+   * @maxItems 16
+   */
+  scans: LidarScanV1[];
+  /**
+   * @minItems 0
+   * @maxItems 64
+   */
+  collisionIds: string[];
+  pose3d: Pose3DV1;
+  wheels: WheelStateV1;
+}
+/**
+ * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
+ * via the `definition` "Sim3DSnapshotV1".
+ */
+export interface Sim3DSnapshotV1 {
+  schemaVersion: 1;
+  runId: string;
+  bootId: string;
+  tick: number;
+  simTimeNs: string;
+  seq: string;
+  sceneDigest: Digest;
+  /**
+   * @minItems 0
+   * @maxItems 2
+   */
+  robots: Sim3DRobotStateV1[];
+  model?: Sim3DModelReadbackV1;
+}
+/**
+ * What the engine reports about the world it loaded (getState only): link masses and world positions, wheel radius and separation, wheel hinge axes. Compared with the physical model by the parity test.
+ *
+ * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
+ * via the `definition` "Sim3DModelReadbackV1".
+ */
+export interface Sim3DModelReadbackV1 {
+  /**
+   * @minItems 0
+   * @maxItems 2
+   */
+  robots: {
+    robotId: EngineeringId;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    links: {
+      name: string;
+      massKg: number;
+      /**
+       * @minItems 3
+       * @maxItems 3
+       */
+      positionMap: number[];
+    }[];
+    wheelRadiusM: number;
+    wheelSeparationM: number;
+    /**
+     * @minItems 2
+     * @maxItems 2
+     */
+    wheelAxes: number[][];
+  }[];
 }

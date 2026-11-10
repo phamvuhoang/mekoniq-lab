@@ -116,3 +116,25 @@ test('review6 C: the source world hash leaves the revision out, so the import co
  const r=report();r.manifest.world={...r.manifest.world,revision:r.manifest.world.revision+1};// same hash, another revision
  await expect(importNavigationEvidence(files(r))).rejects.toThrow('WORLD_HASH_MISMATCH');
 });
+
+// A Webots 3D report: the provider and its R2025a version come from the evidence's own engine block (engineVersion, not version), and the panel names Webots, not IR-SIM.
+const webotsReport=()=>{
+ const base=report(),e=evidence() as unknown as Record<string,unknown> & {engine:Record<string,unknown>;seed:Record<string,unknown>};
+ const doc={...e,engine:{id:'webots_3d',engineVersion:'R2025a',executableSha256:D('e'),basicTimeStepMs:20,pythonVersion:'3.11.15',platform:'darwin-arm64',lockDigest:D('f')},seed:{...e.seed,engineSeedAlgorithm:'webots-worldinfo-seed-v1'}};
+ delete (doc.seed as Record<string,unknown>).engineRng;
+ const m=base.manifest as unknown as {backends:unknown[];models:{id:string;revision:string}[]};
+ m.backends=[{id:'webots_3d',version:'R2025a',model:'webots_diff_drive',dynamics:true}];
+ m.models=m.models.map(x=>x.id==='irsim_2d'?{...x,id:'webots_3d',revision:'R2025a'}:x);
+ return {...base,navigation2d:doc} as unknown as RunReport;
+};
+test('a Webots report: provider webots_3d from the evidence, supported, and the panel says Webots with its version, not IR-SIM',()=>{
+ const r=webotsReport(),view=navigationEvidenceView(r);
+ expect(view.supported,view.reasons.join()).toBe(true);expect(view.provider).toBe('webots_3d');
+ const html=navigationHtml(r);
+ expect(html).toContain('Webots R2025a');expect(html).not.toContain('IR-SIM');
+ expect(html).toMatch(/not_calibrated|assumed/i);
+});
+test('a Webots report whose manifest names another engine version is a provider mismatch, never shown as the evidence says',()=>{
+ const r=webotsReport();(r.manifest as unknown as {backends:{version:string}[]}).backends[0]!.version='R2025b';
+ expect(navigationEvidenceView(r).reasons).toContain('IDENTITY_MISMATCH:provider');
+});

@@ -20,10 +20,14 @@ ajv.addSchema(componentSchema,'engineering-component.schema.json');ajv.addSchema
 const validEvidence=ajv.compile<NavigationRunEvidenceV1>(evidenceSchema);
 export interface NavigationEvidenceView {supported:boolean;provider:string|null;complete:boolean;reasons:string[]}
 const STREAMS=['trajectory','sensors','control','collisions'] as const;
-/** The evidence document, or null when absent or not a navigation-run-evidence-v1 the Lab knows (closed schema, provider irsim_2d, safe chunk names). */
+/** The evidence document, or null when absent or not a navigation-run-evidence-v1 the Lab knows (closed schema, a provider this Lab knows, safe chunk names). */
+/** The engines whose evidence the Lab renders; an unknown id is unsupported, never shown under another name. */
+export const NAVIGATION_PROVIDERS=['irsim_2d','webots_3d'] as const;
+/** The engine's version, which the two branches of the evidence schema name differently (version / engineVersion). */
+export const engineVersionOf=(e:NavigationRunEvidenceV1['engine'])=>e.id==='webots_3d'?e.engineVersion:e.version;
 export function navigationEvidence(report:RunReport):NavigationRunEvidenceV1|null{
  const n=report.navigation2d;
- return validEvidence(n)&&n.engine.id==='irsim_2d'&&STREAMS.every(s=>n.artifacts[s].every(a=>safeArtifactPath(a.path)&&!a.path.includes('/')))?n:null;
+ return validEvidence(n)&&(NAVIGATION_PROVIDERS as readonly string[]).includes(n.engine.id)&&STREAMS.every(s=>n.artifacts[s].every(a=>safeArtifactPath(a.path)&&!a.path.includes('/')))?n:null;
 }
 /** The compiled scene a report may draw: only the one its own evidence names (sceneDigest). A live run whose report carries no evidence yet keeps the scene of the bundle
  * it was created from; anything else is unavailable with the reason — never another run's geometry. */
@@ -43,7 +47,7 @@ function identityMismatches(r:RunReport,n:NavigationRunEvidenceV1):string[]{
  const sensorRobots=new Set(n.seed.sensorSeeds.map(s=>`navigation-model:${s.robotId}`));
  return Object.entries({
   runId:m.runId!==n.runId,
-  provider:!m.backends.some(b=>b.id===n.engine.id&&b.version===n.engine.version),
+  provider:!m.backends.some(b=>b.id===n.engine.id&&b.version===engineVersionOf(n.engine)),
   seed:m.seed!==n.seed.runSeed,
   tickMs:m.clock.tickMs!==n.clock.tickMs,
   sourceCommit:n.identity?.sourceCommit!==undefined&&n.identity.sourceCommit!==m.sourceCommit,

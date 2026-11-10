@@ -5,7 +5,7 @@ import type {RunReport} from '../scenarios/controls';
 import type {openReplayV2} from '../reports/replay';
 import {compareRuns} from '../reports/compare';
 import {engineeringView} from '../reports/engineering-view';
-import {navigationEvidence,navigationEvidenceView,navigationRows} from '../reports/navigation2d';
+import {engineVersionOf,navigationEvidence,navigationEvidenceView,navigationRows} from '../reports/navigation2d';
 import {summarizeReportV2} from '../reports/metrics';
 import {icon,esc} from './icons';
 import {tr} from '../i18n';
@@ -46,13 +46,13 @@ ${v.blockers.length?`<ul class="blockers" data-testid="engineering-blockers">${v
 }
 /** IR-SIM 2D evidence: provider, completeness with every reason, and each assertion's own result. Reports without it say unavailable (never pass). */
 export function navigationHtml(report:RunReport):string{
- if(report.navigation2d===undefined&&!report.manifest.backends.some(b=>b.id==='irsim_2d'))return '';
+ if(report.navigation2d===undefined&&!report.manifest.backends.some(b=>b.id==='irsim_2d'||b.id==='webots_3d'))return '';
  const v=navigationEvidenceView(report),n=navigationEvidence(report),m=report.metrics.navigation,result=(r:string)=>({pass:tr('đạt','合格','pass'),fail:tr('không đạt','不合格','fail'),inconclusive:tr('chưa kết luận','判定不能','inconclusive'),not_run:tr('chưa chạy','未実行','not run'),unverified:tr('chưa xác lập (bằng chứng chưa đầy đủ)','未確立（証跡が不完全）','not established (evidence incomplete)')})[r]??r;
  return `<div data-testid="navigation-evidence" data-supported="${esc(v.supported)}" data-complete="${esc(v.complete)}"><h3>${tr('Bằng chứng điều hướng 2D','2Dナビゲーション証跡','2D navigation evidence')}</h3>
 <p><b>${v.supported?esc(v.provider!):tr('không khả dụng','利用不可','unavailable')}</b> · ${v.complete?tr('đầy đủ','完全','complete'):tr('chưa đầy đủ','不完全','incomplete')}${v.reasons.length?`: <span data-testid="navigation-reasons">${esc(v.reasons.join(', '))}</span>`:''}</p>
-${n?`<p class="field-help">tick 0–${esc(n.clock.tickHorizon)} · ${esc(n.controller.id)} ${esc(n.controller.version)} · IR-SIM ${esc(n.engine.version)} · Python ${esc(n.engine.pythonVersion)} · ${esc(n.engine.platform)} · seed ${esc(n.seed.runSeed)}/${esc(n.seed.engineSeed)} · trajectory <code>${esc(n.digests.trajectoryDigest.slice(0,12))}</code> · sensor <code>${esc(n.digests.sensorDigest.slice(0,12))}</code>${m?.sensorPublications?` · LiDAR ${esc(m.sensorPublications.recorded)}/${esc(m.sensorPublications.expected)}`:''}</p>
+${n?`<p class="field-help">tick 0–${esc(n.clock.tickHorizon)} · ${esc(n.controller.id)} ${esc(n.controller.version)} · ${esc(n.engine.id==='webots_3d'?`Webots ${engineVersionOf(n.engine)}`:`IR-SIM ${engineVersionOf(n.engine)}`)} · Python ${esc(n.engine.pythonVersion)} · ${esc(n.engine.platform)} · seed ${esc(n.seed.runSeed)}/${esc(n.seed.engineSeed)} · trajectory <code>${esc(n.digests.trajectoryDigest.slice(0,12))}</code> · sensor <code>${esc(n.digests.sensorDigest.slice(0,12))}</code>${m?.sensorPublications?` · LiDAR ${esc(m.sensorPublications.recorded)}/${esc(m.sensorPublications.expected)}`:''}</p>
 <div class="eng-table-wrap" tabindex="0" role="region" aria-label="${tr('Khẳng định điều hướng','ナビゲーションのアサーション','Navigation assertions')}"><table class="eng-table nav-assertions" data-testid="navigation-assertions"><thead><tr><th scope="col">${tr('Khẳng định','アサーション','Assertion')}</th><th scope="col">${tr('Kết quả','結果','Result')}</th><th scope="col">${tr('Chi tiết','詳細','Detail')}</th></tr></thead><tbody>${navigationRows(report).map(r=>`<tr data-result="${esc(r.result)}"><th scope="row">${esc(r.id)}</th><td><span class="state-text">${esc(result(r.result))}</span></td><td>${esc(r.detail)}</td></tr>`).join('')}</tbody></table></div>`:''}
-<p class="source-note">${tr('Mô phỏng 2D động học phẳng; không phải bằng chứng Gazebo, native hay phần cứng.','平面運動学の2Dシミュレーション。Gazebo・ネイティブ・実機の証拠ではありません。','Planar kinematic 2D simulation; not Gazebo, native or hardware evidence.')}</p></div>`;
+<p class="source-note">${n?.engine.id==='webots_3d'?tr('Mô phỏng 3D vật lý cứng (Webots R2025a); mọi tham số vật lý là giả định, chưa hiệu chuẩn (not_calibrated); không phải bằng chứng Gazebo, native hay phần cứng.','剛体物理の3Dシミュレーション(Webots R2025a)。物理パラメータはすべて仮定で未校正(not_calibrated)。Gazebo・ネイティブ・実機の証拠ではありません。','Rigid-body 3D simulation (Webots R2025a); every physical parameter is assumed and not calibrated (not_calibrated); not Gazebo, native or hardware evidence.'):tr('Mô phỏng 2D động học phẳng; không phải bằng chứng Gazebo, native hay phần cứng.','平面運動学の2Dシミュレーション。Gazebo・ネイティブ・実機の証拠ではありません。','Planar kinematic 2D simulation; not Gazebo, native or hardware evidence.')}</p></div>`;
 }
 /** `report` may be the replay cursor's projection (streams, verification at the cursor); `full` is the report itself: the navigation evidence verdict is a property of
  * the whole recorded run and is always derived from it, never from a cursor projection. */
