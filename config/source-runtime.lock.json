@@ -4,7 +4,7 @@
   "toolchain": {
     "node": "v24.22.2"
   },
-  "sourceCommit": "a7c7e8b1051fe2209502a68f4090db567eab230a",
+  "sourceCommit": "3caac9deddc26fd134509ebea3d2ebc846d4296a",
   "schemaHash": "5ed587b756975391fa05c60b987b4f20e7c6898cc87c12c8e586d3e14eb812bc",
   "protocolMajor": 2,
   "protocolMajors": [
@@ -12,7 +12,7 @@
     2
   ],
   "nodeMajor": 24,
-  "artifactSha256": "4801038748b5d50195fb55ffe0ced13ea1f6909a610b6a859c2401d0c85de7d1",
+  "artifactSha256": "dd470d2299e72bb281869b91a18d15d795ca3f03833822bf5b4db2794adf45bb",
   "entrypoint": "runtime.mjs",
   "portableToolsDigest": "5e8cb28f5c4643716682dc667829295daf20baa8bc788011dde0b0320eb85818"
 }
