@@ -1,4 +1,4 @@
-// Synced from source packages/contracts/generated/navigation2d.ts @ 9acfe911f06f35df9e5aa004a47d07f3b21db7f7 (sha256 cb8ec304a790c266313aa5dbcb71fa84ffec04d9a1d953bc50f6ddfb1e83c87f). Run node scripts/sync-engineering-contracts.mjs; do not edit.
+// Synced from source packages/contracts/generated/navigation2d.ts @ a6b92c8595c0c208cae49278c02bcb56244a63ce (sha256 ab8d17c7acdd7e90adbc44549ab2c0bd429cb6c635c7b15745e5102d264d266c). Run node scripts/sync-engineering-contracts.mjs; do not edit.
 /* Generated from the navigation/validation schemas. Run pnpm contracts:generate; do not edit. */
 import type { Digest, EngineeringId, Link, Joint, Pose, Scalar, SensorModel, SourceRef } from './engineering';
 /**
@@ -1139,6 +1139,33 @@ export interface Sim3DModelReadbackV1 {
      */
     wheelAxes: number[][];
   }[];
+  /**
+   * The arm as the engine loaded it (getState only): link masses and, per joint in chain order, the hinge axis in the parent frame and the motor's position limits.
+   */
+  arm?: {
+    /**
+     * @minItems 1
+     * @maxItems 9
+     */
+    links: {
+      name: string;
+      massKg: number;
+    }[];
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    joints: {
+      name: string;
+      /**
+       * @minItems 3
+       * @maxItems 3
+       */
+      axis: number[];
+      lower: number;
+      upper: number;
+    }[];
+  };
 }
 /**
  * This interface was referenced by `Navigation2DContracts`'s JSON-Schema
