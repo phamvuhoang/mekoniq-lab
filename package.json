@@ -21,9 +21,11 @@
     "test:twin-e2e": "node scripts/test-mock-e2e.mjs twin-workspace.spec.ts coffee-journey.spec.ts twin-recovery.spec.ts",
     "lab:mock": "node scripts/start-mock.mjs",
     "lab:irsim": "node scripts/start-irsim.mjs",
+    "lab:webots": "node scripts/start-irsim.mjs --provider webots",
     "bundle:offline": "node scripts/build-offline.mjs",
     "test:mock-e2e": "node scripts/test-mock-e2e.mjs",
     "test:irsim-e2e": "node scripts/test-irsim-e2e.mjs",
+    "test:webots-e2e": "node scripts/test-irsim-e2e.mjs --provider webots",
     "check:brand": "node scripts/check-brand.mjs --dir public/brand"
   },
   "dependencies": {

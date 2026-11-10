@@ -8,7 +8,8 @@ import {backendSetOptions} from '../scenarios/support';
 import {loadNavigationScene} from '../scenarios/engineering';
 import {boundNavigationScene,importNavigationEvidence} from '../reports/navigation2d';
 import type {NavigationSceneV1} from '../shared/navigation2d';
-import {IRSIM_PROFILE,type EngineeringPresetInput} from '../scenarios/catalog';
+import {pose3dOf} from '../twin/pose3d';
+import {IRSIM_PROFILE,WEBOTS_PROFILE,type EngineeringPresetInput} from '../scenarios/catalog';
 import {layerProvenance} from '../twin/overlays';
 import {presets,presetById,nameOf,type TwinPreset} from '../scenarios/catalog';
 import {preflight,ready} from '../scenarios/preflight';
@@ -52,7 +53,7 @@ export class TwinWorkspace {
  /** The scene this frame may draw: bound to the shown report's own evidence (an opened report is never live). */
  private scene(){return boundNavigationScene(this.report,this.navigation,!this.archived);}
  /** An open IR-SIM report: its navigation layers are drawn, or the reason they are not is shown (never silently absent). */
- private irsimReport(){return !!this.report&&(this.report.navigation2d!==undefined||this.report.manifest.backends.some(b=>b.id==='irsim_2d'));}
+ private irsimReport(){return !!this.report&&(this.report.navigation2d!==undefined||this.report.manifest.backends.some(b=>b.id==='irsim_2d'||b.id==='webots_3d'));}
  /** Replace the scene with the one of `bundle` (or none); a later load or create() wins over an earlier one. */
  private loadScene(bundle:string|undefined){this.navigation=null;const token=++this.sceneLoad;if(bundle)void loadNavigationScene(this.rt,bundle).catch(()=>null).then(s=>{if(token===this.sceneLoad){this.navigation=s;this.rerender();}});}
  private runSpeed=16;private evidenceStore=new EvidenceStore();private saved:SavedEvidence[]=[];private savedLoaded=false;private archived=false;
@@ -67,7 +68,7 @@ export class TwinWorkspace {
  private resolve(p:TwinPreset):TwinPreset{
   if(!p.engineering)return p;
   const input=this.engineeringInput();
-  return input&&input.project.requestedProfile===IRSIM_PROFILE&&p.engineering.project.requestedProfile===IRSIM_PROFILE?{...p,engineering:{project:input.project,receipt:input.receipt},project:structuredClone(input.project.runtimeProject)}:p;
+  return input&&[IRSIM_PROFILE,WEBOTS_PROFILE].includes(input.project.requestedProfile)&&input.project.requestedProfile===p.engineering.project.requestedProfile?{...p,engineering:{project:input.project,receipt:input.receipt},project:structuredClone(input.project.runtimeProject)}:p;
  }
  private refOf(p:TwinPreset){try{return p.engineering?engineeringRefFor(p.engineering.project,p.engineering.receipt):undefined;}catch{return null;}}
  private clock(){return this.view?clockControls(this.view,this.health):undefined;}
@@ -78,7 +79,7 @@ export class TwinWorkspace {
   const now=performance.now();
   return {...base,samples:Object.fromEntries(this.store.entities().map(s=>[s.entityId,s])),nowMs:now,view:{...v,entities:v.entities.map(e=>{const s=this.store.entity(e.id),o=s?.observed;if(!s||!o||typeof o.xM!=='number')return e;
    const fresh=freshness(s,this.link,now),newer=s.simTimeNs!==null&&BigInt(s.simTimeNs)>=BigInt(v.simTimeNs)&&(v.run.telemetryCursor===null||BigInt(s.seq)>=BigInt(v.run.telemetryCursor));
-   return {...e,...newer?{pose:{x:o.xM as number,y:o.yM as number,yawRad:o.yawRad as number},moving:typeof o.moving==='boolean'?o.moving:e.moving,hold:typeof o.hold==='string'?o.hold:null}:{},sampleAgeMs:fresh.ageMs??undefined,quality:fresh.state==='live'||fresh.state==='frozen_sim'?newer?(s.quality==='valid'?'valid':'stale'):e.quality:'stale'};})}};
+   return {...e,...newer?{pose:{x:o.xM as number,y:o.yM as number,yawRad:o.yawRad as number,...pose3dOf(o)},moving:typeof o.moving==='boolean'?o.moving:e.moving,hold:typeof o.hold==='string'?o.hold:null}:{},sampleAgeMs:fresh.ageMs??undefined,quality:fresh.state==='live'||fresh.state==='frozen_sim'?newer?(s.quality==='valid'?'valid':'stale'):e.quality:'stale'};})}};
  }
  private linkText(){
   if(this.replay)return `${tr('Đã ghi','記録済み','Recorded')} · ${(this.replay.tick*this.replay.rp.range.tickMs/1000).toFixed(2)} s`;

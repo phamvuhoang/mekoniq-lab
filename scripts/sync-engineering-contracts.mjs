@@ -27,6 +27,11 @@ const fixtureSource=here('../../source/robotics/navigation-2d/fixtures/serve-dem
 const fixtureManifest=JSON.parse(await readFile(`${fixtureSource}manifest.json`,'utf8'));
 const fixtureFiles=await Promise.all(FIXTURE_FILES.map(async(n)=>{const b=await readFile(`${fixtureSource}${n}`);if(n!=='manifest.json'&&fixtureManifest.files.find(f=>f.path===n)?.sha256!==createHash('sha256').update(b).digest('hex'))throw new Error(`SERVE_FIXTURE_HASH_MISMATCH:${n}`);return [n,b];}));
 if(execFileSync('git',['status','--porcelain','--','robotics/navigation-2d/fixtures'],{cwd:sourceRoot,encoding:'utf8'}).trim())throw new Error('SOURCE_FIXTURES_DIRTY: commit source before syncing');
+// The Webots 3D fixture (serve-3d-v1: Serve plus two casters), same rule: copied byte for byte after its own manifest hashes verify.
+const fixture3dSource=here('../../source/robotics/simulation-3d/fixtures/serve-3d-v1/'),fixture3dTarget=here('../fixtures/engineering/serve-3d-v1/'),FIXTURE3D_FILES=['manifest.json','serve-3d-project.json','serve-3d-fleet-project.json','serve-3d-components.json','world3d.json'];
+const fixture3dManifest=JSON.parse(await readFile(`${fixture3dSource}manifest.json`,'utf8'));
+const fixture3dFiles=await Promise.all(FIXTURE3D_FILES.map(async(n)=>{const b=await readFile(`${fixture3dSource}${n}`);if(n!=='manifest.json'&&fixture3dManifest.files.find(f=>f.path===n)?.sha256!==createHash('sha256').update(b).digest('hex'))throw new Error(`SERVE3D_FIXTURE_HASH:${n}`);return [n,b];}));
+if(execFileSync('git',['status','--porcelain','--','robotics/simulation-3d/fixtures'],{cwd:sourceRoot,encoding:'utf8'}).trim())throw new Error('SOURCE_FIXTURES_DIRTY: commit source before syncing');
 const schemaDir=here('../src/shared/engineering-schemas/');
 const schemaFiles=await Promise.all(SCHEMAS.map(async(n)=>[n,await readFile(here(`../../source/packages/contracts/schemas/${n}.schema.json`),'utf8')]));
 if(process.argv.includes('--check')){
@@ -37,5 +42,6 @@ if(process.argv.includes('--check')){
  for(const [n,text] of schemaFiles)if(await readFile(`${schemaDir}${n}.schema.json`,'utf8').catch(()=>'')!==text)throw new Error(`ENGINEERING_SCHEMA_DRIFT:${n}`);
  if(strip(await readFile(navigationTarget,'utf8').catch(()=>''))!==strip(navigationOutput))throw new Error('NAVIGATION_CONTRACTS_DRIFT: run node scripts/sync-engineering-contracts.mjs');
  for(const [n,b] of fixtureFiles)if(!b.equals(await readFile(`${fixtureTarget}${n}`).catch(()=>Buffer.alloc(0))))throw new Error(`SERVE_FIXTURE_DRIFT:${n}`);
+ for(const [n,b] of fixture3dFiles)if(!b.equals(await readFile(`${fixture3dTarget}${n}`).catch(()=>Buffer.alloc(0))))throw new Error(`SERVE3D_FIXTURE_DRIFT:${n}`);
  console.log('Engineering contracts match source.');
-}else{await mkdir(schemaDir,{recursive:true});await mkdir(fixtureTarget,{recursive:true});for(const [n,text] of schemaFiles)await writeFile(`${schemaDir}${n}.schema.json`,text);for(const [n,b] of fixtureFiles)await writeFile(`${fixtureTarget}${n}`,b);await writeFile(target,output);await writeFile(navigationTarget,navigationOutput);console.log(`Wrote ${target}, ${navigationTarget} and the Serve fixture`);}
+}else{await mkdir(schemaDir,{recursive:true});await mkdir(fixtureTarget,{recursive:true});await mkdir(fixture3dTarget,{recursive:true});for(const [n,b] of fixture3dFiles)await writeFile(`${fixture3dTarget}${n}`,b);for(const [n,text] of schemaFiles)await writeFile(`${schemaDir}${n}.schema.json`,text);for(const [n,b] of fixtureFiles)await writeFile(`${fixtureTarget}${n}`,b);await writeFile(target,output);await writeFile(navigationTarget,navigationOutput);console.log(`Wrote ${target}, ${navigationTarget} and the Serve fixture`);}

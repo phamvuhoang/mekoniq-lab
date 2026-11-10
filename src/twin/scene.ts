@@ -16,7 +16,7 @@ export interface TwinFrame {preset:TwinPreset;view:RunView|null;report:RunReport
  /** IR-SIM 2D runs: the run bundle's compiled navigation scene (footprints, sensors, obstacles) and, for imported evidence only, scans with their own-tick poses. */
  navigation?:NavigationSceneV1|null;scans?:{scans:ScanSample[]}}
 export interface ViewState {view:'2d'|'3d';layers:Layers;selected:string|null}
-export interface SceneEntity {id:string;kind:string;name:string;x:number;y:number;source:'observed'|'modeled'|'derived'|'unknown';status?:string}
+export interface SceneEntity {id:string;kind:string;name:string;x:number;y:number;/** AMR only, from a 3D plant: base height, roll and pitch */pose3d?:{z:number;rollRad:number;pitchRad:number};yawRad?:number;source:'observed'|'modeled'|'derived'|'unknown';status?:string}
 const S=100;
 /** Observed path from the lossy telemetry: one polyline per run of consecutive samples; a jump in sim time larger than two sample periods is a gap and is
  * never joined (so no distance is drawn across it). */
@@ -35,7 +35,7 @@ export function sceneEntities(f:TwinFrame):SceneEntity[] {
  const parking=p.world.points.filter(x=>x.kind==='parking').sort((a,b)=>a.id<b.id?-1:1);
  p.entities.filter(e=>e.kind==='amr').forEach((e,i)=>{
   const o=v?.entities.find(r=>r.id===e.id),park=parking[i];
-  if(o)out.push({id:e.id,kind:'amr',name:nameOf(f.preset,e.id),x:o.pose.x,y:o.pose.y,source:o.quality==='valid'?'observed':'unknown',status:o.moving?'moving':o.hold??'stopped'});
+  if(o)out.push({id:e.id,kind:'amr',name:nameOf(f.preset,e.id),x:o.pose.x,y:o.pose.y,yawRad:o.pose.yawRad,...o.pose.z!==undefined?{pose3d:{z:o.pose.z,rollRad:o.pose.rollRad!,pitchRad:o.pose.pitchRad!}}:{},source:o.quality==='valid'?'observed':'unknown',status:o.moving?'moving':o.hold??'stopped'});
   else if(park)out.push({id:e.id,kind:'amr',name:nameOf(f.preset,e.id),x:park.x,y:park.y,source:'modeled',status:'planned'});
  });
  if(l)for(const e of p.entities){

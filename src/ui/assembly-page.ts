@@ -4,7 +4,7 @@ import type {BundleReceipt,Bom,CompiledScene,EngineeringProject} from '../shared
 import {EngineeringProjectStore} from '../project/engineering-store';
 import {EngineeringProjectRepository} from '../project/engineering-repository';
 import {checkArchive} from '../project/engineering-archive';
-import {addInstance,archiveFor,archiveMetadata,catalogFromArchive,connect,disconnect,mergeCatalog,parseArchive,previewProblems,referenceCatalog,referenceProject,removeInstance,serializeArchive,serveCatalog,serveProject,fleetProject,uniqueInstanceId,type AssemblyCatalog} from '../design/assembly';
+import {addInstance,archiveFor,archiveMetadata,catalogFromArchive,connect,disconnect,mergeCatalog,parseArchive,previewProblems,referenceCatalog,referenceProject,removeInstance,serializeArchive,serveCatalog,serveProject,fleetProject,serve3dCatalog,serve3dProject,fleet3dProject,uniqueInstanceId,type AssemblyCatalog} from '../design/assembly';
 import {modelValidationPanel,validationView,type ValidationState} from './model-validation-panel';
 import {estimateSummary} from '../design/engineering-estimates';
 import {buildEngineeringCandidate} from '../deployment/engineering-bundle';
@@ -104,6 +104,8 @@ export class AssemblyWorkspace {
 <button class="button" data-action="asm-reference">${tr('Mở AMR tham chiếu FD01','FD01参照AMRを開く','Open FD01 reference AMR')}</button>
 <button class="button" data-action="asm-serve">${tr('Mở robot Serve (IR-SIM 2D)','Serveロボットを開く(IR-SIM 2D)','Open Serve robot (IR-SIM 2D)')}</button>
 <button class="button" data-action="asm-fleet">${tr('Mở đội hai robot Serve (IR-SIM 2D)','Serve 2台フリートを開く(IR-SIM 2D)','Open two-robot Serve fleet (IR-SIM 2D)')}</button>
+<button class="button" data-action="asm-serve3d">${tr('Mở robot Serve (Webots 3D)','Serveロボットを開く(Webots 3D)','Open Serve robot (Webots 3D)')}</button>
+<button class="button" data-action="asm-fleet3d">${tr('Mở đội hai robot Serve (Webots 3D)','Serve 2台フリートを開く(Webots 3D)','Open two-robot Serve fleet (Webots 3D)')}</button>
 <button class="button quiet" data-action="asm-undo" ${this.busy?'disabled':''}>${tr('Hoàn tác','元に戻す','Undo')}</button>
 <button class="button quiet" data-action="asm-redo">${tr('Làm lại','やり直す','Redo')}</button>
 <button class="button quiet" data-action="asm-export">${tr('Xuất dự án kỹ thuật','エンジニアリング書き出し','Export engineering project')}</button>
@@ -146,6 +148,8 @@ ${validation}
       case 'asm-compile': void this.compile();break;
       case 'asm-serve': this.openServe();break;
       case 'asm-fleet': this.openServe(fleetProject());break;
+      case 'asm-serve3d': this.openServe(serve3dProject(),serve3dCatalog);break;
+      case 'asm-fleet3d': this.openServe(fleet3dProject(),serve3dCatalog);break;
       case 'asm-validate': if (value) void this.validate(value);break;
     }
   }
@@ -160,8 +164,8 @@ ${validation}
     const width=Number(value);
     if (id==='asm-world-width'&&Number.isFinite(width)&&width>=1&&width<=200&&width!==this.design().runtimeProject.world.width) this.edit(p=>({...p,revision:p.revision+1,runtimeProject:{...p.runtimeProject,revision:p.runtimeProject.revision+1,world:{...p.runtimeProject.world,revision:p.runtimeProject.world.revision+1,width}}}));
   }
-  private openServe(design:EngineeringProject=serveProject()):void {
-    mergeCatalog(this.catalog,serveCatalog());
+  private openServe(design:EngineeringProject=serveProject(),catalog:()=>AssemblyCatalog=serveCatalog):void {
+    mergeCatalog(this.catalog,catalog());
     this.store.load(design);
     this.receipt=null;this.bom=null;this.scene=null;this.message='';
     this.rerender();

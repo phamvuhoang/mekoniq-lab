@@ -1,5 +1,6 @@
 // Read-only replay of a v2 run report: scrub/playback over recorded business events (durable) and telemetry (lossy), and a causal trace
 // command -> observation -> business transition. No runtime client is imported here: replay cannot send anything.
+import {pose3dOf} from '../twin/pose3d';
 import {reportClock} from './clock';
 import {validVerification} from './verification';
 import type {RunReport,RunView,AmrView,CoffeeJobView,CupView,ArmCollisionView,ArmCollisionScene,ArmStopView} from '../scenarios/controls';
@@ -64,7 +65,7 @@ export function openReplayV2(report:RunReport,o:{maxGapTicks?:number}={}){
   const hasPose=(s:TwinSample)=>typeof s.observed?.xM==='number';
   const lastPose=hasPose(before)?before:list.filter(s=>tickOfSample(s)<=tick&&hasPose(s)).at(-1);
   if(!lastPose)return null;
-  const p=(s:TwinSample)=>({x:s.observed!.xM as number,y:s.observed!.yM as number,yawRad:s.observed!.yawRad as number});
+  const p=(s:TwinSample)=>({x:s.observed!.xM as number,y:s.observed!.yM as number,yawRad:s.observed!.yawRad as number,...pose3dOf(s.observed)});
   const tb=tickOfSample(before);
   if(before.quality!=='valid'||!hasPose(before))return {...p(lastPose),interpolated:false,gap:true,epochChange:false,seq:before.seq};
   if(tb===tick||!after)return {...p(before),interpolated:false,gap:!after&&tick-tb>maxGap,epochChange:false,seq:before.seq};
@@ -74,7 +75,8 @@ export function openReplayV2(report:RunReport,o:{maxGapTicks?:number}={}){
   if(after.bootId!==before.bootId)return {...p(before),interpolated:false,gap:false,epochChange:true,seq:before.seq};
   if(ta-tb>maxGap)return {...p(before),interpolated:false,gap:true,epochChange:false,seq:before.seq};
   const f=(tick-tb)/(ta-tb),a=p(before),b=p(after);
-  return {x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f,yawRad:a.yawRad+Math.atan2(Math.sin(b.yawRad-a.yawRad),Math.cos(b.yawRad-a.yawRad))*f,interpolated:true,gap:false,epochChange:false,seq:before.seq};
+  const mix=(u:number|undefined,v:number|undefined)=>u!==undefined&&v!==undefined?u+(v-u)*f:undefined,z=mix(a.z,b.z),rollRad=mix(a.rollRad,b.rollRad),pitchRad=mix(a.pitchRad,b.pitchRad);
+  return {x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f,yawRad:a.yawRad+Math.atan2(Math.sin(b.yawRad-a.yawRad),Math.cos(b.yawRad-a.yawRad))*f,...z!==undefined&&rollRad!==undefined&&pitchRad!==undefined?{z,rollRad,pitchRad}:{},interpolated:true,gap:false,epochChange:false,seq:before.seq};
  };
  const seek=(t:number)=>{
   const tick=clamp(t),entities:Record<string,TwinSample>={};
@@ -99,7 +101,7 @@ export function openReplayV2(report:RunReport,o:{maxGapTicks?:number}={}){
    const served=String(entries('fulfillment').reduce((n,[,s])=>n+BigInt(String(s.served??'0')),0n));
    const entities:AmrView[]=base.entities.map(e=>{
     const sample=f.entities[e.id],p=pose(e.id,f.tick),observed=sample?.observed,commanded=sample?.commanded;
-    return {id:e.id,kind:'amr',pose:p?{x:p.x,y:p.y,yawRad:p.yawRad}:{x:NaN,y:NaN,yawRad:NaN},quality:p&&!p.gap&&!p.epochChange?'valid':'stale',moving:!!observed?.moving,hold:typeof observed?.hold==='string'?observed.hold:null,goal:typeof commanded?.goalCommandId==='string'?{commandId:commanded.goalCommandId,state:String(commanded.goalState??'unknown')}:null,path:[],distanceM:NaN};
+    return {id:e.id,kind:'amr',pose:p?{x:p.x,y:p.y,yawRad:p.yawRad,...p.z!==undefined?{z:p.z,rollRad:p.rollRad,pitchRad:p.pitchRad}:{}}:{x:NaN,y:NaN,yawRad:NaN},quality:p&&!p.gap&&!p.epochChange?'valid':'stale',moving:!!observed?.moving,hold:typeof observed?.hold==='string'?observed.hold:null,goal:typeof commanded?.goalCommandId==='string'?{commandId:commanded.goalCommandId,state:String(commanded.goalState??'unknown')}:null,path:[],distanceM:NaN};
    });
    const missions=entries('mission'),awaiting:RunView['awaiting']=[];
    for(const [id,m] of missions)for(const stop of Array.isArray(m.stops)?m.stops as Record<string,unknown>[]:[])if(stop.status==='awaiting_action')awaiting.push({subjectId:String(stop.id),confirmationType:String(stop.action),missionId:id,robotId:String(m.robotId??'')});

@@ -2,6 +2,9 @@ import reference from '../../fixtures/engineering/reference-catalog.json' with {
 import serve from '../../fixtures/engineering/serve-demo-v1/serve-components.json' with {type:'json'};
 import serveDesign from '../../fixtures/engineering/serve-demo-v1/serve-project.json' with {type:'json'};
 import fleetDesign from '../../fixtures/engineering/serve-demo-v1/serve-fleet-project.json' with {type:'json'};
+import serve3d from '../../fixtures/engineering/serve-3d-v1/serve-3d-components.json' with {type:'json'};
+import serve3dDesign from '../../fixtures/engineering/serve-3d-v1/serve-3d-project.json' with {type:'json'};
+import fleet3dDesign from '../../fixtures/engineering/serve-3d-v1/serve-3d-fleet-project.json' with {type:'json'};
 import type {ComponentRevision,EngineeringProject,Problem} from '../shared/engineering';
 import {componentDigest,requiredDigests,type EngineeringArchiveFiles} from '../project/engineering-archive';
 import {canonicalJson,sha256Hex} from '../twin/hash';
@@ -53,13 +56,18 @@ export const referenceProject=():EngineeringProject=>structuredClone(reference.p
 export const serveProject=():EngineeringProject=>structuredClone(serveDesign) as unknown as EngineeringProject;
 /** The two-robot Serve fleet (robot01 Serve, robot02 wider chassis/wheels and a 180-beam LiDAR), same source fixture set; its parts are in the same catalog. */
 export const fleetProject=():EngineeringProject=>structuredClone(fleetDesign) as unknown as EngineeringProject;
-export const serveCatalog=():AssemblyCatalog=>{
-  const catalog={...structuredClone({components:serve.components,models:serve.models}),blobs:{},extras:{}} as unknown as AssemblyCatalog;
+/** The Webots 3D demos (serve-3d-v1: the Serve robot plus two passive ball casters, all values assumed), synced byte for byte from source robotics/simulation-3d/fixtures/serve-3d-v1. */
+export const serve3dProject=():EngineeringProject=>structuredClone(serve3dDesign) as unknown as EngineeringProject;
+export const fleet3dProject=():EngineeringProject=>structuredClone(fleet3dDesign) as unknown as EngineeringProject;
+export const serveCatalog=(source:{components:unknown;models:unknown}=serve):AssemblyCatalog=>{
+  const catalog={...structuredClone({components:source.components,models:source.models}),blobs:{},extras:{}} as unknown as AssemblyCatalog;
   for (const [digest,model] of Object.entries(catalog.models)) {const bytes=new TextEncoder().encode(canonicalJson(model));if (sha256Hex(bytes)===digest) catalog.blobs[digest]={bytes,mediaType:'application/json',license:'internal'};}
   return catalog;
 };
 const IDENTITY={xyzM:[0,0,0] as [number,number,number],quaternionXyzw:[0,0,0,1] as [number,number,number,number]};
 const problem=(code:string,path:string,detail:string):Problem=>({code,path,blocking:true,detail});
+
+export const serve3dCatalog=():AssemblyCatalog=>serveCatalog(serve3d);
 
 export function uniqueInstanceId(project:EngineeringProject,base:string):string {
   const taken=new Set(project.assembly.instances.map(i=>i.id));

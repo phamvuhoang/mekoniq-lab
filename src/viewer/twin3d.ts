@@ -5,6 +5,7 @@ import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {observedSegments,sceneEntities,type TwinFrame,type ViewState} from '../twin/scene';
 import {amrFootprint,assetOf} from '../twin/amr';
 import {footprintInMap} from '../twin/lidar';
+import {bodyPlacement} from '../twin/pose3d';
 export interface Twin3d {canvas:HTMLCanvasElement;/** Move into a re-rendered stage and size from it. */attach(host:HTMLElement):void;update(f:TwinFrame,vs:ViewState):void;dispose():void}
 const LIME=0xb4f375,NAVY=0x182a33;
 const COLOR:Record<string,number>={footprint:0x9dccff,safety:0xf0b45a,observed:0x5ad1c6};
@@ -63,7 +64,12 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
     const geo=e.kind==='amr'?new THREE.CylinderGeometry(0.3,0.3,0.45,24):e.kind==='coffee_machine'?new THREE.BoxGeometry(0.4,0.45,0.3):e.kind==='arm'?new THREE.CylinderGeometry(0.09,0.12,0.7,16):e.kind==='cup'?new THREE.CylinderGeometry(0.05,0.04,0.12,16):new THREE.BoxGeometry(0.25,0.3,0.25);
     const m=new THREE.Mesh(geo,mat(e.kind==='amr'?0xd3dcd3:e.kind==='cup'?0xf5f0e6:NAVY+0x101010,{wire:unknown||e.source==='derived',emissive:on}));
     const h=e.kind==='amr'?0.225:e.kind==='coffee_machine'?1.125:e.kind==='arm'?1.25:e.kind==='cup'?(e.status?.startsWith('robot')?0.52:e.status?.startsWith('customer')?0.8:1.0):1.05;
-    m.position.copy(at(e.x,e.y,h));m.userData.entityId=e.id;dynamic.add(m);
+    if(e.kind==='amr'&&e.pose3d){
+     // a 3D plant: lift and tip the body by the plant's own base height and tilt (the wheel radius is the base origin's height when it stands level)
+     const wheel=f.navigation?.robots.find(r=>r.robotId===e.id)?.model.kinematics.wheelRadiusM??0.09,pl=bodyPlacement({x:e.x,y:e.y,yawRad:e.yawRad??0,...{z:e.pose3d.z,rollRad:e.pose3d.rollRad,pitchRad:e.pose3d.pitchRad}},h,wheel);
+     m.position.set(...pl.position);m.quaternion.set(...pl.quaternion);
+    }else m.position.copy(at(e.x,e.y,h));
+    m.userData.entityId=e.id;dynamic.add(m);
    }
    for(const sh of overlayShapes(f,vs)){
     const pts=sh.points.map(([x,y])=>at(x,y,sh.z)),g=new THREE.BufferGeometry().setFromPoints(pts);

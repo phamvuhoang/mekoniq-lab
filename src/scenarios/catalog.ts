@@ -4,6 +4,8 @@ import coffeeFixture from '../../fixtures/twins/coffee-cell-v2.json' with {type:
 import restaurantFixture from '../../fixtures/twins/restaurant-v2.json' with {type:'json'};
 import serveDesign from '../../fixtures/engineering/serve-demo-v1/serve-project.json' with {type:'json'};
 import fleetDesign from '../../fixtures/engineering/serve-demo-v1/serve-fleet-project.json' with {type:'json'};
+import serve3dDesign from '../../fixtures/engineering/serve-3d-v1/serve-3d-project.json' with {type:'json'};
+import fleet3dDesign from '../../fixtures/engineering/serve-3d-v1/serve-3d-fleet-project.json' with {type:'json'};
 import type {AssetRevision,LabProjectV2} from '../shared/types';
 import {tr} from '../i18n';
 /** Present only on an engineering preset: the exact draft that was compiled and the receipt for it. */
@@ -36,6 +38,15 @@ presets.push({id:'irsim-fd01',mode:'simulation',scenarioId:'IR-FD01',scenarioRev
 presets.push({id:'irsim-fd07',mode:'simulation',scenarioId:'IR-FD07',scenarioRevision:1,backendSetId:IRSIM_SET,seed:7,project:structuredClone(fleetDesign.runtimeProject) as LabProjectV2,assets:[],names:{robot01:'Serve-1',robot02:'Serve-2'},roles:{entities:['amr'],points:['kitchen','table','parking']},
  engineering:{project:structuredClone(fleetDesign) as unknown as import('../shared/engineering').EngineeringProject,receipt:null},
  title:()=>tr('IR-SIM 2D · hai robot FD07','IR-SIM 2D · 2台FD07','IR-SIM 2D · two robots FD07'),summary:()=>tr('Hai robot Serve khác bánh xe và LiDAR · nguồn cho chạy lần lượt từng robot · vùng lối đi đặt trước và khách đi bộ chỉ có ở phía máy chủ, không vẽ ở đây · mô phỏng 2D, không phải phần cứng','車輪とLiDARが異なるServe 2台 · ソースは1台ずつ走行させる · 予約通路ゾーンと歩行者はサーバー側のみで、ここには描画されない · ポータブル2D、実機ではない','Two Serve robots with different wheels and LiDARs · the source moves one robot at a time · the reserved aisle zone and the walking customer are server-side only and not drawn here · portable 2D, not hardware')});
+/** Webots 3D on the Serve robot with casters (serve-3d-v1): same rule as IR-SIM, it runs only from a receipt compiled for exactly the open 3D design. Every physical parameter is assumed. */
+export const WEBOTS_SET='engineering-webots-3d-v1',WEBOTS_PROFILE='engineering-webots-3d-v1';
+presets.push({id:'webots-fd01',mode:'simulation',scenarioId:'WB-FD01',scenarioRevision:1,backendSetId:WEBOTS_SET,seed:5,project:structuredClone(serve3dDesign.runtimeProject) as LabProjectV2,assets:[],names:{'amr-1':'Serve-1'},roles:{entities:['amr'],points:['kitchen','table','parking']},
+ engineering:{project:structuredClone(serve3dDesign) as unknown as import('../shared/engineering').EngineeringProject,receipt:null},
+ title:()=>tr('Webots 3D · giao món FD01','Webots 3D · FD01配膳','Webots 3D · FD01 delivery'),summary:()=>tr('Robot Serve có bánh phụ · nhà hàng 10 bàn · vật lý cứng 3D trên Webots R2025a, tham số giả định, chưa hiệu chuẩn · không phải Gazebo hay phần cứng','キャスター付きServeロボット · 10卓レストラン · Webots R2025aの剛体3D物理、仮定パラメータで未校正 · Gazebo・実機ではない','Serve robot with casters · 10-table restaurant · rigid-body 3D physics on Webots R2025a, assumed and uncalibrated parameters · not Gazebo or hardware')});
+/** Webots 3D FD07 on the two-robot Serve fleet; the source moves one robot at a time and the aisle zone is server-side only. */
+presets.push({id:'webots-fd07',mode:'simulation',scenarioId:'WB-FD07',scenarioRevision:1,backendSetId:WEBOTS_SET,seed:7,project:structuredClone(fleet3dDesign.runtimeProject) as LabProjectV2,assets:[],names:{robot01:'Serve-1',robot02:'Serve-2'},roles:{entities:['amr'],points:['kitchen','table','parking']},
+ engineering:{project:structuredClone(fleet3dDesign) as unknown as import('../shared/engineering').EngineeringProject,receipt:null},
+ title:()=>tr('Webots 3D · hai robot FD07','Webots 3D · 2台FD07','Webots 3D · two robots FD07'),summary:()=>tr('Hai robot Serve có bánh phụ · nguồn cho chạy lần lượt từng robot · vùng lối đi đặt trước chỉ có ở phía máy chủ · Webots R2025a, tham số giả định, chưa hiệu chuẩn','キャスター付きServe 2台 · ソースは1台ずつ走行させる · 予約通路ゾーンはサーバー側のみ · Webots R2025a、仮定パラメータで未校正','Two Serve robots with casters · the source moves one robot at a time · the reserved aisle zone is server-side only · Webots R2025a, assumed and uncalibrated parameters')});
 export const presetById=(id:string)=>presets.find(p=>p.id===id);
 /** Display name of an entity, point, cup or job; unknown ids are shown as-is, never invented. */
 export function nameOf(preset:TwinPreset|undefined,id:string):string {

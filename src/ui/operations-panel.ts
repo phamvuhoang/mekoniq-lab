@@ -1,7 +1,7 @@
 // Operator view: one next action, the attention chain (waiting -> observed -> rule -> action) with entity links, and the cycle/resource queue.
 import type {ClockControls,RunView} from '../scenarios/controls';
 import {explain,jobsOf,reconcilable} from '../twin/coffee-cell';
-import {nameOf,type TwinPreset} from '../scenarios/catalog';
+import {WEBOTS_SET,nameOf,type TwinPreset} from '../scenarios/catalog';
 import {icon,esc} from './icons';
 import {tr} from '../i18n';
 import {stateLabel} from './labels';
@@ -12,7 +12,9 @@ export type NextAction={title:string;detail:string;action?:{id:string;label:stri
 export function nextAction(s:OpsState):NextAction {
  const v=s.view,st=v?.run.status;
  if(!s.paired)return {title:tr('Ghép nối runtime','ランタイムをペアリング','Pair the runtime'),detail:tr('Nhập mã một lần in trong terminal của runtime.','ランタイムのターミナルに表示されたワンタイムコードを入力。','Enter the one-time code printed by the runtime terminal.')};
- if(!v&&s.ready&&s.preset.mode==='simulation'&&s.preset.engineering)return {title:tr('Sẵn sàng chạy IR-SIM 2D','IR-SIM 2D実行の準備完了','Ready for IR-SIM 2D'),detail:tr('Runtime điều khiển đồng hồ từng tick 20 ms và plant IR-SIM; đây là mô phỏng 2D di động, không phải Gazebo hay robot thật.','ランタイムが20 msごとの時刻とIR-SIMプラントを制御します。ポータブル2Dで、Gazeboや実機ではありません。','The runtime steps the 20 ms clock and the IR-SIM plant; this is portable 2D simulation, not Gazebo or a robot.'),action:{id:'twin-run',label:tr('Chạy IR-SIM 2D','IR-SIM 2D実行','Run IR-SIM 2D'),primary:true}};
+ if(!v&&s.ready&&s.preset.mode==='simulation'&&s.preset.engineering)return s.preset.backendSetId===WEBOTS_SET
+  ?{title:tr('Sẵn sàng chạy Webots 3D','Webots 3D実行の準備完了','Ready for Webots 3D'),detail:tr('Runtime điều khiển đồng hồ từng tick 20 ms và plant Webots R2025a trên máy này; vật lý cứng 3D với tham số giả định, chưa hiệu chuẩn (not_calibrated), không phải Gazebo hay robot thật.','ランタイムが20 msごとの時刻とこのマシンのWebots R2025aプラントを制御します。剛体3D物理、パラメータは仮定で未校正(not_calibrated)。Gazeboや実機ではありません。','The runtime steps the 20 ms clock and the Webots R2025a plant on this machine; rigid-body 3D physics with assumed, not calibrated (not_calibrated) parameters, not Gazebo or a robot.'),action:{id:'twin-run',label:tr('Chạy Webots 3D','Webots 3D実行','Run Webots 3D'),primary:true}}
+  :{title:tr('Sẵn sàng chạy IR-SIM 2D','IR-SIM 2D実行の準備完了','Ready for IR-SIM 2D'),detail:tr('Runtime điều khiển đồng hồ từng tick 20 ms và plant IR-SIM; đây là mô phỏng 2D di động, không phải Gazebo hay robot thật.','ランタイムが20 msごとの時刻とIR-SIMプラントを制御します。ポータブル2Dで、Gazeboや実機ではありません。','The runtime steps the 20 ms clock and the IR-SIM plant; this is portable 2D simulation, not Gazebo or a robot.'),action:{id:'twin-run',label:tr('Chạy IR-SIM 2D','IR-SIM 2D実行','Run IR-SIM 2D'),primary:true}};
  if(!v&&s.ready&&s.preset.mode==='simulation')return {title:tr('Sẵn sàng chạy native simulation','ネイティブ模擬実行の準備完了','Ready for native simulation'),detail:tr('Runtime sẽ điều khiển các simulation engine đã cấu hình. Bằng chứng được phân loại theo từng nguồn.','設定済みシミュレーションを実行し、証跡をソース別に分類します。','The runtime controls the configured simulation engines and records evidence per producer.'),action:{id:'twin-run',label:tr('Chạy native simulation','ネイティブ模擬実行','Run native simulation'),primary:true}};
  if(!v)return s.ready?{title:tr('Sẵn sàng chạy','実行可能','Ready to run'),detail:tr('Chạy kịch bản qua source runner với backend mock. Kết quả là mô phỏng, không phải robot thật.','モックバックエンドでsource runnerを実行。結果はシミュレーションです。','Runs the scenario through the source runner on the mock backend. Results are simulation, not a robot.'),action:{id:'twin-run',label:tr('Chạy mock','モック実行','Run mock'),primary:true}}
   :{title:tr('Chưa thể chạy','実行できません','Cannot run yet'),detail:tr('Xem mục preflight chưa đạt bên dưới.','未達のプリフライト項目を確認してください。','See the failing preflight items below.')};

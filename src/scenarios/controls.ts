@@ -22,7 +22,7 @@ export interface RunSnapshotV2 {schemaVersion:2;id:string;mode:'mock'|'simulatio
  status:'ready'|'running'|'paused'|'awaiting_confirmation'|'needs_attention'|'completed'|'cancelled'|'failed';runRevision:number;eventCursor:string|null;telemetryCursor:string|null;
  fidelity:string;ageMs:number;sourceCommit:string;scenarioId:string;scenarioRevision:number;seed:number;}
 export interface Attention {reason:string;tick:number;robotId?:string;subjectId?:string;commandId?:string}
-export interface AmrView {sampleAgeMs?:number;id:string;kind:'amr';pose:{x:number;y:number;yawRad:number};quality:'valid'|'stale';moving:boolean;hold:string|null;goal:{commandId:string;state:string}|null;path:[number,number][];distanceM:number}
+export interface AmrView {sampleAgeMs?:number;id:string;kind:'amr';pose:{x:number;y:number;yawRad:number;z?:number;rollRad?:number;pitchRad?:number};quality:'valid'|'stale';moving:boolean;hold:string|null;goal:{commandId:string;state:string}|null;path:[number,number][];distanceM:number}
 export interface CoffeeJobView {canRestoreCup?:boolean;waitingReason?:string|null;jobId:string;status:string;recipeId:string;cupId:string;attentionReason:string|null}
 export interface CupView {cupId:string;ownerKind:string;ownerId:string}
 /** The inputs a run was created from, as stored by the runtime. Engineering runs also carry the exact project, projection and bundle ref. */
