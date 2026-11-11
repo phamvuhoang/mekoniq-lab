@@ -9,7 +9,7 @@ import {tr} from '../../i18n';
 import type {ArmJointsView} from './arm-telemetry';
 export function armTelemetryRows(v:ArmJointsView|null):Row[] {
  if(!v)return [];
- const src=v.provenance==='controller_sim'?tr('controller mô phỏng','コントローラ模擬','controller sim'):v.provenance==='mock'?tr('mock','モック','mock'):v.provenance;
+ const src=v.provenance==='physics_sim'?tr('thực (Webots) · lệnh','実測(Webots) · 指令','actual (Webots) · commanded'):v.provenance==='controller_sim'?tr('controller mô phỏng','コントローラ模擬','controller sim'):v.provenance==='mock'?tr('mock','モック','mock'):v.provenance;
  const rows:Row[]=Array.from({length:6},(_,i)=>({key:`joint-${i+1}`,label:`q${i+1}`,observed:v.jointsActualRad?`${fmt(v.jointsActualRad[i]!,4)} (${fmt(v.jointsActualRad[i]!*180/Math.PI,2)}°)`:tr('không có','なし','none'),
   commanded:v.jointsCommandedRad?`${fmt(v.jointsCommandedRad[i]!,4)} (${fmt(v.jointsCommandedRad[i]!*180/Math.PI,2)}°)`:'—',unit:'rad',source:v.jointsActualRad?(v.stale?'unknown':'observed'):v.jointsCommandedRad?'commanded':'unknown',ageMs:v.ageMs}));
  if(v.tcpM)rows.push({key:'tcp',label:'TCP x, y, z',observed:v.tcpM.map(x=>fmt(x,3)).join(', '),commanded:'—',unit:'m',source:v.stale?'unknown':'observed',ageMs:v.ageMs});
@@ -21,7 +21,7 @@ export function armTelemetryRows(v:ArmJointsView|null):Row[] {
 export interface Arm03Status {result:'pass'|'fail'|'not_run';reason:string;engine:string|null;intervals:number;geometryRevision:string|null}
 /** ARM03 from the recorded evidence up to `tick`: the checker must have run (intervals retained, geometry named); a picture is never a pass. */
 export function arm03Status(report:RunReport|null,tick:number):Arm03Status {
- if(report?.verification||report?.manifest.mode==='simulation'){
+ if(report?.verification||(report?.manifest.mode==='simulation'&&!report.arm)){ // a plant arm (webots_arm) keeps its ARM03 evidence in the coffee arm trace, like the mock
   const v=report.verification,a=v?.arm,none=(reason:string):Arm03Status=>({result:'not_run',reason,engine:a?.engine??null,intervals:0,geometryRevision:a?.geometryRevision??null});
   if(!validVerification(v)||v.execution!=='ran'||!a)return none('CONTROLLER_EVIDENCE_INVALID_OR_MISSING');
   if(a.worldRevision.id!==report.manifest.world.id||a.worldRevision.revision!==report.manifest.world.revision||a.worldRevision.hash!==report.manifest.world.hash)return none('VERIFICATION_WORLD_MISMATCH');

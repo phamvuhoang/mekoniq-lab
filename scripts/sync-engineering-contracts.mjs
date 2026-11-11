@@ -32,6 +32,10 @@ const fixture3dSource=here('../../source/robotics/simulation-3d/fixtures/serve-3
 const fixture3dManifest=JSON.parse(await readFile(`${fixture3dSource}manifest.json`,'utf8'));
 const fixture3dFiles=await Promise.all(FIXTURE3D_FILES.map(async(n)=>{const b=await readFile(`${fixture3dSource}${n}`);if(n!=='manifest.json'&&fixture3dManifest.files.find(f=>f.path===n)?.sha256!==createHash('sha256').update(b).digest('hex'))throw new Error(`SERVE3D_FIXTURE_HASH:${n}`);return [n,b];}));
 if(execFileSync('git',['status','--porcelain','--','robotics/simulation-3d/fixtures'],{cwd:sourceRoot,encoding:'utf8'}).trim())throw new Error('SOURCE_FIXTURES_DIRTY: commit source before syncing');
+// The Webots arm fixture (arm-ref-3d-v1): the Lab draws the arm's joint chain from its joint origins and axes, so the component and the FK golden are copied byte for byte after the manifest hashes verify.
+const armSource=here('../../source/robotics/simulation-3d/fixtures/arm-ref-3d-v1/'),armTarget=here('../fixtures/engineering/arm-ref-3d-v1/'),ARM_FILES=['manifest.json','component.json','fk-golden.json'];
+const armManifest=JSON.parse(await readFile(`${armSource}manifest.json`,'utf8'));
+const armFiles=await Promise.all(ARM_FILES.map(async(n)=>{const b=await readFile(`${armSource}${n}`);if(n!=='manifest.json'&&armManifest.files.find(f=>f.path===n)?.sha256!==createHash('sha256').update(b).digest('hex'))throw new Error(`ARM_FIXTURE_HASH:${n}`);return [n,b];}));
 const schemaDir=here('../src/shared/engineering-schemas/');
 const schemaFiles=await Promise.all(SCHEMAS.map(async(n)=>[n,await readFile(here(`../../source/packages/contracts/schemas/${n}.schema.json`),'utf8')]));
 if(process.argv.includes('--check')){
@@ -43,5 +47,6 @@ if(process.argv.includes('--check')){
  if(strip(await readFile(navigationTarget,'utf8').catch(()=>''))!==strip(navigationOutput))throw new Error('NAVIGATION_CONTRACTS_DRIFT: run node scripts/sync-engineering-contracts.mjs');
  for(const [n,b] of fixtureFiles)if(!b.equals(await readFile(`${fixtureTarget}${n}`).catch(()=>Buffer.alloc(0))))throw new Error(`SERVE_FIXTURE_DRIFT:${n}`);
  for(const [n,b] of fixture3dFiles)if(!b.equals(await readFile(`${fixture3dTarget}${n}`).catch(()=>Buffer.alloc(0))))throw new Error(`SERVE3D_FIXTURE_DRIFT:${n}`);
+ for(const [n,b] of armFiles)if(!b.equals(await readFile(`${armTarget}${n}`).catch(()=>Buffer.alloc(0))))throw new Error(`ARM_FIXTURE_DRIFT:${n}`);
  console.log('Engineering contracts match source.');
-}else{await mkdir(schemaDir,{recursive:true});await mkdir(fixtureTarget,{recursive:true});await mkdir(fixture3dTarget,{recursive:true});for(const [n,b] of fixture3dFiles)await writeFile(`${fixture3dTarget}${n}`,b);for(const [n,text] of schemaFiles)await writeFile(`${schemaDir}${n}.schema.json`,text);for(const [n,b] of fixtureFiles)await writeFile(`${fixtureTarget}${n}`,b);await writeFile(target,output);await writeFile(navigationTarget,navigationOutput);console.log(`Wrote ${target}, ${navigationTarget} and the Serve fixture`);}
+}else{await mkdir(schemaDir,{recursive:true});await mkdir(fixtureTarget,{recursive:true});await mkdir(fixture3dTarget,{recursive:true});for(const [n,b] of fixture3dFiles)await writeFile(`${fixture3dTarget}${n}`,b);await mkdir(armTarget,{recursive:true});for(const [n,b] of armFiles)await writeFile(`${armTarget}${n}`,b);for(const [n,text] of schemaFiles)await writeFile(`${schemaDir}${n}.schema.json`,text);for(const [n,b] of fixtureFiles)await writeFile(`${fixtureTarget}${n}`,b);await writeFile(target,output);await writeFile(navigationTarget,navigationOutput);console.log(`Wrote ${target}, ${navigationTarget} and the Serve fixture`);}

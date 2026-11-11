@@ -19,7 +19,7 @@ import {promisify} from 'node:util';
 import {launch,checkHealth,MOCK_BACKENDS} from './start-mock.mjs';
 import {installedManifest,verifyPortableTree} from './runtime-artifact.mjs';
 const run=promisify(execFile),lab=fileURLToPath(new URL('../',import.meta.url));
-export const IRSIM_BACKEND='irsim_2d',WEBOTS_BACKEND='webots_3d',WEBOTS_VERSION='R2025a';
+export const IRSIM_BACKEND='irsim_2d',WEBOTS_BACKEND='webots_3d',WEBOTS_ARM_BACKEND='webots_arm',WEBOTS_VERSION='R2025a';
 /** The runtime must be the pinned one with exactly the mock backends plus a live irsim_2d, and advertise both engineering and IR-SIM navigation. */
 export function checkIRSimHealth(health,lock){
  const live=(health.backends??[]).find(b=>b.id===IRSIM_BACKEND);
@@ -27,12 +27,14 @@ export function checkIRSimHealth(health,lock){
  for(const c of ['engineering_bundle_v1','irsim_navigation_v1'])if(!health.capabilities?.includes(c))throw new Error(`CAPABILITY_MISSING:${c}`);
  checkHealth({...health,backends:health.backends.filter(b=>b.id!==IRSIM_BACKEND)},lock);
 }
-/** The runtime must be the pinned one with exactly the mock backends plus a live webots_3d, and advertise both engineering and Webots navigation. */
+/** The runtime must be the pinned one with exactly the mock backends plus a live webots_3d and webots_arm (one flag enables both on the shared Webots), and advertise engineering, Webots navigation and the Webots arm. */
 export function checkWebotsHealth(health,lock){
- const live=(health.backends??[]).find(b=>b.id===WEBOTS_BACKEND);
- if(!live?.enabled||!live.installed||!live.compatible||!live.reachable)throw new Error(`WEBOTS_PROVIDER_UNAVAILABLE:${live?.reason??'not offered'}`);
- for(const c of ['engineering_bundle_v1','sim3d_navigation_v1'])if(!health.capabilities?.includes(c))throw new Error(`CAPABILITY_MISSING:${c}`);
- checkHealth({...health,backends:health.backends.filter(b=>b.id!==WEBOTS_BACKEND)},lock);
+ for(const id of [WEBOTS_BACKEND,WEBOTS_ARM_BACKEND]){
+  const live=(health.backends??[]).find(b=>b.id===id);
+  if(!live?.enabled||!live.installed||!live.compatible||!live.reachable)throw new Error(`WEBOTS_PROVIDER_UNAVAILABLE:${live?.reason??'not offered'}`);
+ }
+ for(const c of ['engineering_bundle_v1','sim3d_navigation_v1','sim3d_arm_v1'])if(!health.capabilities?.includes(c))throw new Error(`CAPABILITY_MISSING:${c}`);
+ checkHealth({...health,backends:health.backends.filter(b=>b.id!==WEBOTS_BACKEND&&b.id!==WEBOTS_ARM_BACKEND)},lock);
 }
 // Reads the venv's installed distributions with the standard library only (isolated mode: no user site, no cwd on sys.path).
 const PROBE="import sys,json,importlib.metadata as m\nprint(json.dumps({'version':list(sys.version_info[:2]),'impl':sys.implementation.name,'dists':{d.metadata['Name'].lower().replace('_','-'):d.version for d in m.distributions()}}))";
@@ -121,7 +123,7 @@ export async function prepareWebots(o,launch_,lock,track=()=>{}){
  for(const [digest,m] of Object.entries(fixture.models??{}))await writeFile(join(catalog,'models',`${digest}.json`),JSON.stringify(m));
  await writeFile(join(catalog,'catalog.json'),JSON.stringify({schemaVersion:1,id:'serve-3d-v1',components:entries,quotes:[]}));
  const simulation=join(o.source,tool('description_helper').root,'..');
- return {readyMs:120000,backends:[...MOCK_BACKENDS,WEBOTS_BACKEND].join(', '),env:{MEKONIQ_LAB_WEBOTS:'1',MEKONIQ_WEBOTS_HOME:o.webotsHome},
+ return {readyMs:120000,backends:[...MOCK_BACKENDS,WEBOTS_BACKEND,WEBOTS_ARM_BACKEND].join(', '),env:{MEKONIQ_LAB_WEBOTS:'1',MEKONIQ_WEBOTS_HOME:o.webotsHome},
   args:['--engineering-catalog',catalog,'--engineering-simulation',simulation,'--engineering-python',o.irsimPython,'--webots-python',o.webotsPython,'--webots-worker',root('webots_worker'),
    '--webots-lock',join(o.source,tool('webots_worker').lock.path),'--webots-home',o.webotsHome]};
 }

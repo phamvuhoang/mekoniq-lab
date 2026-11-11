@@ -6,6 +6,11 @@ import {observedSegments,sceneEntities,type TwinFrame,type ViewState} from '../t
 import {amrFootprint,assetOf} from '../twin/amr';
 import {footprintInMap} from '../twin/lidar';
 import {bodyPlacement} from '../twin/pose3d';
+import {armFrames,type ArmJointDef} from '../twin/arm/arm-frames';
+import {armJointsView,displayJoints} from '../twin/arm/arm-telemetry';
+import {armChain} from './arm-chain';
+import armComponent from '../../fixtures/engineering/arm-ref-3d-v1/component.json' with {type:'json'};
+const ARM_JOINTS=armComponent.joints as unknown as ArmJointDef[];
 export interface Twin3d {canvas:HTMLCanvasElement;/** Move into a re-rendered stage and size from it. */attach(host:HTMLElement):void;update(f:TwinFrame,vs:ViewState):void;dispose():void}
 const LIME=0xb4f375,NAVY=0x182a33;
 const COLOR:Record<string,number>={footprint:0x9dccff,safety:0xf0b45a,observed:0x5ad1c6};
@@ -61,6 +66,17 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
    for(const e of sceneEntities(f)){
     if(!Number.isFinite(e.x)||e.kind==='job')continue;
     const on=e.id===vs.selected,unknown=e.source==='unknown';
+    // an arm with joint telemetry and a base pose is drawn as its joint chain (what the runtime last reported, never extrapolated); otherwise the single cylinder below
+    if(e.kind==='arm'){
+     const sample=f.samples?.[e.id],view=sample?armJointsView(sample,f.nowMs??sample.receivedAtMs):null,shown=displayJoints(null,view),base=f.preset.project.armCollisionProfile?.baseInMap;
+     if(shown.jointsRad&&base){
+      const chain=armChain(armFrames(ARM_JOINTS,shown.jointsRad),mat(NAVY+0x101010,{wire:shown.source!=='observed'||shown.frozen,emissive:on}));
+      const [px,py,pz]=base.position as [number,number,number],[qx,qy,qz,qw]=base.quaternionXyzw as [number,number,number,number];
+      chain.quaternion.set(qx,qy,qz,qw);chain.position.set(px,py,pz);
+      const holder=new THREE.Group();holder.rotation.x=-Math.PI/2;holder.add(chain); // ROS (z up) -> scene (y up): (x, y, z) -> (x, z, -y); the chain sits at the base pose in the ROS map
+      holder.traverse(o=>{o.userData.entityId=e.id;});dynamic.add(holder);continue;
+     }
+    }
     const geo=e.kind==='amr'?new THREE.CylinderGeometry(0.3,0.3,0.45,24):e.kind==='coffee_machine'?new THREE.BoxGeometry(0.4,0.45,0.3):e.kind==='arm'?new THREE.CylinderGeometry(0.09,0.12,0.7,16):e.kind==='cup'?new THREE.CylinderGeometry(0.05,0.04,0.12,16):new THREE.BoxGeometry(0.25,0.3,0.25);
     const m=new THREE.Mesh(geo,mat(e.kind==='amr'?0xd3dcd3:e.kind==='cup'?0xf5f0e6:NAVY+0x101010,{wire:unknown||e.source==='derived',emissive:on}));
     const h=e.kind==='amr'?0.225:e.kind==='coffee_machine'?1.125:e.kind==='arm'?1.25:e.kind==='cup'?(e.status?.startsWith('robot')?0.52:e.status?.startsWith('customer')?0.8:1.0):1.05;

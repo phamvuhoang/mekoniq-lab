@@ -26,13 +26,15 @@ async function run(args: string[]) {
 const b = (id: string, on: boolean) => ({ id, modes: ['simulation'], accesses: ['simulated'], installed: on, compatible: on, reachable: on, enabled: on, commissioned: true });
 const lock = { sourceCommit: 'c'.repeat(40), schemaHash: 'a'.repeat(64) };
 
-test('checkWebotsHealth wants a live webots_3d and both capabilities, and the rest of the runtime exactly the mock backends', () => {
+test('checkWebotsHealth wants a live webots_3d and webots_arm and their capabilities, and the rest of the runtime exactly the mock backends', () => {
   const mock = ['mock_amr', 'mock_coffee', 'mock_arm'].map((id) => ({ ...b(id, true), modes: ['mock'] }));
-  const health = { protocolMajors: [1, 2], sourceCommit: lock.sourceCommit, schemaHash: lock.schemaHash, capabilities: ['engineering_bundle_v1', 'sim3d_navigation_v1'], backends: [...mock, b('irsim_2d', false), b('webots_3d', true)] };
+  const health = { protocolMajors: [1, 2], sourceCommit: lock.sourceCommit, schemaHash: lock.schemaHash, capabilities: ['engineering_bundle_v1', 'sim3d_navigation_v1', 'sim3d_arm_v1'], backends: [...mock, b('irsim_2d', false), b('webots_3d', true), b('webots_arm', true)] };
   expect(() => checkWebotsHealth(health, lock)).not.toThrow();
-  expect(() => checkWebotsHealth({ ...health, backends: [...mock, b('irsim_2d', false), { ...b('webots_3d', false), reason: 'WEBOTS_NOT_INSTALLED: x' }] }, lock)).toThrow(/WEBOTS_PROVIDER_UNAVAILABLE:WEBOTS_NOT_INSTALLED/);
+  expect(() => checkWebotsHealth({ ...health, backends: [...mock, b('irsim_2d', false), { ...b('webots_3d', false), reason: 'WEBOTS_NOT_INSTALLED: x' }, b('webots_arm', true)] }, lock)).toThrow(/WEBOTS_PROVIDER_UNAVAILABLE:WEBOTS_NOT_INSTALLED/);
+  expect(() => checkWebotsHealth({ ...health, backends: [...mock, b('irsim_2d', false), b('webots_3d', true)] }, lock)).toThrow(/WEBOTS_PROVIDER_UNAVAILABLE:not offered/); // a runtime without the arm provider
   expect(() => checkWebotsHealth({ ...health, capabilities: ['engineering_bundle_v1'] }, lock)).toThrow('CAPABILITY_MISSING:sim3d_navigation_v1');
-  expect(() => checkWebotsHealth({ ...health, backends: [...mock, b('irsim_2d', true), b('webots_3d', true)] }, lock)).toThrow(/NON_MOCK_BACKEND_ENABLED:irsim_2d/);
+  expect(() => checkWebotsHealth({ ...health, capabilities: ['engineering_bundle_v1', 'sim3d_navigation_v1'] }, lock)).toThrow('CAPABILITY_MISSING:sim3d_arm_v1');
+  expect(() => checkWebotsHealth({ ...health, backends: [...mock, b('irsim_2d', true), b('webots_3d', true), b('webots_arm', true)] }, lock)).toThrow(/NON_MOCK_BACKEND_ENABLED:irsim_2d/);
 });
 
 test('--provider webots selects the Webots tools and keeps the IR-SIM defaults for the engineering helper', () => {
