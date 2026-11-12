@@ -8,6 +8,9 @@ import type {TwinSample} from '../twin/store';
 import type {BundleReceipt,EngineeringAssessment,EngineeringProject,EngineeringRef} from '../shared/engineering';
 import type {ModelValidationReportV1} from '../shared/navigation2d';
 import {validModelValidationReport} from './model-validation';
+import {loadToken,requestInit,saveToken,type RuntimeTarget} from '../runtime/target';
+import {FetchEventSource} from '../runtime/fetch-event-source';
+import type {StreamDeps} from '../runtime/stream';
 export interface TwinHealth {scenarioRequirements?:Record<string,{mock:string[];simulation:string[]}>;
  /** Server-advertised optional features, e.g. engineering_bundle_v1. Absent on runtimes that predate engineering. */
  capabilities?:string[];
@@ -15,7 +18,8 @@ export interface TwinHealth {scenarioRequirements?:Record<string,{mock:string[];
  scenarioRequirementsByBackendSet?:Record<string,Record<string,{supported:boolean;required:string[];reasonCodes:string[]}>>;protocolMajors:number[];sourceCommit:string;schemaHash:string;scenarioIds:string[];
  backends:{id:string;modes:string[];installed:boolean;compatible:boolean;reachable:boolean;commissioned:boolean;enabled:boolean;reason?:string}[];
  /** `execution` is the set's optional clock metadata (portable IR-SIM: source_fixed_step); legacy sets omit it and keep their behaviour. It never grants anything by itself. */
- backendSets:{id:string;mode:string;access:string;backends:string[];execution?:BackendExecution}[];features?:{polling?:boolean;sse?:boolean;readiness?:boolean};}
+ backendSets:{id:string;mode:string;access:string;backends:string[];execution?:BackendExecution}[];features?:{polling?:boolean;sse?:boolean;readiness?:boolean;
+ /** N01/N02: a bearer session (sessionToken) and `step.payload.pace` (factor 1, 4, 16, 64; at most 50 ticks). */bearer?:boolean;pacedStep?:boolean};}
 export interface BackendExecution {host:'portable_python'|'linux_native';clock:'source_fixed_step'|'native';manualStep:boolean;speedMultipliers:number[]}
 export interface ReadinessSnapshot {checkedAt:string;expiresAt:string;scenarioId:string;backendSetId:string;checks:{id:string;status:'ready'|'blocked'|'unknown';reasonCodes:string[];evidenceRef:string|null}[];canStart:boolean}
 export interface RunSnapshotV2 {schemaVersion:2;id:string;mode:'mock'|'simulation'|'hardware';access:string;backendSetId:string;backends:string[];
@@ -102,26 +106,55 @@ export interface TwinRuntime {
  /** Drop the in-memory CSRF token after the runtime lost the session (restart): the pair form shows again. */
  forget():void;
  create(request:CreateRun,identity:{sourceCommit:string;schemaHash:string}):Promise<RunView>;
- action(view:RunView,kind:ActionKind,payload?:Record<string,unknown>):Promise<RunView>;
+ /** `actionId`: resend a step whose response was lost with the same id; the runtime returns its stored receipt and does not act again. */
+ action(view:RunView,kind:ActionKind,payload?:Record<string,unknown>,actionId?:string):Promise<RunView>;
  readonly recoverableRunIds?:readonly string[];archive?(runId:string):Promise<void>;reclaim?(runId:string):Promise<RunView>;
  get(runId:string):Promise<RunView>;report(runId:string):Promise<RunReport>;
+ /** Where requests go (target.ts). Optional only so test doubles may omit it; httpTwinRuntime always has it. */
+ readonly target?:RuntimeTarget;
+ /** Point this client at another runtime: the old session (and its stored bearer) is dropped. */
+ retarget?(t:RuntimeTarget):void;
+ /** What openRunStreams needs to reach this runtime with this client's credentials. */
+ streamDeps?():Pick<StreamDeps,'base'|'EventSource'|'fetch'>;
 }
 export class TwinRuntimeError extends Error {
  constructor(readonly code:string,readonly reasonCodes:string[],readonly status:number){super(reasonCodes.length?`${code}: ${reasonCodes.join(', ')}`:code);this.name='TwinRuntimeError';}
 }
-export function httpTwinRuntime(base='/lab/v2'):TwinRuntime {
- let csrf='';
+/** The Lab's pin (config/source-runtime.lock.json, served beside the page): the commit a runtime on another origin must report. */
+let pin:Promise<string>|undefined;
+const pinnedCommit=()=>pin??=fetch('/source-runtime.lock.json',{cache:'no-store'}).then(async r=>{const c=r.ok?(await r.json() as {sourceCommit?:unknown}).sourceCommit:undefined;if(typeof c!=='string'||!c)throw new TwinRuntimeError('RUNTIME_LOCK_MISSING',[],409);return c;}).catch(e=>{pin=undefined;throw e;});
+/** Same origin: cookie session + CSRF header (unchanged). Other targets: the bearer from POST /sessions, no CSRF, no cookie; the bearer is dropped on 401. */
+export function httpTwinRuntime(target:RuntimeTarget={base:'/lab/v2',kind:'same_origin'}):TwinRuntime {
+ let csrf='',token=target.kind==='same_origin'?'':loadToken(target);
+ const remote=()=>target.kind!=='same_origin',auth=()=>requestInit(target,token);
  const storageKey='mekoniq-lab-reclaim';let proofs:Record<string,string>={};
  try{proofs=JSON.parse(localStorage.getItem(storageKey)??'{}');}catch{/* no local ownership proofs */}
+ const forget=()=>{csrf='';if(token){token='';saveToken(target,'');}};
+ /** A loopback fetch the browser refuses (local network access denied, nothing listening, Safari's HTTPS-to-http rule) rejects with a TypeError we cannot tell apart. */
+ const send=async(url:string,init:RequestInit)=>{
+  let response:Response;
+  try{response=await fetch(url,init);}catch(e){if(target.kind==='loopback'&&e instanceof TypeError)throw new TwinRuntimeError('LOOPBACK_BLOCKED',[],0);throw e;}
+  if(response.status===401&&remote())forget();
+  return response;
+ };
  const request=async<T>(path:string,body?:unknown):Promise<T>=>{
-  const post=body!==undefined,response=await fetch(base+path,{method:post?'POST':'GET',credentials:'same-origin',cache:'no-store',headers:post?{'Content-Type':'application/json',...csrf?{'X-CSRF-Token':csrf}:{}}:{},...post?{body:JSON.stringify(body)}:{}});
+  const post=body!==undefined,a=auth(),response=await send(target.base+path,{method:post?'POST':'GET',...a,cache:'no-store',headers:{...a.headers as Record<string,string>,...post?{'Content-Type':'application/json',...csrf&&!remote()?{'X-CSRF-Token':csrf}:{}}:{}},...post?{body:JSON.stringify(body)}:{}});
   const data=await response.json().catch(()=>({error:'INVALID_RUNTIME_RESPONSE'}));
   if(!response.ok)throw new TwinRuntimeError(String(data.error??'RUNTIME_REQUEST_FAILED'),Array.isArray(data.reasonCodes)?data.reasonCodes.map(String):[],response.status);
   return data as T;
  };
  const run=(id:string)=>`/runs/${encodeURIComponent(id)}`;
  return {
-  get paired(){return !!csrf;},forget(){csrf='';},
+  get paired(){return remote()?!!token:!!csrf;},forget,
+  get target(){return target;},
+  retarget(t){forget();target=t;token=t.kind==='same_origin'?'':loadToken(t);},
+  streamDeps(){
+   if(!remote())return {base:target.base,EventSource:globalThis.EventSource};
+   // the bearer is read when each stream opens (a re-pair is picked up by the next reconnect), and only while this client still points at that runtime
+   const t=target,a=()=>requestInit(t,t===target?token:''),init=()=>{const {headers,...extra}=a();return {headers:headers as Record<string,string>,extra};};
+   return {base:t.base,EventSource:class extends FetchEventSource{constructor(url:string){super(url,init());}} as unknown as typeof EventSource,
+    fetch:((url:string,i:RequestInit={})=>{const x=a();return send(url,{...i,...x,headers:{...i.headers as Record<string,string>,...x.headers as Record<string,string>}});}) as typeof fetch};
+  },
   health:()=>request<TwinHealth>('/health'),
   compileEngineering:project=>request<BundleReceipt>('/engineering/compile',{project}),
   async validateEngineeringModel(engineeringRef,robotId){const r=await request<{report?:unknown}>('/engineering/validate',{engineeringRef,robotId});if(!validModelValidationReport(r.report))throw new TwinRuntimeError('MODEL_VALIDATION_SCHEMA_UNKNOWN',[],502);return r.report;},
@@ -134,7 +167,7 @@ export function httpTwinRuntime(base='/lab/v2'):TwinRuntime {
   },
   engineeringManifest:digest=>request<EngineeringManifest>(`/engineering/bundles/${encodeURIComponent(digest)}/manifest`),
   async engineeringBlob(sha256){
-   const response=await fetch(`${base}/engineering/blobs/${encodeURIComponent(sha256)}`,{credentials:'same-origin',cache:'no-store'});
+   const response=await send(`${target.base}/engineering/blobs/${encodeURIComponent(sha256)}`,{...auth(),cache:'no-store'});
    if(!response.ok){const data=await response.json().catch(()=>({error:'INVALID_RUNTIME_RESPONSE'}));throw new TwinRuntimeError(String(data.error??'RUNTIME_REQUEST_FAILED'),[],response.status);}
    const bytes=new Uint8Array(await response.arrayBuffer());
    // content addressing is checked here too: a blob that does not hash to its name is never rendered
@@ -142,13 +175,20 @@ export function httpTwinRuntime(base='/lab/v2'):TwinRuntime {
    return bytes;
   },
   readiness:(scenarioId,backendSetId,project,engineeringRef)=>engineeringRef?request<ReadinessSnapshot>('/readiness',{scenarioId,backendSetId,engineeringRef,...project?{project}:{}}):project?request<ReadinessSnapshot>('/readiness',{scenarioId,backendSetId,project}):request<ReadinessSnapshot>(`/readiness?scenarioId=${encodeURIComponent(scenarioId)}&backendSetId=${encodeURIComponent(backendSetId)}`),
-  async pair(token){const r=await request<{csrfToken?:string}>('/sessions',{token});if(!r.csrfToken)throw new TwinRuntimeError('INVALID_PAIRING_RESPONSE',[],502);csrf=r.csrfToken;},
-  async create(r,identity){const {reclaimToken,...view}=await request<RunView&{reclaimToken?:string}>('/runs',{...r,runtimeIdentity:identity});if(reclaimToken){proofs[view.run.id]=reclaimToken;try{localStorage.setItem(storageKey,JSON.stringify(proofs));}catch{/* current tab retains the proof if storage is unavailable */}}return view;},
+  async pair(code){
+   const r=await request<{csrfToken?:string;sessionToken?:string}>('/sessions',{token:code});
+   if(remote()){if(!r.sessionToken)throw new TwinRuntimeError('INVALID_PAIRING_RESPONSE',[],502);token=r.sessionToken;saveToken(target,token);return;}
+   if(!r.csrfToken)throw new TwinRuntimeError('INVALID_PAIRING_RESPONSE',[],502);csrf=r.csrfToken;
+  },
+  async create(r,identity){
+   // a runtime on another origin was not installed by the launcher: it must be the pinned one (same origin is checked by the launcher)
+   if(remote()){const [h,p]=await Promise.all([request<TwinHealth>('/health'),pinnedCommit()]);if(h.sourceCommit!==p)throw new TwinRuntimeError('RUNTIME_PIN_MISMATCH',[String(h.sourceCommit).slice(0,7),p.slice(0,7)],409);}
+   const {reclaimToken,...view}=await request<RunView&{reclaimToken?:string}>('/runs',{...r,runtimeIdentity:identity});if(reclaimToken){proofs[view.run.id]=reclaimToken;try{localStorage.setItem(storageKey,JSON.stringify(proofs));}catch{/* current tab retains the proof if storage is unavailable */}}return view;},
   get recoverableRunIds(){return Object.keys(proofs);},
   async archive(id){await request(`${run(id)}/archive`,{});},
   reclaim:id=>{const proof=proofs[id];if(!proof)throw new TwinRuntimeError('RUN_PROOF_MISSING',[],403);return request<RunView>(`${run(id)}/reclaim`,{proof});},
   // expectedRevision comes from the last snapshot the UI rendered: a stale view is refused (REVISION_CONFLICT), never applied
-  action:(v,kind,payload={})=>request<RunView>(`${run(v.run.id)}/actions`,{actionId:crypto.randomUUID(),expectedRevision:v.run.runRevision,kind,payload}),
+  action:(v,kind,payload={},actionId=crypto.randomUUID())=>request<RunView>(`${run(v.run.id)}/actions`,{actionId,expectedRevision:v.run.runRevision,kind,payload}),
   get:id=>request<RunView>(run(id)),
   report:id=>request<RunReport>(`${run(id)}/report`),
  };

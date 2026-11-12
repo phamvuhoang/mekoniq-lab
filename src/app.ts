@@ -14,6 +14,7 @@ import { robotSvg } from "./viewer/fallback";
 import { TwinWorkspace } from "./ui/workspace";
 import { AssemblyWorkspace } from "./ui/assembly-page";
 import { httpTwinRuntime } from "./scenarios/controls";
+import { loadTarget } from "./runtime/target";
 import { businessSimulationNote, illustrativeNote } from "./ui/labels";
 
 type Page = "design" | "assembly" | "restaurant" | "scenarios" | "twin" | "results" | "deployment";
@@ -94,7 +95,8 @@ export class LabApp {
   private backendCompatible = false;
   private faultKind = "blocked";
   // one runtime client for every page: the pairing (CSRF token, ownership proofs) lives in it, so a session made on the Twin page also serves Assembly
-  private runtime = httpTwinRuntime();
+  // the saved runtime address (Twin page runtime box; none saved: this page's own /lab/v2) and, for another origin, the bearer kept in this tab
+  private runtime = httpTwinRuntime(loadTarget(location.origin));
   private assembly = new AssemblyWorkspace(() => this.render(), this.runtime, (name, data) => this.download(name, data));
   private twin = new TwinWorkspace(() => this.render(), this.runtime, () => this.assembly.projectDigest(), () => this.assembly.engineeringInput());
   constructor(host: HTMLElement) {

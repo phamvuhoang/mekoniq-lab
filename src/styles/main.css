@@ -2378,6 +2378,8 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 .preset-option[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
 .preset-option[aria-pressed="true"] b::after{content:" ✓" / "";color:var(--accent)}
 .twin-pair label{display:block;font-size: 12px;color:var(--muted);margin-bottom:6px}
+.twin-pair > input{display:block;width:100%;max-width:380px;margin-bottom:10px}
+.twin-pair .field-error{margin:-6px 0 10px;color:var(--danger);font-size: 12px}
 .twin-layers{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
 .twin-layers button{min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--muted)}
 .twin-layers button[aria-pressed="true"]{color:var(--accent-ink);background:var(--accent);border-color:var(--accent)}

@@ -16,7 +16,8 @@ await new Promise((resolve, reject) => {
 });
 const {file} = await checkedRuntime(root);
 const directory = await mkdtemp(join(tmpdir(), 'mekoniq-lab-browser-'));
-const runtime = spawn(process.execPath, [file, '--port', '4176', '--data-dir', directory], {cwd: root, stdio: ['ignore', 'pipe', 'inherit']});
+const {MEKONIQ_LAB_ACCESS_KEY: _key, ...env} = process.env; // a local launcher never uses an access key: the runtime must print its pairing code
+const runtime = spawn(process.execPath, [file, '--port', '4176', '--data-dir', directory], {cwd: root, stdio: ['ignore', 'pipe', 'inherit'], env});
 const runtimeClosed = new Promise(resolve => runtime.once('close', resolve));
 let runner;
 const stop = () => {runner?.kill('SIGTERM'); runtime.kill('SIGTERM');};

@@ -1,0 +1,78 @@
+import {test,expect,type Page,type Request} from '@playwright/test';
+import {openScenarioPicker} from '../support/twin';
+// N03 / RT04: the Lab on another origin (http://localhost:4177, no /lab of its own) reaches the runtime at http://127.0.0.1:4176 with a bearer
+// session and fetch-based streams. Run with scripts/test-mock-e2e.mjs remote-origin.spec.ts: the launcher starts the runtime with
+// --allow-origin http://localhost:4177 and serves the Lab again on --extra-ui-port 4177. One spec per launcher (one-use pairing code).
+const token=process.env.LAB_TEST_PAIRING_TOKEN,shots=process.env.LAB_EVIDENCE_DIR;
+const LAB='http://localhost:4177',RUNTIME='http://127.0.0.1:4176';
+const shot=async(page:Page,name:string)=>{if(shots)await page.screenshot({path:`${shots}/N03-${name}.png`});};
+
+test('a Lab on another origin sends nothing to the runtime before the click, then pairs with a bearer and runs BV01 to completed',async({page})=>{
+ test.skip(!token,'Run scripts/test-mock-e2e.mjs remote-origin.spec.ts: it starts the pinned runtime for this origin and supplies its one-time token.');
+ test.setTimeout(180000);
+ await page.setViewportSize({width:1440,height:900});
+ const toRuntime:Request[]=[];page.on('request',r=>{if(r.url().startsWith(RUNTIME))toRuntime.push(r);});
+ await page.goto(`${LAB}/#twin`);
+ const address=page.locator('#twin-runtime-address');
+ await expect(address).toBeVisible();await expect(address).toHaveValue('');
+ // the page's own origin has no runtime: the automatic probe (own origin only) finds none, and nothing went to 127.0.0.1:4176
+ await expect(page.getByTestId('runtime-popover')).toContainText('Không thấy runtime /lab/v2');
+ await page.waitForTimeout(1500);
+ expect(toRuntime.map(r=>r.url())).toEqual([]);
+ await shot(page,'before-connect');
+
+ // an http address that is not loopback is refused next to the field, before any request
+ await address.fill('http://rt.example:4176');await page.locator('#twin-pair-token').fill('not-a-code');
+ await page.getByRole('button',{name:'Ghép nối runtime'}).click();
+ await expect(page.getByTestId('runtime-address-error')).toContainText('Địa chỉ không hợp lệ');
+ await expect(address).toHaveAttribute('aria-invalid','true');
+ await shot(page,'address-error');
+ expect(toRuntime).toHaveLength(0);
+
+ await address.fill(RUNTIME);await page.locator('#twin-pair-token').fill(token!);
+ await shot(page,'pair-form-filled');
+ expect(toRuntime).toHaveLength(0);
+ await page.getByRole('button',{name:'Ghép nối runtime'}).click();
+ await expect(page.getByTestId('runtime-popover')).toBeHidden();
+ await expect(page.getByTestId('runtime-address-error')).toHaveCount(0);
+
+ await openScenarioPicker(page);
+ await page.getByRole('button',{name:'Cà phê sữa đá'}).click();
+ await page.getByRole('button',{name:'Chạy mock'}).click();
+ await expect(page.getByTestId('mode-badge')).toContainText('MOCK');
+ await expect(page.getByTestId('run-status')).toContainText('Đang chạy');
+ // the streams are read through fetch with the bearer; the first heartbeat makes the chip live
+ const chip=page.getByTestId('runtime-chip');
+ await expect(chip).toHaveAttribute('data-state','live',{timeout:15000});await expect(chip).toContainText('Trực tiếp');
+ await shot(page,'connected-run-bar');
+
+ await page.getByRole('button',{name:'Tự chạy'}).click();
+ await expect(page.getByTestId('run-status')).toContainText('Hoàn thành',{timeout:150000});
+ await expect(page.getByTestId('run-served')).toContainText('2');
+ await shot(page,'completed');
+
+ // every runtime request after pairing carried the bearer, none carried a cookie, CSRF header or token in its URL;
+ // the bearer is kept in sessionStorage only (and never in the page)
+ const session=await page.evaluate(()=>({keys:Object.keys(sessionStorage),value:sessionStorage.getItem('mekoniq-lab-session:http://127.0.0.1:4176/lab/v2'),local:JSON.stringify({...localStorage}),html:document.documentElement.outerHTML}));
+ expect(session.value).toBeTruthy();expect(session.local).not.toContain(session.value!);expect(session.html).not.toContain(session.value!);
+ const authed=toRuntime.filter(r=>r.method()!=='OPTIONS'&&!r.url().endsWith('/health')&&!r.url().endsWith('/sessions'));
+ expect(authed.length).toBeGreaterThan(0);
+ for(const r of authed){const h=await r.allHeaders();expect(h.authorization,r.url()).toBe(`Bearer ${session.value}`);expect(h['x-csrf-token'],r.url()).toBeUndefined();expect(h.cookie,r.url()).toBeUndefined();expect(r.url()).not.toContain(session.value!);}
+ expect(toRuntime.some(r=>r.url().includes('/events'))).toBe(true);
+ // paced auto-run: every step names a factor the runtime accepts and at most 50 ticks
+ const steps=authed.filter(r=>r.url().endsWith('/actions')).map(r=>r.postDataJSON()).filter(b=>b.kind==='step'&&b.payload.pace);
+ expect(steps.length).toBeGreaterThan(0);for(const b of steps)expect(b.payload).toEqual({ticks:20,pace:{factor:16}});
+
+ // a reload keeps the address and the bearer (the one-use code is spent), but reaching the runtime is still a click
+ toRuntime.length=0;await page.reload();
+ await expect(page.getByTestId('runtime-address')).toHaveText(RUNTIME);await expect(page.locator('#twin-pair-token')).toHaveCount(0);
+ await page.waitForTimeout(1500);expect(toRuntime).toHaveLength(0);
+ await page.locator('[data-action="twin-connect"]').click();
+ await expect(page.getByTestId('runtime-popover')).toBeHidden();
+ await expect(chip).toContainText('Sẵn sàng');
+ expect(toRuntime.some(r=>r.url().endsWith('/health'))).toBe(true);
+ // disconnect drops the bearer from this tab
+ await chip.click();await page.locator('[data-action="twin-disconnect"]').click();
+ await expect(page.locator('#twin-pair-token')).toBeVisible();await expect(page.locator('#twin-runtime-address')).toHaveValue(RUNTIME);
+ expect(await page.evaluate(()=>Object.keys(sessionStorage).filter(k=>k.startsWith('mekoniq-lab-session:')))).toEqual([]);
+});

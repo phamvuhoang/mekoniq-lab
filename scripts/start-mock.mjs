@@ -3,8 +3,12 @@
 // Never downloads or installs anything, never starts a stand-in when the runtime is missing, never stops a process it did not start.
 // Options (defaults are the only ones the source runtime accepts browser traffic from): --ui-port 4175 --runtime-port 4176 --data-dir <lab>/runs
 // --root <dir> selects another Lab install (tests); --boot-only exits after ready (boot-to-ready measurement).
+// --allow-origin <origin> lets the runtime accept a bearer session from that origin too; --extra-ui-port <port> serves the same Lab on
+// http://localhost:<port> (another origin, loopback only) with no /lab of its own: a web-hosted Lab stand-in for the e2e (remote-origin.spec.ts).
+// A local launcher never uses an access key: MEKONIQ_LAB_ACCESS_KEY is removed from the runtime's environment, so it always prints a pairing code.
 import {spawn} from 'node:child_process';
 import {createServer} from 'node:net';
+import {createServer as httpServer,request} from 'node:http';
 import {access} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -24,12 +28,24 @@ export function checkHealth(health,lock){
  for(const id of MOCK_BACKENDS)if(!enabled.has(id))throw new Error(`BACKEND_UNAVAILABLE:${id}`);
  for(const id of enabled)if(!MOCK_BACKENDS.includes(id))throw new Error(`NON_MOCK_BACKEND_ENABLED:${id}`);
 }
+/** The user's shell environment without the access key (a keyed runtime prints no pairing code and the launcher would wait for one). */
+export const runtimeEnv=(env=process.env)=>{const {MEKONIQ_LAB_ACCESS_KEY:_key,...rest}=env;return rest;};
+/** The Lab UI on another loopback origin: every request goes to the UI server as it is, except /lab, which that origin does not have. */
+function extraUi(port,uiPort){
+ const server=httpServer((q,r)=>{
+  if(q.url?.startsWith('/lab/')||q.url==='/lab'){r.writeHead(404,{'Content-Type':'application/json'});r.end('{"error":"NO_RUNTIME_ON_THIS_ORIGIN"}');return;}
+  const upstream=request({host:'127.0.0.1',port:uiPort,path:q.url,method:q.method,headers:q.headers},res=>{r.writeHead(res.statusCode??502,res.headers);res.pipe(r);});
+  upstream.on('error',()=>{if(!r.headersSent)r.writeHead(502);r.end();});r.once('close',()=>upstream.destroy());q.pipe(upstream);
+ });
+ return new Promise((ok,fail)=>{server.once('error',fail);server.listen(port,'127.0.0.1',()=>ok(server));});
+}
 const PREVIEW='Runtime unavailable: the Lab can only open in preview only mode (design, layout, no runs or results). Install the pinned export with node scripts/import-runtime.mjs <artifact-dir> (see README), then pnpm check:source.';
 function options(argv){
- const o={root:lab,uiPort:4175,runtimePort:4176,dataDir:undefined,bootOnly:false};
+ const o={root:lab,uiPort:4175,runtimePort:4176,dataDir:undefined,bootOnly:false,allowOrigin:undefined,extraUiPort:undefined};
  for(let i=0;i<argv.length;i++){const a=argv[i];
   if(a==='--')continue;else if(a==='--root')o.root=resolve(argv[++i]);else if(a==='--ui-port')o.uiPort=Number(argv[++i]);else if(a==='--runtime-port')o.runtimePort=Number(argv[++i]);
-  else if(a==='--data-dir')o.dataDir=resolve(argv[++i]);else if(a==='--boot-only')o.bootOnly=true;else throw new Error(`UNKNOWN_ARGUMENT:${a}`);}
+  else if(a==='--data-dir')o.dataDir=resolve(argv[++i]);else if(a==='--boot-only')o.bootOnly=true;
+  else if(a==='--allow-origin')o.allowOrigin=argv[++i];else if(a==='--extra-ui-port')o.extraUiPort=Number(argv[++i]);else throw new Error(`UNKNOWN_ARGUMENT:${a}`);}
  o.dataDir??=join(o.root,'runs');return o;
 }
 const waitFor=(child,name,until,ms)=>new Promise((ok,fail)=>{
@@ -64,6 +80,8 @@ export async function launch({argv=process.argv.slice(2),prepare=async()=>({args
   assertNode();assertPlatform();
   const o=options(argv);
   assertPort(o.uiPort);assertPort(o.runtimePort);if(o.uiPort===o.runtimePort)throw new Error('INVALID_PORT:ui and runtime ports must differ');
+  if(o.extraUiPort!==undefined){assertPort(o.extraUiPort);if([o.uiPort,o.runtimePort].includes(o.extraUiPort))throw new Error('INVALID_PORT:the extra UI port must differ from the others');}
+  if(o.allowOrigin!==undefined&&!/^https?:\/\/[^/\s]+$/.test(o.allowOrigin))throw new Error(`INVALID_ORIGIN:${o.allowOrigin}`);
   let runtime;
   try{runtime=await checkedRuntime(o.root);}catch(e){throw new Error(`${e.code==='ENOENT'?'RUNTIME_NOT_INSTALLED':e.message}. ${PREVIEW}`);}
   const {lock,file}=runtime;
@@ -71,19 +89,21 @@ export async function launch({argv=process.argv.slice(2),prepare=async()=>({args
   const vite=join(lab,'node_modules/vite/bin/vite.js');
   await access(vite).catch(()=>{throw new Error('DEPENDENCIES_NOT_INSTALLED: run pnpm install --frozen-lockfile once (the launcher never downloads).');});
   const extra=await prepare(o,lock,track);go();
-  await portFree(o.runtimePort);await portFree(o.uiPort);go();
-  const rt=spawn(process.execPath,[file,'--port',String(o.runtimePort),'--data-dir',o.dataDir,...extra.args],{cwd:o.root,stdio:['ignore','pipe','inherit'],env:{...process.env,...extra.env},detached:true});rt.groupKill=true;track(rt);
+  await portFree(o.runtimePort);await portFree(o.uiPort);if(o.extraUiPort!==undefined)await portFree(o.extraUiPort);go();
+  const rt=spawn(process.execPath,[file,'--port',String(o.runtimePort),'--data-dir',o.dataDir,...o.allowOrigin?['--allow-origin',o.allowOrigin]:[],...extra.args],{cwd:o.root,stdio:['ignore','pipe','inherit'],env:{...runtimeEnv(),...extra.env},detached:true});rt.groupKill=true;track(rt);
   let out='';rt.stdout.on('data',c=>{out+=c;});
   const token=await waitFor(rt,'RUNTIME',()=>/Pairing token \(expires in 5 minutes; one use\): (\S+)/.exec(out)?.[1],extra.readyMs??15000);
   go();const health=await (await fetch(`http://127.0.0.1:${o.runtimePort}/lab/v2/health`)).json();
   check(health,lock);go();
   const ui=spawn(process.execPath,[vite,'--host','127.0.0.1','--port',String(o.uiPort),'--strictPort'],{cwd:lab,stdio:['ignore','ignore','inherit'],env:{...process.env,LAB_RUNTIME_PORT:String(o.runtimePort)},detached:true});ui.groupKill=true;track(ui);
   await waitFor(ui,'UI',async()=>(await fetch(`http://127.0.0.1:${o.uiPort}/`)).ok||undefined,30000);go();
+  // in-process: it ends with the launcher
+  const extraServer=o.extraUiPort===undefined?null:await extraUi(o.extraUiPort,o.uiPort);go();
   console.log(`${banner??'Mekoniq Robot Lab — mock twin (simulated; no robot hardware)'}
 Source ${lock.sourceCommit} · artifact ${lock.artifactSha256.slice(0,12)} · protocol ${health.protocolMajors.join('/')}
 Backends: ${extra.backends??MOCK_BACKENDS.join(', ')} · journal ${o.dataDir}
 Owned processes: runtime pid ${rt.pid}, UI pid ${ui.pid}
-Open http://127.0.0.1:${o.uiPort} and enter this one-use pairing code (expires in 5 minutes): ${token}
+${extraServer?`Also serving the Lab at http://localhost:${o.extraUiPort} (no /lab there: enter the runtime address http://127.0.0.1:${o.runtimePort}${o.allowOrigin?`; runtime allows ${o.allowOrigin}`:''})\n`:''}Open http://127.0.0.1:${o.uiPort} and enter this one-use pairing code (expires in 5 minutes): ${token}
 Ready in ${Math.round(performance.now()-started)} ms. Press Ctrl-C to stop.`);ready=true;
   if(o.bootOnly){await stop();return;}
   const code=await new Promise(r=>{for(const c of owned)c.once('exit',x=>r(x));});

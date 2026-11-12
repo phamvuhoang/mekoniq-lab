@@ -9,6 +9,8 @@ import {fileURLToPath} from 'node:url';
 import {pairingOutput} from './launcher-output.mjs';
 import {playwrightSpecEnv} from './recorder-options.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
+/** Launcher options a spec needs beyond the defaults: remote-origin.spec.ts opens the Lab on another origin and reaches the runtime with a bearer. */
+const LAUNCHER_ARGS={'remote-origin.spec.ts':['--allow-origin','http://localhost:4177','--extra-ui-port','4177']};
 const args=process.argv.slice(2),specs=args.filter(a=>!a.startsWith('--'));
 const {CI:_ci,...env}=process.env;// Playwright must reuse the launcher's UI, not start its own
 if(args.includes('--evidence')){env.LAB_EVIDENCE_DIR=join(root,'docs/implementation/evidence/digital-twin-v2');await mkdir(env.LAB_EVIDENCE_DIR,{recursive:true});}
@@ -19,7 +21,7 @@ process.once('SIGINT',stop);process.once('SIGTERM',stop);
 try{
  for(const spec of specs.length?specs:['twin-recovery.spec.ts','coffee-journey.spec.ts']){
   const offline=process.env.LAB_TEST_OFFLINE_ROOT;
-  launcher=spawn(offline?join(offline,'bin/node'):process.execPath,[offline?join(offline,'start.mjs'):join(root,'scripts/start-mock.mjs'),'--data-dir',join(work,`runs-${spec}`)],{cwd:root,stdio:['ignore','pipe','inherit'],env});
+  launcher=spawn(offline?join(offline,'bin/node'):process.execPath,[offline?join(offline,'start.mjs'):join(root,'scripts/start-mock.mjs'),'--data-dir',join(work,`runs-${spec}`),...LAUNCHER_ARGS[spec]??[]],{cwd:root,stdio:['ignore','pipe','inherit'],env});
   const exited=new Promise(r=>launcher.once('exit',c=>r(c??1)));
   const redacted=pairingOutput(c=>process.stdout.write(c));launcher.stdout.once('end',()=>redacted.end());
   const token=await new Promise((ok,fail)=>{let out='';launcher.stdout.on('data',c=>{out+=c;redacted.write(c);const m=/one-use pairing code \(expires in 5 minutes\): (\S+)[\s\S]*Ready in/.exec(out);if(m)ok(m[1]);});void exited.then(c=>fail(new Error(`Launcher exited before ready: ${c}`)));});
