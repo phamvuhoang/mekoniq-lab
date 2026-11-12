@@ -2264,8 +2264,7 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 .twin-scenario span{display:flex;flex-direction:column;min-width:0;line-height:1.2}
 .twin-scenario small{font-size:12px;color:var(--muted)}
 .twin-scenario b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.twin-scenario svg{flex:none}
-.twin-scenario svg{transform:rotate(90deg)}
+.twin-scenario svg{flex:none;transform:rotate(90deg)}
 .twin-runtime-chip{font:12px var(--mono);max-width:360px}
 .twin-runtime-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .twin-runtime-chip i{flex:none;width:10px;height:10px;border-radius:50%;border:2px solid var(--muted)}

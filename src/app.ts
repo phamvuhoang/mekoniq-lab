@@ -14,6 +14,7 @@ import { robotSvg } from "./viewer/fallback";
 import { TwinWorkspace } from "./ui/workspace";
 import { AssemblyWorkspace } from "./ui/assembly-page";
 import { httpTwinRuntime } from "./scenarios/controls";
+import { businessSimulationNote, illustrativeNote } from "./ui/labels";
 
 type Page = "design" | "assembly" | "restaurant" | "scenarios" | "twin" | "results" | "deployment";
 const PAGES: Page[] = ["design", "assembly", "restaurant", "scenarios", "twin", "results", "deployment"];
@@ -228,7 +229,7 @@ export class LabApp {
 <span class="connection ${this.health ? "online" : ""}">
 <i>
 </i>${this.health ? tr("Runtime đã kết nối", "ランタイム接続済み", "Runtime connected") : tr("Chế độ xem trước", "プレビューモード", "Preview mode")}</span>
-<span>${this.health ? tr("Source runtime · chỉ mô phỏng nghiệp vụ", "Source runtime · 業務シミュレーションのみ", "Source runtime · business simulation only") : tr("Thiết kế tự do · kết nối runtime cục bộ để chạy kịch bản", "自由に設計 · シナリオ実行にはローカル接続が必要", "Explore your design · connect a local runtime to run scenarios")}</span>
+<span>${this.health ? businessSimulationNote() : tr("Thiết kế tự do · kết nối runtime cục bộ để chạy kịch bản", "自由に設計 · シナリオ実行にはローカル接続が必要", "Explore your design · connect a local runtime to run scenarios")}</span>
 <button class="text-button" data-action="goto-runtime">${tr("Kết nối", "接続", "Connect")}${icon("arrow", 14)}</button>
 </div>`
     }${
@@ -242,7 +243,7 @@ export class LabApp {
         ? ""
         : `<footer class="main-footer">
 <span>MEKONIQ ROBOT LAB <span class="footer-divider">/</span> ${tr("Không gian kỹ thuật mở", "オープンエンジニアリング", "An open engineering workspace")}</span>
-<span>${icon("info", 13)} ${tr("Mô hình minh họa · chưa nghiệm thu phần cứng", "参考モデル · 実機未検証", "Illustrative model · hardware unvalidated")}</span>
+<span>${icon("info", 13)} ${illustrativeNote()}</span>
 </footer>`
     }
 </main>

@@ -7,7 +7,7 @@ const shot=async(page:Page,name:string)=>{if(shots)await page.screenshot({path:`
 const LEVEL1=['scenario-picker','runtime-chip','mode-badge','run-status','run-tick','run-served','twin-scene','twin-transport'];
 // where every existing data-testid now lives (spec §6.3); `ids` are element ids
 const ROWS:{name:string;open:(page:Page)=>Promise<void>;container:string;testids:string[];ids?:string[]}[]=[
- {name:'display',open:openDisplayMenu,container:'[data-testid="display-menu"]',testids:['twin-legend','layer-provenance','layers-2d-only','navigation-scene-unavailable']},
+ {name:'display',open:openDisplayMenu,container:'[data-testid="display-menu"]',testids:['twin-legend','honesty-notes','layer-provenance','layers-2d-only','navigation-scene-unavailable']},
  {name:'objects',open:p=>openInspector(p,'objects'),container:'#inspector-panel-objects',testids:['cycle-queue','entity-list','cup-owner','attention-reason']},
  {name:'engineering',open:p=>openInspector(p,'engineering'),container:'#inspector-panel-engineering',testids:['run-identity','run-id','run-revision','engineering-panel'],ids:['twin-fault']},
  {name:'report',open:p=>openInspector(p,'report'),container:'#inspector-panel-report',testids:['report-streams','saved-evidence','controller-verification'],ids:['twin-report-summary','twin-import-evidence']},
@@ -72,10 +72,27 @@ test.describe.serial('viewport-first twin layout',()=>{
   await expect(page.getByTestId('run-status')).toContainText('Đang chạy');
   for(const s of ['twin-scene','twin-fallback-note','next-action'].map(sel))expect(await page.locator('.twin-viewport').locator(s).count(),s).toBe(await page.locator(s).count());
   for(const row of ROWS.filter(r=>r.name!=='setup')){await rowReachable(page,row);await shot(page,`${row.name}-desktop-vi`);}
+  // the app-wide honesty notes the twin page no longer shows in a footer/strip live in the Display menu
+  await openDisplayMenu(page);
+  await expect(page.getByTestId('honesty-notes')).toContainText('Mô hình minh họa · chưa nghiệm thu phần cứng');
+  await expect(page.getByTestId('honesty-notes')).toContainText('Source runtime · chỉ mô phỏng nghiệp vụ');
   await page.getByTestId('runtime-chip').click();
   await expect(page.getByTestId('runtime-popover')).toBeVisible();
   await page.getByTestId('runtime-chip').click();
   await expect(page.getByTestId('runtime-popover')).toBeHidden();
+ });
+
+ test('a re-render keeps the scroll position of an inspector tab',async()=>{
+  await openInspector(page,'objects');
+  await page.getByTestId('entity-list').getByRole('button',{name:/Cánh tay 1/}).click();
+  await openInspector(page,'engineering');
+  const panel=page.locator('#inspector-panel-engineering');
+  expect(await panel.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeGreaterThan(60);
+  const before=await panel.evaluate(el=>{el.scrollTop=60;return el.scrollTop;});
+  const tick=await page.getByTestId('run-tick').textContent();
+  await page.getByRole('button',{name:'+5 s'}).click();
+  await expect(page.getByTestId('run-tick')).not.toHaveText(tick!);
+  expect(Math.abs(await panel.evaluate(el=>el.scrollTop)-before)).toBeLessThanOrEqual(1);
  });
 
  test('a completed run still fits the window with the inspector closed and on every tab',async()=>{
