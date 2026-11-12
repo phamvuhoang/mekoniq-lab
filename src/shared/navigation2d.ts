@@ -1,4 +1,4 @@
-// Synced from source packages/contracts/generated/navigation2d.ts @ 0891f96dd3f9fc3f6d6c120153152dd1f9a17336 (sha256 ff0bf89c51cbd89ca8b994b65b3f39a992b1b156999558b83dfafa3a111a051c). Run node scripts/sync-engineering-contracts.mjs; do not edit.
+// Synced from source packages/contracts/generated/navigation2d.ts @ a5f1df195066f212776415f40838d75a9db234af (sha256 15cf4131cc1f3dfe7bd488f16a13d12c82940d87efc71506a3bed0302269cdab). Run node scripts/sync-engineering-contracts.mjs; do not edit.
 /* Generated from the navigation/validation schemas. Run pnpm contracts:generate; do not edit. */
 import type { Digest, EngineeringId, Link, Joint, Pose, Scalar, SensorModel, SourceRef } from './engineering';
 /**
@@ -227,7 +227,7 @@ export type Sim3DRequestV1 =
          */
         arms?: {
           armId: EngineeringId;
-          sceneRef: 'arm-scene.json';
+          sceneRef: 'arm-scene.json' | 'arm-cell-scene.json';
         }[];
       };
     }
@@ -1235,6 +1235,10 @@ export interface Sim3DModelReadbackV1 {
       axis: number[];
       lower: number;
       upper: number;
+      /**
+       * The joint actuator's force (torque, N*m for a hinge) limit as the engine loaded it; MuJoCo plant only.
+       */
+      forceN?: number;
     }[];
   };
 }
