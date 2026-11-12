@@ -14,10 +14,18 @@ const ROS_TO_THREE:Q=about(0,-Math.PI/2),THREE_TO_ROS:Q=about(0,Math.PI/2);
 export function bodyPlacement(p:BasePose,centerHeightM:number,baseHeightM:number):Placement{
  const three=p.z!==undefined&&p.rollRad!==undefined&&p.pitchRad!==undefined&&[p.z,p.rollRad,p.pitchRad,p.yawRad].every(Number.isFinite);
  if(!three)return {position:[p.x,centerHeightM,-p.y],quaternion:[0,0,0,1]};
- const ros=mul(mul(about(2,p.yawRad),about(1,p.pitchRad!)),about(0,p.rollRad!)),[qx,qy,qz,qw]=ros,c=centerHeightM-baseHeightM;
+ return placeBody([p.x,p.y,p.z!],rosQuat(p.yawRad,p.pitchRad!,p.rollRad!),centerHeightM-baseHeightM);
+}
+/** ROS orientation (x, y, z, w) of yaw about z, then pitch about y, then roll about x. */
+export const rosQuat=(yawRad:number,pitchRad:number,rollRad:number):Q=>mul(mul(about(2,yawRad),about(1,pitchRad)),about(0,rollRad));
+/** Yaw of a ROS orientation (the inverse of rosQuat's first rotation). */
+export const yawOf=([x,y,z,w]:readonly number[]):number=>Math.atan2(2*(w!*z!+x!*y!),1-2*(y!*y!+z!*z!));
+/** A body whose centre sits `c` above the ROS base origin `position` along its own up axis, with ROS orientation `ros`, placed in the three.js scene. */
+export function placeBody(position:readonly number[],ros:readonly number[],c:number):Placement{
+ const [qx,qy,qz,qw]=ros as Q;
  // R * (0, 0, c): the third column of the rotation matrix of `ros`, scaled
- const up=[2*(qx*qz+qy*qw),2*(qy*qz-qx*qw),1-2*(qx*qx+qy*qy)],rosCenter=[p.x+c*up[0]!,p.y+c*up[1]!,p.z!+c*up[2]!];
- return {position:[rosCenter[0]!,rosCenter[2]!,-rosCenter[1]!],quaternion:mul(mul(ROS_TO_THREE,ros),THREE_TO_ROS)}; // a mesh's own axes are three's (y up): conjugate the ROS rotation into them
+ const up=[2*(qx*qz+qy*qw),2*(qy*qz-qx*qw),1-2*(qx*qx+qy*qy)],rosCenter=[position[0]!+c*up[0]!,position[1]!+c*up[1]!,position[2]!+c*up[2]!];
+ return {position:[rosCenter[0]!,rosCenter[2]!,-rosCenter[1]!],quaternion:mul(mul(ROS_TO_THREE,ros as Q),THREE_TO_ROS)}; // a mesh's own axes are three's (y up): conjugate the ROS rotation into them
 }
 /** The optional 3D fields of an AMR sample's `observed` (zM, rollRad, pitchRad), all three or none: a partial or non-numeric set is no 3D pose. */
 export function pose3dOf(observed:Record<string,unknown>|null|undefined):{z?:number;rollRad?:number;pitchRad?:number}{

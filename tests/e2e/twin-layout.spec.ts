@@ -35,7 +35,11 @@ test.describe.serial('viewport-first twin layout',()=>{
  test.skip(!token,'Run scripts/test-mock-e2e.mjs twin-layout.spec.ts: it starts the pinned source runtime and supplies its one-time token.');
  test.describe.configure({timeout:180000});
  let page:Page;
- test.beforeAll(async({browser})=>{page=await browser.newPage({viewport:{width:1440,height:900}});});
+ test.beforeAll(async({browser})=>{
+  page=await browser.newPage({viewport:{width:1440,height:900}});
+  // counts the page's own animation frames (Playwright's actionability checks run in another world)
+  await page.addInitScript(()=>{const w=window as unknown as {rafCalls:number},raf=window.requestAnimationFrame.bind(window);w.rafCalls=0;window.requestAnimationFrame=cb=>{w.rafCalls++;return raf(cb);};});
+ });
  test.afterAll(async()=>{await page.close();});
 
  test('first open: level 1 only, the inspector closed, no vertical scroll and a dominant viewport',async()=>{
@@ -91,6 +95,51 @@ test.describe.serial('viewport-first twin layout',()=>{
   await expect(page.getByTestId('runtime-popover')).toBeVisible();
   await page.getByTestId('runtime-chip').click();
   await expect(page.getByTestId('runtime-popover')).toBeHidden();
+ });
+
+ test('3D (U04): the scene is kept while samples play; camera home and fit; a layer from the Display menu; reduced motion has no animation loop',async()=>{
+  const canvas=page.getByTestId('twin-scene').locator('canvas'),tick=page.getByTestId('run-tick'),transport=page.getByTestId('twin-transport');
+  let start:(()=>Promise<void>)|undefined;
+  const rafs=()=>page.evaluate(()=>(window as unknown as {rafCalls:number}).rafCalls),attr=async(n:string)=>(await canvas.getAttribute(n))!;
+  const auto=async(ms:number,watch?:()=>Promise<void>,settle=0)=>{
+   await transport.getByRole('button',{name:'Tự chạy',exact:true}).click();await page.waitForTimeout(settle);await start?.();
+   const until=Date.now()+ms;while(Date.now()<until){await watch?.();await page.waitForTimeout(200);}
+   await transport.getByRole('button',{name:'Tạm dừng tự chạy'}).click();
+   await expect(transport.getByRole('button',{name:'Tự chạy',exact:true})).toBeEnabled({timeout:30000});
+  };
+  await expect(canvas).toHaveAttribute('data-camera',/^-?\d+\.\d{3},/);
+  // 5 s of auto-run: the tick moves on every sample batch and the scene is not rebuilt for it; only a change of the set of objects (a new cup) rebuilds it
+  const objects=()=>page.locator('#twin-entity-list [data-action="twin-select"]').evaluateAll(b=>b.map(x=>(x as HTMLElement).dataset.value).join());
+  let r0=0,before=0;const ticks=new Set<string|null>(),sets=new Set<string>();
+  start=async()=>{r0=Number(await attr('data-rebuilds'));before=await rafs();sets.add(await objects());};
+  await auto(5000,async()=>{ticks.add(await tick.textContent());sets.add(await objects());},1000);start=undefined;
+  const rebuilt=Number(await attr('data-rebuilds'))-r0;
+  expect(rebuilt,'rebuilt only when the set of objects changed').toBeLessThanOrEqual(sets.size-1);
+  expect(ticks.size,'the tick moved many times without a rebuild').toBeGreaterThan(rebuilt+5);
+  expect(await rafs(),'live samples are played on animation frames').toBeGreaterThan(before);
+  // camera: orbit away, home brings it back; fit (key f, nothing selected) frames the whole scene
+  const home=await attr('data-camera'),box=(await canvas.boundingBox())!,[cx,cy]=[box.x+box.width/2,box.y+box.height/2];
+  await page.mouse.move(cx,cy);await page.mouse.down();await page.mouse.move(cx+140,cy+40,{steps:6});await page.mouse.up();
+  await expect(canvas).not.toHaveAttribute('data-camera',home);
+  await page.getByRole('button',{name:'Về góc nhìn gốc'}).click();
+  await expect(canvas).toHaveAttribute('data-camera',home);
+  await page.keyboard.press('f');
+  await expect(canvas).not.toHaveAttribute('data-camera',home);
+  await page.getByRole('button',{name:'Về góc nhìn gốc'}).click();
+  // the Display menu turns a layer on and off: that is a structural change
+  await openDisplayMenu(page);
+  const frames=page.getByTestId('display-menu').locator('[data-action="twin-layer"][data-value="frames"]'),r1=Number(await attr('data-rebuilds'));
+  await frames.click();await expect(frames).toHaveAttribute('aria-pressed','true');
+  await expect.poll(async()=>Number(await attr('data-rebuilds'))).toBeGreaterThan(r1);
+  await frames.click();await expect(frames).toHaveAttribute('aria-pressed','false');
+  await page.locator('[data-action="twin-display-toggle"]').click();
+  // reduced motion: no animation loop, the view is still redrawn per sample
+  await page.emulateMedia({reducedMotion:'reduce'});
+  const still=await canvas.screenshot(),f0=await rafs();
+  await auto(3000);
+  expect(await rafs(),'no animation frame with reduced motion').toBe(f0);
+  expect((await canvas.screenshot()).equals(still),'the view follows the samples').toBe(false);
+  await page.emulateMedia({reducedMotion:'no-preference'});
  });
 
  test('a re-render keeps the scroll position of an inspector tab',async()=>{

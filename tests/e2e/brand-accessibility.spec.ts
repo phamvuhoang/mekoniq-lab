@@ -1,12 +1,19 @@
-import {test,expect} from '@playwright/test';
+import {test,expect,type Page} from '@playwright/test';
 import axe from 'axe-core';
+import {openDisplayMenu,openInspector} from '../support/twin';
 declare global { interface Window { axe: typeof axe } }
+const serious=(page:Page)=>page.evaluate(async()=>{const result=await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa','wcag22aa']}});return result.violations.filter(v=>v.impact==='serious'||v.impact==='critical').map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)}));});
+const open=async(page:Page,route:string)=>{await page.emulateMedia({reducedMotion:'reduce'});await page.goto('/#'+route);await page.evaluate(()=>document.fonts.ready);await page.addScriptTag({content:axe.source});};
 for(const route of ['design','restaurant','scenarios','twin','results','deployment'])test(`accessible brand surface: ${route}`,async({page})=>{
- await page.emulateMedia({reducedMotion:'reduce'});
- await page.goto('/#'+route);await page.evaluate(()=>document.fonts.ready);
- await page.addScriptTag({content:axe.source});
- const violations=await page.evaluate(async()=>{const result=await window.axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa','wcag22aa']}});return result.violations.filter(v=>v.impact==='serious'||v.impact==='critical').map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)}));});
- expect(violations).toEqual([]);
+ await open(page,route);
+ expect(await serious(page)).toEqual([]);
+});
+test('accessible twin page: each details tab open, then the Display menu open (with the viewport tool buttons)',async({page})=>{
+ await open(page,'twin');
+ for(const tab of ['objects','engineering','report','setup'] as const){await openInspector(page,tab);expect(await serious(page),tab).toEqual([]);}
+ await openDisplayMenu(page);
+ await expect(page.locator('[data-action="twin-help"]').first()).toBeVisible();
+ expect(await serious(page),'display menu').toEqual([]);
 });
 test('compact heading controls retain touch targets',async({page})=>{
  await page.setViewportSize({width:390,height:844});await page.goto('/#design');

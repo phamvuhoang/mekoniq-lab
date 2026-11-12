@@ -8,7 +8,7 @@ import {backendSetOptions} from '../scenarios/support';
 import {loadNavigationScene} from '../scenarios/engineering';
 import {boundNavigationScene,importNavigationEvidence} from '../reports/navigation2d';
 import type {NavigationSceneV1} from '../shared/navigation2d';
-import {pose3dOf} from '../twin/pose3d';
+import {pose3dOf,rosQuat} from '../twin/pose3d';
 import {IRSIM_PROFILE,WEBOTS_ARM_SET,WEBOTS_PROFILE,type EngineeringPresetInput} from '../scenarios/catalog';
 import {layerProvenance} from '../twin/overlays';
 import {presets,presetById,nameOf,type TwinPreset} from '../scenarios/catalog';
@@ -25,9 +25,11 @@ import {transportBar,transportTime,type TransportState} from './transport';
 import {keyAction,shortcutsDialog} from './keys';
 import {inspector,loadUi,saveUi,type InspectorTab} from './inspector';
 import {engineeringPanel,engineeringInspection} from './engineering-panel';
-import type {Twin3d} from '../viewer/twin3d';
+import type {Twin3d,TwinPoses} from '../viewer/twin3d';
+import {SampleBuffer,lerpJoints,lerpPose} from '../twin/sample-buffer';
+import {armJointsView,displayJoints} from '../twin/arm/arm-telemetry';
 import {icon,esc} from './icons';
-import {TwinStore} from '../twin/store';
+import {TwinStore,type Held} from '../twin/store';
 import {freshness,type Link} from '../twin/freshness';
 import {openRunStreams,type LinkState} from '../runtime/stream';
 import {openReplayV2} from '../reports/replay';
@@ -51,7 +53,9 @@ export class TwinWorkspace {
  private runPreset:TwinPreset|null=null;
  private view:RunView|null=null;private report:RunReport|null=null;private seen:Record<string,number>={};
  private vs:ViewState={view:innerWidth<768?'2d':'3d',layers:defaultLayers(),selected:null};
- private webglFailed=false;private viewer:Twin3d|null=null;private mounting=false;
+ private webglFailed=false;private viewer:Twin3d|null=null;private mounting=false;private v3d:typeof import('../viewer/twin3d')|null=null;
+ /** D58: one sim-time playback buffer per entity (live runs only); `at` is when its newest sample arrived. The frame's exact poses are what it overrides. */
+ private bufs=new Map<string,{src:string;b:SampleBuffer<number[]>;at:number}>();private exact:TwinPoses|null=null;private raf=0;
  /** Telemetry (lossy) lives in the store; the durable view only changes from action receipts, resets and polled snapshots. */
  private store=new TwinStore();private link:Link={state:'closed',lastHeartbeatMs:null,paused:false};private streams:ReturnType<typeof openRunStreams>|null=null;private streamRun='';
  private business=0;private ticker:ReturnType<typeof setInterval>|undefined;private painted='';private refreshing=false;
@@ -117,7 +121,7 @@ export class TwinWorkspace {
   const now=performance.now(),n=JSON.stringify([this.store.stats.applied,this.store.stats.epochResets,this.link.state,this.link.paused,this.vs.selected,this.store.entities().map(s=>{const f=freshness(s,this.link,now);return [s.entityId,f.state,f.reason];})]);
   if(n===this.painted&&!this.replay)return;this.painted=n;
   const f=this.frame();
-  if(this.vs.view==='2d'){const st=document.getElementById('twin-stage');if(st)st.innerHTML=renderTwin(f,this.vs);}else this.viewer?.update(f,this.vs);
+  if(this.vs.view==='2d'){const st=document.getElementById('twin-stage');if(st)st.innerHTML=renderTwin(f,this.vs);}else this.paint3d(f);
   const inspector=document.getElementById('twin-inspector');if(inspector)inspector.innerHTML=engineeringInspection(inspect(f,this.vs.selected,f.seen??this.seen));
   if(this.replay){
    for(const [id,html] of [['twin-run-bar',this.bar(f)],['twin-objects',this.objects(f)],['twin-identity',this.identity(f)],['twin-next',this.strip(f)]] as const){const el=document.getElementById(id);if(el)el.outerHTML=html;}
@@ -126,18 +130,47 @@ export class TwinWorkspace {
    const summary=document.getElementById('twin-report-summary');if(summary&&f.report)summary.outerHTML=reportSummary(f.report,this.business);
   }
  }
+ /** Animate only a live run that had a sample in the last second, in 3D, without reduced motion; otherwise the view is drawn per sample. */
+ private animating(now:number){return this.vs.view==='3d'&&!!this.viewer&&!this.replay&&this.link.state==='live'&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&[...this.bufs.values()].some(e=>now-e.at<1000);}
+ private loop=()=>{this.raf=0;const now=performance.now();if(!this.exact||!this.animating(now))return;this.viewer!.pose(this.posed(this.exact,now));this.raf=requestAnimationFrame(this.loop);};
+ /** Structure and the frame's exact poses, then (same task, so the newest sample never flashes) the buffered poses while animating. Replay: exact only. */
+ private paint3d(f:TwinFrame){
+  const v=this.viewer;if(!v||!this.v3d)return;v.update(f,this.vs);this.exact=this.replay?null:this.v3d.posesOf(f);
+  const now=performance.now();if(this.exact&&this.animating(now)){v.pose(this.posed(this.exact,now));if(!this.raf)this.raf=requestAnimationFrame(this.loop);}
+ }
+ /** The exact poses with each live entity's buffered value; a stale or lost entity keeps its exact (frozen) pose. */
+ private posed(p:TwinPoses,now:number):TwinPoses{
+  const arms={...p.arms},bodies={...p.bodies};
+  for(const [id,e] of this.bufs){
+   if(freshness(this.store.entity(id),this.link,now).state!=='live')continue;const v=e.b.at(now);if(!v)continue;
+   if(e.src.startsWith('pose')){if(bodies[id])bodies[id]={positionM:[v[0]!,v[1]!,v[3]??0],quaternionXyzw:rosQuat(v[2]!,v[5]??0,v[4]??0)};}else if(arms[id])arms[id]={...arms[id]!,jointsRad:v};
+  }
+  return {arms,bodies};
+ }
+ /** Into the entity's buffer: arm joints (observed, else commanded) or an AMR base pose. A stale sample, a change of display source or an epoch reset
+  * clears the buffer instead of interpolating across it. */
+ private feed(h:Held,reset:boolean){
+  const d=displayJoints(null,armJointsView(h,h.receivedAtMs)),o=h.observed,p3=pose3dOf(o);let src:string|null=null,val:number[]=[];
+  if(d.jointsRad){if(!d.frozen){src=d.source;val=d.jointsRad;}}
+  else if(h.quality==='valid'&&typeof o?.xM==='number'&&typeof o.yM==='number'&&typeof o.yawRad==='number'){src=p3.z===undefined?'pose':'pose3d';val=[o.xM,o.yM,o.yawRad,...p3.z===undefined?[]:[p3.z,p3.rollRad!,p3.pitchRad!]];}
+  let e=this.bufs.get(h.entityId);
+  if(!src||h.simTimeNs===null){this.bufs.delete(h.entityId);return;}
+  if(reset||e?.src!==src){e={src,b:new SampleBuffer<number[]>(src.startsWith('pose')?lerpPose:lerpJoints),at:0};this.bufs.set(h.entityId,e);}
+  e.b.push(BigInt(h.simTimeNs),h.receivedAtMs,val);e.at=h.receivedAtMs;
+  if(!this.raf&&this.exact&&this.animating(performance.now()))this.raf=requestAnimationFrame(this.loop);
+ }
  private openStreams(v:RunView){
   if(this.streamRun===v.run.id&&this.streams&&!['session_lost','run_lost','closed'].includes(this.streams.state))return;
-  this.streams?.close();this.store=new TwinStore();this.business=0;this.streamRun=v.run.id;this.link={state:'connecting',lastHeartbeatMs:null,paused:false};
+  this.streams?.close();this.store=new TwinStore();this.bufs.clear();this.business=0;this.streamRun=v.run.id;this.link={state:'connecting',lastHeartbeatMs:null,paused:false};
   this.streams=openRunStreams<RunView,Parameters<TwinStore['apply']>[0]>(v.run.id,v.run.eventCursor,{
-   onSample:s=>{this.store.apply(s);},onGap:g=>this.store.gap(g as never),
+   onSample:s=>{const r=this.store.apply(s);if(r==='applied'||r==='epoch_reset')this.feed(this.store.entity(s.entityId)!,r==='epoch_reset');},onGap:g=>{this.store.gap(g as never);this.bufs.clear();},
    onHeartbeat:h=>{this.link={...this.link,lastHeartbeatMs:performance.now(),paused:h.paused};if(!this.busy&&!this.refreshing&&this.view&&h.runRevision!==this.view.run.runRevision)void this.refresh();},
    onBusiness:e=>{this.business++;const c=this.view?.run.eventCursor;if(!this.busy&&!this.refreshing&&this.view&&(c==null||BigInt(e.sequence)>BigInt(c)))void this.refresh();},
    onReset:(snap,reason)=>{this.notice=`${tr('Đồng bộ lại từ snapshot','スナップショットから再同期','Resynchronised from a snapshot')}: ${reason}`;if(!this.busy)void this.apply(snap).then(()=>this.rerender());},
    onSnapshot:snap=>{if(!this.busy&&snap.run.runRevision!==this.view?.run.runRevision)void this.apply(snap).then(()=>this.rerender());},
    onState:st=>{this.link={...this.link,state:st};
     // telemetry is not replayed after a drop: the hole is recorded as an explicit local gap
-    if(st==='reconnecting'||st==='runtime_lost')this.store.gap({reason:`LINK_${st.toUpperCase()}`});
+    if(st==='reconnecting'||st==='runtime_lost'){this.store.gap({reason:`LINK_${st.toUpperCase()}`});this.bufs.clear();}
     if(st==='session_lost'){this.rt.forget();this.playing=false;this.ui.runtimeOpen=true;this.notice=tr('Runtime đã mất phiên (khởi động lại?). Ghép nối lại; lần chạy trong bộ nhớ không mở lại được, báo cáo cuối vẫn xem được.','ランタイムのセッションが失われました(再起動?)。再ペアリングしてください。メモリ上の実行は再開できませんが、最後のレポートは閲覧できます。','The runtime lost the session (restarted?). Pair again; the in-memory run cannot be reopened, the last report stays viewable.');this.rerender();}
     else if(st==='run_lost'||st==='runtime_lost'){this.playing=false;this.rerender();}
     else this.tick();}},
@@ -227,8 +260,9 @@ export class TwinWorkspace {
   const legendHtml=`<ul class="twin-legend" data-testid="twin-legend" aria-label="${tr('Chú giải','凡例','Legend')}">${legend().map(x=>`<li><i class="mark ${x.mark}" aria-hidden="true"></i><b>${x.label}</b><small>${x.note}</small></li>`).join('')}</ul>`;
   const display=`<div class="twin-popover twin-display-menu" id="twin-display-menu" data-testid="display-menu" role="group" aria-labelledby="twin-scene-title"${this.ui.displayOpen?'':' hidden'}><h2 id="twin-scene-title" class="small-code">${esc(p.project.name)} · ${p.project.world.width} × ${p.project.world.height} m</h2>${viewSwitch}${layers}
 ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớp vùng chiếm chỗ thể hiện hình học mô hình.','3D形状は模式図です。占有領域レイヤーがモデル形状を示します。','3D shapes are schematic. The footprint layer shows model geometry.')}</p>`:''}${legendHtml}<p class="source-note">${icon('info',15)}${tr('Cảnh chỉ đọc: vị trí lấy từ runtime, canvas không quyết định đến đích hay hoàn thành.','表示は読み取り専用。位置はランタイムから取得し、描画は到着や完了を判定しません。','Read-only scene: positions come from the runtime; the canvas never decides arrival or completion.')}</p><p class="source-note" data-testid="honesty-notes">${icon('info',15)}${esc(illustrativeNote())} · ${esc(businessSimulationNote())}</p></div>`;
+  const tool=(a:string,ic:string,label:string)=>`<button class="icon-button twin-tool" data-action="${a}" aria-label="${label}" title="${label}">${icon(ic,18)}</button>`;
   const viewport=`<section class="twin-viewport" aria-label="${tr('Khung nhìn','ビューポート','Viewport')}"><div class="twin-stage" id="twin-stage" data-testid="twin-scene">${renderTwin(f,this.vs)}</div>
-<div class="twin-viewport-tools"><button class="button quiet" data-action="twin-display-toggle" aria-expanded="${this.ui.displayOpen}" aria-controls="twin-display-menu">${icon('design',16)}${tr('Hiển thị','表示','Display')}</button>${display}</div>
+<div class="twin-viewport-tools"><div class="twin-tool-row">${this.vs.view==='3d'&&!this.webglFailed?tool('twin-camera-home','home',tr('Về góc nhìn gốc','初期視点に戻す','Reset the camera'))+tool('twin-camera-fit','fit',tr('Vừa khung đối tượng chọn (không chọn: cả cảnh)','選択対象に合わせる(未選択なら全体)','Fit the selected object (none: the whole scene)')):''}${tool('twin-watch','eye',tr('Chế độ xem','視聴モード','Watch mode'))}${tool('twin-help','keyboard',tr('Phím tắt','キーボードショートカット','Keyboard shortcuts'))}<button class="button quiet" data-action="twin-display-toggle" aria-expanded="${this.ui.displayOpen}" aria-controls="twin-display-menu">${icon('design',16)}${tr('Hiển thị','表示','Display')}</button></div>${display}</div>
 ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(this.notice)}</span><button aria-label="${tr('Đóng','閉じる','Dismiss')}" data-action="twin-dismiss">${icon('cross',16)}</button></div>`:''}
 <div class="twin-overlay">${this.webglFailed?`<p class="source-note" data-testid="twin-fallback-note" role="status">${icon('info',15)}${tr('WebGL không khả dụng · đang hiển thị mặt bằng 2D với cùng dữ liệu và lựa chọn.','WebGLを利用できません · 同じデータと選択で2D平面図を表示中。','WebGL unavailable · showing the 2D plan with the same data and selection.')}</p>`:''}${this.strip(f)}</div></section>`;
   const list=`<ul class="entity-list" id="twin-entity-list" data-testid="entity-list" aria-label="${tr('Đối tượng trong twin','ツイン内の対象','Twin objects')}">${this.entityList(f)}</ul>`;
@@ -258,18 +292,18 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   if(this.confirming||this.reconcileTargets.length){const d=document.getElementById('twin-confirm') as HTMLDialogElement|null;if(d&&!d.open)d.showModal();d?.addEventListener('cancel',()=>{this.confirming=null;this.reconcileTargets=[];},{once:true});}
   const stage=document.getElementById('twin-stage');
   if(!stage||this.vs.view!=='3d'||this.webglFailed)return;
-  if(this.viewer){this.viewer.attach(stage);this.viewer.update(this.frame(),this.vs);return;}
+  if(this.viewer){this.viewer.attach(stage);this.paint3d(this.frame());return;}
   if(this.mounting)return;this.mounting=true;
-  void import('../viewer/twin3d').then(({mountTwin3d})=>{
+  void import('../viewer/twin3d').then(m=>{this.v3d=m;
    this.mounting=false;
    const now=document.getElementById('twin-stage');if(!now||this.vs.view!=='3d')return;
-   const v=mountTwin3d(now,id=>selectEntity(id),()=>this.fallback());
+   const v=m.mountTwin3d(now,id=>selectEntity(id),()=>this.fallback());
    if(!v)return this.fallback();
-   this.viewer=v;v.update(this.frame(),this.vs);
+   this.viewer=v;this.paint3d(this.frame());
   },()=>{this.mounting=false;this.fallback();});
  }
  private fallback(){this.viewer?.dispose();this.viewer=null;this.webglFailed=true;this.vs={...this.vs,view:'2d'};this.rerender();}
- leave(){if(this.keys){document.removeEventListener('keydown',this.onKey);this.keys=false;}this.ui.watch=false;this.helpOpen=false;this.playing=false;this.viewer?.dispose();this.viewer=null;this.streams?.close();this.streams=null;clearInterval(this.ticker);clearTimeout(this.readinessExpiry);this.stopReplay();}
+ leave(){if(this.raf)cancelAnimationFrame(this.raf);this.raf=0;if(this.keys){document.removeEventListener('keydown',this.onKey);this.keys=false;}this.ui.watch=false;this.helpOpen=false;this.playing=false;this.viewer?.dispose();this.viewer=null;this.streams?.close();this.streams=null;clearInterval(this.ticker);clearTimeout(this.readinessExpiry);this.stopReplay();}
  private stopReplay(){clearInterval(this.replayTimer);this.replayTimer=undefined;if(this.replay)this.replay.playing=false;}
  private track(v:RunView){for(const c of v.coffee?.cups??[]){const k=`${c.cupId}:${c.ownerKind}:${c.ownerId}`;if(!(k in this.seen))this.seen[k]=v.tick;}}
  private async call(task:()=>Promise<void>){
@@ -335,6 +369,8 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   if(action==='twin-toggle-play')return this.click(this.replay?'twin-replay-play':this.playing?'twin-stop':'twin-play');
   if(action==='twin-watch'){this.ui={...this.ui,watch:!this.ui.watch};return this.rerender();}
   if(action==='twin-help'){this.helpOpen=!this.helpOpen;return this.rerender();}
+  if(action==='twin-camera-home')return this.viewer?.home();
+  if(action==='twin-camera-fit')return this.viewer?.fit(this.vs.selected);
   // one step per press: watch mode, then the open run-bar/viewport box, then the key list, then the inspector; the modal confirm closes itself
   if(action==='twin-escape'){
    const u=this.ui,box=Object.values(BOXES).find(k=>u[k]);if(this.confirming||this.reconcileTargets.length)return;// the modal confirm owns Escape (onKey leaves it alone)

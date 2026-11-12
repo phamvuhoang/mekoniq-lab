@@ -2296,6 +2296,9 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 .twin-viewport{position:relative;min-height:0;border-radius:10px;overflow:hidden;background:#0d1a20}
 .twin-viewport-tools{position:absolute;top:8px;right:8px;bottom:8px;z-index:3;display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:calc(100% - 16px);pointer-events:none}
 .twin-viewport-tools>*{pointer-events:auto}
+.twin-tool-row{display:flex;align-items:center;gap:6px}
+.twin-tool-row .icon-button{background:var(--panel);color:var(--ink)}
+#twin-fault-schedule>summary{min-height:24px;cursor:pointer}
 .twin-display-menu{position:static;min-height:0;width:min(360px,calc(100vw - 48px));max-height:none}
 .twin-display-menu h2{margin:0 0 8px;font-size:13px}
 .twin-viewport .notice{position:absolute;top:8px;left:8px;z-index:2;max-width:min(560px,calc(100% - 200px));margin:0}

@@ -22,6 +22,10 @@ const paths: Record<string, string> = {
   lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/>',
   undo: '<path d="m8 3-5 5 5 5M3 8h10a7 7 0 0 1 0 14"/>',
   cross: '<path d="m6 6 12 12M6 18 18 6"/>',
+  home: '<path d="m3 11 9-8 9 8M5 9v12h14V9"/>',
+  fit: '<path d="M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5"/>',
+  eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
   coffee:
     '<path d="M4 8h13v7a6 6 0 0 1-12 0V8Zm13 1h2a3 3 0 0 1 0 6h-2M8 2v3m5-3v3M3 22h16"/>',
   heat: '<path d="M12 3c1 5 7 7 7 12a7 7 0 0 1-14 0c0-3 2-5 4-7 0 4 2 5 3 5 2-2 1-5 0-10Z"/>',
