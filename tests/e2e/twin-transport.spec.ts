@@ -125,4 +125,23 @@ test.describe.serial('transport bar, keys and watch mode',()=>{
   await expect(cursor).toHaveCount(0);
   await expect(page.getByTestId('run-tick')).toHaveText(done!);
  });
+ test('Escape closes the modal confirm dialog (its native cancel), and the dialog opens again',async()=>{
+  await page.getByTestId('primary-action').click();// run again with the same inputs
+  await expect(page.getByTestId('run-status')).toContainText('Đang chạy');
+  await openInspector(page,'engineering');
+  await page.locator('#twin-fault').selectOption('cup-removed');
+  await page.getByRole('button',{name:'Chèn lỗi'}).click();
+  await expect(page.getByTestId('run-status')).toContainText('Cần kiểm tra');
+  await expect(page.getByTestId('primary-action')).toHaveText('Đối soát');
+  const confirm=page.locator('#twin-confirm');
+  await page.getByTestId('primary-action').click();
+  await expect(confirm).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(confirm).toBeHidden();
+  await expect(page.getByTestId('twin-inspector')).toBeVisible();// the Escape went to the dialog, not to the page's own steps
+  await page.getByTestId('primary-action').click();
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole('button',{name:'Hủy'}).click();
+  await expect(confirm).toHaveCount(0);
+ });
 });

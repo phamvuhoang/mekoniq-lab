@@ -70,8 +70,9 @@ export class TwinWorkspace {
  /** Keys (D66) while the page is shown: registered in mounted() (the same listener is added once), removed in leave(). */
  private onKey=(e:KeyboardEvent)=>{
   const t=e.target as HTMLElement|null;
-  // the app already acted on it (Space/Enter on a scene object), or Space on a control keeps its native meaning
-  if(e.defaultPrevented||e.key===' '&&t?.closest?.('button,a[href],summary,[role="button"],[data-action]'))return;
+  // the app already acted on it (Space/Enter on a scene object), Space on a control keeps its native meaning, and an open modal
+  // (the confirm dialog) keeps its own keys: cancelling its Escape would suppress the dialog's close request
+  if(e.defaultPrevented||document.querySelector('dialog:modal')||e.key===' '&&t?.closest?.('button,a[href],summary,[role="button"],[data-action]'))return;
   const a=keyAction({key:e.key,ctrlKey:e.ctrlKey,metaKey:e.metaKey,altKey:e.altKey,target:t},!!document.querySelector('dialog[open]'));
   if(a){e.preventDefault();this.click(a);}
  };
@@ -336,7 +337,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   if(action==='twin-help'){this.helpOpen=!this.helpOpen;return this.rerender();}
   // one step per press: watch mode, then the open run-bar/viewport box, then the key list, then the inspector; the modal confirm closes itself
   if(action==='twin-escape'){
-   const u=this.ui,box=Object.values(BOXES).find(k=>u[k]);if(this.confirming||this.reconcileTargets.length)return;
+   const u=this.ui,box=Object.values(BOXES).find(k=>u[k]);if(this.confirming||this.reconcileTargets.length)return;// the modal confirm owns Escape (onKey leaves it alone)
    if(u.watch)this.ui={...u,watch:false};else if(box)this.ui={...u,[box]:false};else if(this.helpOpen)this.helpOpen=false;else if(u.inspectorOpen){this.ui={...u,inspectorOpen:false};saveUi(this.ui);}else return;
    return this.rerender();
   }
