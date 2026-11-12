@@ -110,13 +110,16 @@ test.describe.serial('viewport-first twin layout',()=>{
   await expect(canvas).toHaveAttribute('data-camera',/^-?\d+\.\d{3},/);
   // 5 s of auto-run: the tick moves on every sample batch and the scene is not rebuilt for it; only a change of the set of objects (a new cup) rebuilds it
   const objects=()=>page.locator('#twin-entity-list [data-action="twin-select"]').evaluateAll(b=>b.map(x=>(x as HTMLElement).dataset.value).join());
-  let r0=0,before=0;const ticks=new Set<string|null>(),sets=new Set<string>();
-  start=async()=>{r0=Number(await attr('data-rebuilds'));before=await rafs();sets.add(await objects());};
+  let r0=0,o0=0,before=0;const ticks=new Set<string|null>(),sets=new Set<string>();
+  start=async()=>{r0=Number(await attr('data-rebuilds'));o0=Number(await attr('data-overlay-builds'));before=await rafs();sets.add(await objects());};
   await auto(5000,async()=>{ticks.add(await tick.textContent());sets.add(await objects());},1000);start=undefined;
   const rebuilt=Number(await attr('data-rebuilds'))-r0;
   expect(rebuilt,'rebuilt only when the set of objects changed').toBeLessThanOrEqual(sets.size-1);
   expect(ticks.size,'the tick moved many times without a rebuild').toBeGreaterThan(rebuilt+5);
-  expect(await rafs(),'live samples are played on animation frames').toBeGreaterThan(before);
+  const rafN=await rafs()-before,overlays=Number(await attr('data-overlay-builds'))-o0;
+  expect(rafN,'live samples are played on animation frames').toBeGreaterThan(0);
+  // an animation frame changes transforms only: the overlays (path, footprint) are not rebuilt per frame
+  expect(overlays,`overlay builds ${overlays} over ${rafN} animation frames`).toBeLessThan(rafN/4);
   // camera: orbit away, home brings it back; fit (key f, nothing selected) frames the whole scene
   const home=await attr('data-camera'),box=(await canvas.boundingBox())!,[cx,cy]=[box.x+box.width/2,box.y+box.height/2];
   await page.mouse.move(cx,cy);await page.mouse.down();await page.mouse.move(cx+140,cy+40,{steps:6});await page.mouse.up();

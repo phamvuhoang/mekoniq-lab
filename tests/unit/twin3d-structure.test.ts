@@ -2,7 +2,7 @@
 // source) rebuilds it. A new pose or joint angle never does.
 import {expect,test,vi} from 'vitest';
 vi.hoisted(()=>{(globalThis as Record<string,unknown>).localStorage={getItem:()=>'en',setItem:()=>{}};});
-import {posesOf,structureKey} from '../../src/viewer/twin3d';
+import {anchoredOverlays,posesOf,structureKey} from '../../src/viewer/twin3d';
 import type {TwinFrame,ViewState} from '../../src/twin/scene';
 import {defaultLayers} from '../../src/twin/overlays';
 import {presets} from '../../src/scenarios/catalog';
@@ -30,4 +30,9 @@ test('posesOf: the AMR base in the ROS map and the arm joints shown, from the fr
  expect(p.bodies['amr-1']!.quaternionXyzw[2]).toBeCloseTo(Math.sin(0.1),12);
  expect(p.arms['arm-1']).toEqual({jointsRad:[0,-0.6,1.2,0,0.6,0],gripperOpeningM:null});
  expect(posesOf(frame({joints:null})).arms).toEqual({});
+});
+test('a footprint is drawn in its body frame: the same outline whatever the pose (it moves with the body, it is not rebuilt)',()=>{
+ const fp=(x:number)=>{const f=frame({x});f.view!.entities[0]!.pose.yawRad=x;return anchoredOverlays(f,vs).filter(s=>s.layer==='footprint');};
+ const a=fp(1),b=fp(2.5);expect(a).toHaveLength(1);expect(a[0]!.anchored).toBe(true);
+ a[0]!.points.forEach((p,i)=>p.forEach((v,k)=>expect(v).toBeCloseTo(b[0]!.points[i]![k]!,9)));
 });

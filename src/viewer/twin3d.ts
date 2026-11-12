@@ -62,11 +62,22 @@ export function posesOf(f:TwinFrame):TwinPoses{
 }
 /** Remove and free every child: geometries and materials are not shared across rebuilds. */
 const free=(g:THREE.Object3D)=>{for(const c of [...g.children]){g.remove(c);c.traverse(o=>{const m=o as THREE.Mesh,mt=m.material as THREE.Material|THREE.Material[]|undefined;m.geometry?.dispose();for(const x of Array.isArray(mt)?mt:mt?[mt]:[])x.dispose();});}};
+/** The overlays as drawn: footprint and safety outlines in their entity's own frame (`anchored`: they move with its body, never rebuilt for a pose),
+ * the rest in the map. Pure. */
+export function anchoredOverlays(f:TwinFrame,vs:ViewState):(OverlayShape&{anchored:boolean})[]{
+ const at=new Map((f.view?.entities??[]).filter(r=>[r.pose.x,r.pose.y,r.pose.yawRad].every(Number.isFinite)).map(r=>[r.id,r.pose]));
+ return overlayShapes(f,vs).map(sh=>{
+  const p=at.get(sh.entityId);if(!p||(sh.layer!=='footprint'&&sh.layer!=='safety'))return {...sh,anchored:false};
+  const c=Math.cos(p.yawRad),s=Math.sin(p.yawRad);
+  return {...sh,anchored:true,points:sh.points.map(([x,y])=>{const dx=x-p.x,dy=y-p.y;return [c*dx+s*dy,-s*dx+c*dy] as [number,number];})};
+ });
+}
+const r6=(_k:string,v:unknown)=>typeof v==='number'?Math.round(v*1e6)/1e6:v;
 export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:()=>void):Twin3d|null {
  let renderer:THREE.WebGLRenderer;
  try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});}catch{return null;}
  renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
- const canvas=renderer.domElement;canvas.setAttribute('aria-label','3D twin view. Use the entity list to select objects.');canvas.dataset.rebuilds='0';
+ const canvas=renderer.domElement;canvas.setAttribute('aria-label','3D twin view. Use the entity list to select objects.');canvas.dataset.rebuilds='0';canvas.dataset.overlayBuilds='0';
  canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();queueMicrotask(onFail);});
  host.replaceChildren(canvas);
  const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(40,1,0.1,200),controls=new OrbitControls(camera,canvas);
@@ -77,7 +88,9 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  const world=new THREE.Group(),overlays=new THREE.Group();scene.add(world,overlays);
  /** Per drawn entity: its object, the height of its centre above the base origin (AMR), and the arm chain to re-pose. */
  const objs=new Map<string,{obj:THREE.Object3D;c:number;chain?:THREE.Group}>();
- let key='',rebuilds=0,lf:TwinFrame|null=null,lvs:ViewState|null=null,floor='';
+ let key='',rebuilds=0,lf:TwinFrame|null=null,floor='',okey='',overlayBuilds=0;
+ /** Per entity: the overlay group that moves with its body, and its path line whose first point is the body. */
+ const anchors=new Map<string,THREE.Group>(),heads=new Map<string,THREE.Line>();
  const mat=(color:number,o:{wire?:boolean;emissive?:boolean}={})=>new THREE.MeshStandardMaterial({color,wireframe:!!o.wire,emissive:o.emissive?LIME:0x000000,emissiveIntensity:o.emissive?0.6:0,roughness:0.7});
  const render=()=>{renderer.render(scene,camera);canvas.dataset.camera=camera.position.toArray().map(v=>v.toFixed(3)).join(',');};
  // size from wherever the canvas lives now: the stage element is replaced on every workspace render
@@ -121,39 +134,52 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
   const sc=sun.shadow.camera;sc.left=sc.bottom=-m;sc.right=sc.top=m;sc.near=0.5;sc.far=40;sc.updateProjectionMatrix();
   canvas.dataset.rebuilds=String(++rebuilds);
  };
- /** The plan overlays follow the poses shown (a footprint never lags or leads its body). */
- const drawOverlays=(f:TwinFrame,vs:ViewState,p:TwinPoses)=>{
-  free(overlays);
-  const g:TwinFrame=f.view?{...f,view:{...f.view,entities:f.view.entities.map(r=>{const b=p.bodies[r.id];return b?{...r,pose:{...r.pose,x:b.positionM[0],y:b.positionM[1],yawRad:yawOf(b.quaternionXyzw)}}:r;})}}:f;
-  for(const sh of overlayShapes(g,vs)){
-   const pts=sh.points.map(([x,y])=>at(x,y,sh.z)),geo=new THREE.BufferGeometry().setFromPoints(pts);
-   if(sh.layer==='path')overlays.add(new THREE.Line(geo,new THREE.LineDashedMaterial({color:LIME,dashSize:0.08,gapSize:0.06})).computeLineDistances());
-   else overlays.add(sh.loop?new THREE.LineLoop(geo,new THREE.LineBasicMaterial({color:COLOR[sh.layer]})):new THREE.Line(geo,new THREE.LineBasicMaterial({color:COLOR[sh.layer]})));
+ /** Rebuilt only when the overlay data changes (a new path, a longer trail, a layer), never for a pose: `canvas.dataset.overlayBuilds` counts it. */
+ const drawOverlays=(f:TwinFrame,vs:ViewState)=>{
+  const shapes=anchoredOverlays(f,vs),ids=vs.layers.frames?(f.view?.entities??[]).map(r=>r.id):[];
+  const k=JSON.stringify([shapes.map(sh=>sh.layer==='path'?{...sh,points:sh.points.slice(1)}:sh),ids],r6);if(k===okey)return;okey=k;
+  free(overlays);anchors.clear();heads.clear();
+  const anchor=(id:string)=>{let g=anchors.get(id);if(!g){g=new THREE.Group();overlays.add(g);anchors.set(id,g);}return g;};
+  for(const sh of shapes){
+   const geo=new THREE.BufferGeometry().setFromPoints(sh.points.map(([x,y])=>sh.anchored?new THREE.Vector3(x,sh.z,-y):at(x,y,sh.z)));
+   const line=sh.layer==='path'?new THREE.Line(geo,new THREE.LineDashedMaterial({color:LIME,dashSize:0.08,gapSize:0.06})).computeLineDistances():new (sh.loop?THREE.LineLoop:THREE.Line)(geo,new THREE.LineBasicMaterial({color:COLOR[sh.layer]}));
+   (sh.anchored?anchor(sh.entityId):overlays).add(line);if(sh.layer==='path')heads.set(sh.entityId,line);
   }
-  if(vs.layers.frames)for(const r of g.view?.entities??[]){const ax=new THREE.AxesHelper(0.4);ax.position.copy(at(r.pose.x,r.pose.y,0.5));ax.rotation.y=r.pose.yawRad;overlays.add(ax);}
+  for(const id of ids){const ax=new THREE.AxesHelper(0.4);ax.position.y=0.5;anchor(id).add(ax);}
+  canvas.dataset.overlayBuilds=String(++overlayBuilds);
  };
+ /** Transforms only: bodies, the arm chain, the overlays anchored to a body and the first point of its path (moved in place). */
  const pose=(p:TwinPoses)=>{
-  for(const [id,b] of Object.entries(p.bodies)){const o=objs.get(id);if(!o||o.chain)continue;const pl=placeBody(b.positionM,b.quaternionXyzw,o.c);o.obj.position.set(...pl.position);o.obj.quaternion.set(...pl.quaternion);}
+  for(const [id,b] of Object.entries(p.bodies)){
+   const o=objs.get(id),g=anchors.get(id),head=heads.get(id),[x,y]=b.positionM;
+   if(o&&!o.chain){const pl=placeBody(b.positionM,b.quaternionXyzw,o.c);o.obj.position.set(...pl.position);o.obj.quaternion.set(...pl.quaternion);}
+   if(g){g.position.set(x,0,-y);g.rotation.y=yawOf(b.quaternionXyzw);}
+   if(head){
+    const pos=head.geometry.getAttribute('position') as THREE.BufferAttribute,dist=head.geometry.getAttribute('lineDistance') as THREE.BufferAttribute|undefined;
+    pos.setXYZ(0,x,pos.getY(0),-y);pos.needsUpdate=true;
+    // the dashes keep their phase along the rest of the path: shift every later distance by the change of the first segment
+    if(dist&&pos.count>1){const d=Math.hypot(pos.getX(1)-x,pos.getZ(1)+y)-dist.getX(1);for(let i=1;i<dist.count;i++)dist.setX(i,dist.getX(i)+d);dist.needsUpdate=true;}
+   }
+  }
   for(const [id,a] of Object.entries(p.arms)){const o=objs.get(id);if(o?.chain&&a.jointsRad.length===ARM_JOINTS.length)poseArmChain(o.chain,armFrames(ARM_JOINTS,a.jointsRad));}
-  if(lf&&lvs)drawOverlays(lf,lvs,p);
   render();
  };
  const home=()=>{if(!lf)return;const w=lf.preset.project.world,m=Math.max(w.width,w.height);camera.position.set(w.width/2,m*0.9,w.height*0.4+m*0.6);controls.target.set(w.width/2,0,-w.height/2);controls.update();render();};
  return {canvas,pose,home,
   attach(next){if(canvas.parentElement!==next)next.replaceChildren(canvas);ro.disconnect();ro.observe(next);resize();},
   update(f,vs){
-   lf=f;lvs=vs;
+   lf=f;
    const k=structureKey(f,vs);if(k!==key){key=k;build(f,vs);}
    const w=f.preset.project.world,size=`${w.width}x${w.height}`;if(size!==floor){floor=size;home();}
    // objects without a pose of their own (cups, a cylinder arm, machines) move with the frame
    for(const {e} of drawn(f)){const o=objs.get(e.id);if(o&&e.kind!=='amr'&&!o.chain)o.obj.position.copy(at(e.x,e.y,heightOf(e)));}
-   pose(posesOf(f));
+   drawOverlays(f,vs);pose(posesOf(f));
   },
   fit(id){
    const o=id?objs.get(id)?.obj:undefined,box=new THREE.Box3().setFromObject(o??world);if(box.isEmpty())return;
    const s=box.getBoundingSphere(new THREE.Sphere()),d=Math.max(s.radius,0.3)/Math.sin(THREE.MathUtils.degToRad(camera.fov)/2),dir=camera.position.clone().sub(controls.target).normalize();
    controls.target.copy(s.center);camera.position.copy(s.center).addScaledVector(dir,d);controls.update();render();
   },
-  dispose(){free(world);free(overlays);objs.clear();sun.dispose();ro.disconnect();controls.dispose();renderer.dispose();canvas.remove();},
+  dispose(){free(world);free(overlays);objs.clear();anchors.clear();heads.clear();sun.dispose();ro.disconnect();controls.dispose();renderer.dispose();canvas.remove();},
  };
 }

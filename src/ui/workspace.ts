@@ -8,7 +8,7 @@ import {backendSetOptions} from '../scenarios/support';
 import {loadNavigationScene} from '../scenarios/engineering';
 import {boundNavigationScene,importNavigationEvidence} from '../reports/navigation2d';
 import type {NavigationSceneV1} from '../shared/navigation2d';
-import {pose3dOf,rosQuat} from '../twin/pose3d';
+import {pose3dOf} from '../twin/pose3d';
 import {IRSIM_PROFILE,WEBOTS_ARM_SET,WEBOTS_PROFILE,type EngineeringPresetInput} from '../scenarios/catalog';
 import {layerProvenance} from '../twin/overlays';
 import {presets,presetById,nameOf,type TwinPreset} from '../scenarios/catalog';
@@ -26,10 +26,9 @@ import {keyAction,shortcutsDialog} from './keys';
 import {inspector,loadUi,saveUi,type InspectorTab} from './inspector';
 import {engineeringPanel,engineeringInspection} from './engineering-panel';
 import type {Twin3d,TwinPoses} from '../viewer/twin3d';
-import {SampleBuffer,lerpJoints,lerpPose} from '../twin/sample-buffer';
-import {armJointsView,displayJoints} from '../twin/arm/arm-telemetry';
+import {LivePlayback} from '../twin/live-playback';
 import {icon,esc} from './icons';
-import {TwinStore,type Held} from '../twin/store';
+import {TwinStore} from '../twin/store';
 import {freshness,type Link} from '../twin/freshness';
 import {openRunStreams,type LinkState} from '../runtime/stream';
 import {openReplayV2} from '../reports/replay';
@@ -54,8 +53,8 @@ export class TwinWorkspace {
  private view:RunView|null=null;private report:RunReport|null=null;private seen:Record<string,number>={};
  private vs:ViewState={view:innerWidth<768?'2d':'3d',layers:defaultLayers(),selected:null};
  private webglFailed=false;private viewer:Twin3d|null=null;private mounting=false;private v3d:typeof import('../viewer/twin3d')|null=null;
- /** D58: one sim-time playback buffer per entity (live runs only); `at` is when its newest sample arrived. The frame's exact poses are what it overrides. */
- private bufs=new Map<string,{src:string;b:SampleBuffer<number[]>;at:number}>();private exact:TwinPoses|null=null;private raf=0;
+ /** D58: live playback of the 3D view (twin/live-playback); `exact` are the newest frame's poses it overrides. */
+ private playback=new LivePlayback({reducedMotion:()=>matchMedia('(prefers-reduced-motion: reduce)').matches,fresh:(id,now)=>freshness(this.store.entity(id),this.link,now).state==='live'});private exact:TwinPoses|null=null;private raf=0;
  /** Telemetry (lossy) lives in the store; the durable view only changes from action receipts, resets and polled snapshots. */
  private store=new TwinStore();private link:Link={state:'closed',lastHeartbeatMs:null,paused:false};private streams:ReturnType<typeof openRunStreams>|null=null;private streamRun='';
  private business=0;private ticker:ReturnType<typeof setInterval>|undefined;private painted='';private refreshing=false;
@@ -130,47 +129,22 @@ export class TwinWorkspace {
    const summary=document.getElementById('twin-report-summary');if(summary&&f.report)summary.outerHTML=reportSummary(f.report,this.business);
   }
  }
- /** Animate only a live run that had a sample in the last second, in 3D, without reduced motion; otherwise the view is drawn per sample. */
- private animating(now:number){return this.vs.view==='3d'&&!!this.viewer&&!this.replay&&this.link.state==='live'&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&[...this.bufs.values()].some(e=>now-e.at<1000);}
- private loop=()=>{this.raf=0;const now=performance.now();if(!this.exact||!this.animating(now))return;this.viewer!.pose(this.posed(this.exact,now));this.raf=requestAnimationFrame(this.loop);};
- /** Structure and the frame's exact poses, then (same task, so the newest sample never flashes) the buffered poses while animating. Replay: exact only. */
- private paint3d(f:TwinFrame){
-  const v=this.viewer;if(!v||!this.v3d)return;v.update(f,this.vs);this.exact=this.replay?null:this.v3d.posesOf(f);
-  const now=performance.now();if(this.exact&&this.animating(now)){v.pose(this.posed(this.exact,now));if(!this.raf)this.raf=requestAnimationFrame(this.loop);}
- }
- /** The exact poses with each live entity's buffered value; a stale or lost entity keeps its exact (frozen) pose. */
- private posed(p:TwinPoses,now:number):TwinPoses{
-  const arms={...p.arms},bodies={...p.bodies};
-  for(const [id,e] of this.bufs){
-   if(freshness(this.store.entity(id),this.link,now).state!=='live')continue;const v=e.b.at(now);if(!v)continue;
-   if(e.src.startsWith('pose')){if(bodies[id])bodies[id]={positionM:[v[0]!,v[1]!,v[3]??0],quaternionXyzw:rosQuat(v[2]!,v[5]??0,v[4]??0)};}else if(arms[id])arms[id]={...arms[id]!,jointsRad:v};
-  }
-  return {arms,bodies};
- }
- /** Into the entity's buffer: arm joints (observed, else commanded) or an AMR base pose. A stale sample, a change of display source or an epoch reset
-  * clears the buffer instead of interpolating across it. */
- private feed(h:Held,reset:boolean){
-  const d=displayJoints(null,armJointsView(h,h.receivedAtMs)),o=h.observed,p3=pose3dOf(o);let src:string|null=null,val:number[]=[];
-  if(d.jointsRad){if(!d.frozen){src=d.source;val=d.jointsRad;}}
-  else if(h.quality==='valid'&&typeof o?.xM==='number'&&typeof o.yM==='number'&&typeof o.yawRad==='number'){src=p3.z===undefined?'pose':'pose3d';val=[o.xM,o.yM,o.yawRad,...p3.z===undefined?[]:[p3.z,p3.rollRad!,p3.pitchRad!]];}
-  let e=this.bufs.get(h.entityId);
-  if(!src||h.simTimeNs===null){this.bufs.delete(h.entityId);return;}
-  if(reset||e?.src!==src){e={src,b:new SampleBuffer<number[]>(src.startsWith('pose')?lerpPose:lerpJoints),at:0};this.bufs.set(h.entityId,e);}
-  e.b.push(BigInt(h.simTimeNs),h.receivedAtMs,val);e.at=h.receivedAtMs;
-  if(!this.raf&&this.exact&&this.animating(performance.now()))this.raf=requestAnimationFrame(this.loop);
- }
+ private animating(now:number){return this.vs.view==='3d'&&!!this.viewer&&this.playback.animating(now,{live:this.link.state==='live',replay:!!this.replay});}
+ private loop=()=>{this.raf=0;const now=performance.now();if(!this.exact||!this.animating(now))return;this.viewer!.pose(this.playback.poses(this.exact,now));this.raf=requestAnimationFrame(this.loop);};
+ /** Structure and the frame's exact poses, then (same task, so the newest sample never flashes) the played-back poses while animating. Replay: exact only. */
+ private paint3d(f:TwinFrame){const v=this.viewer;if(!v||!this.v3d)return;v.update(f,this.vs);this.exact=this.replay?null:this.v3d.posesOf(f);const now=performance.now();if(this.exact&&this.animating(now)){v.pose(this.playback.poses(this.exact,now));this.raf||=requestAnimationFrame(this.loop);}}
  private openStreams(v:RunView){
   if(this.streamRun===v.run.id&&this.streams&&!['session_lost','run_lost','closed'].includes(this.streams.state))return;
-  this.streams?.close();this.store=new TwinStore();this.bufs.clear();this.business=0;this.streamRun=v.run.id;this.link={state:'connecting',lastHeartbeatMs:null,paused:false};
+  this.streams?.close();this.store=new TwinStore();this.playback.clear();this.business=0;this.streamRun=v.run.id;this.link={state:'connecting',lastHeartbeatMs:null,paused:false};
   this.streams=openRunStreams<RunView,Parameters<TwinStore['apply']>[0]>(v.run.id,v.run.eventCursor,{
-   onSample:s=>{const r=this.store.apply(s);if(r==='applied'||r==='epoch_reset')this.feed(this.store.entity(s.entityId)!,r==='epoch_reset');},onGap:g=>{this.store.gap(g as never);this.bufs.clear();},
+   onSample:s=>{const r=this.store.apply(s);if(r==='applied'||r==='epoch_reset'){this.playback.feed(this.store.entity(s.entityId)!,r==='epoch_reset');if(!this.raf&&this.exact&&this.animating(performance.now()))this.raf=requestAnimationFrame(this.loop);}},onGap:g=>{this.store.gap(g as never);this.playback.clear();},
    onHeartbeat:h=>{this.link={...this.link,lastHeartbeatMs:performance.now(),paused:h.paused};if(!this.busy&&!this.refreshing&&this.view&&h.runRevision!==this.view.run.runRevision)void this.refresh();},
    onBusiness:e=>{this.business++;const c=this.view?.run.eventCursor;if(!this.busy&&!this.refreshing&&this.view&&(c==null||BigInt(e.sequence)>BigInt(c)))void this.refresh();},
    onReset:(snap,reason)=>{this.notice=`${tr('Đồng bộ lại từ snapshot','スナップショットから再同期','Resynchronised from a snapshot')}: ${reason}`;if(!this.busy)void this.apply(snap).then(()=>this.rerender());},
    onSnapshot:snap=>{if(!this.busy&&snap.run.runRevision!==this.view?.run.runRevision)void this.apply(snap).then(()=>this.rerender());},
    onState:st=>{this.link={...this.link,state:st};
     // telemetry is not replayed after a drop: the hole is recorded as an explicit local gap
-    if(st==='reconnecting'||st==='runtime_lost'){this.store.gap({reason:`LINK_${st.toUpperCase()}`});this.bufs.clear();}
+    if(st==='reconnecting'||st==='runtime_lost'){this.store.gap({reason:`LINK_${st.toUpperCase()}`});this.playback.clear();}
     if(st==='session_lost'){this.rt.forget();this.playing=false;this.ui.runtimeOpen=true;this.notice=tr('Runtime đã mất phiên (khởi động lại?). Ghép nối lại; lần chạy trong bộ nhớ không mở lại được, báo cáo cuối vẫn xem được.','ランタイムのセッションが失われました(再起動?)。再ペアリングしてください。メモリ上の実行は再開できませんが、最後のレポートは閲覧できます。','The runtime lost the session (restarted?). Pair again; the in-memory run cannot be reopened, the last report stays viewable.');this.rerender();}
     else if(st==='run_lost'||st==='runtime_lost'){this.playing=false;this.rerender();}
     else this.tick();}},
