@@ -242,8 +242,12 @@ ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớ
    // the locked engineering design (no receipt: a reclaimed run is read-only and never recompiled from here)
    ...input.engineering?{engineering:{project:structuredClone(input.engineering.project),receipt:null}}:{}};
  }
+ private retired:string|null=null;
+ private async retire(){if(this.view&&!this.archived&&this.rt.archive&&this.retired!==this.view.run.id){this.streams?.close();this.streams=null;clearInterval(this.ticker);await this.rt.archive(this.view.run.id);this.retired=this.view.run.id;}}
  private async create(p:TwinPreset,start=true){
   if(!this.health)throw new TwinRuntimeError('RUNTIME_UNAVAILABLE',[],0);
+  // a finished run still owns the host's one Webots slot until it is archived: retire it before readiness, or the new run is refused WEBOTS_CAPACITY
+  if(this.view&&['completed','failed','cancelled'].includes(this.view.run.status)){await this.saveEvidence();await this.retire();}
   if(this.health.features?.readiness){
    if(!this.rt.readiness)throw new TwinRuntimeError('READINESS_NOT_CHECKED',[],0);
    const ref=this.refOf(p);if(ref===null)throw new TwinRuntimeError('ENGINEERING_NOT_COMPILED',[],0);
@@ -252,7 +256,7 @@ ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớ
    if(!ready(preflight(p,this.health,this.rt.paired,snapshot)))throw new TwinRuntimeError('RUNTIME_NOT_READY',snapshot.checks.flatMap(c=>c.reasonCodes),422);
   }
   await this.saveEvidence();
-  if(this.view&&!this.archived&&this.rt.archive){this.streams?.close();this.streams=null;clearInterval(this.ticker);await this.rt.archive(this.view.run.id);}
+  await this.retire();
   this.archived=false;
   this.previous=this.report;this.view=null;this.report=null;this.seen={};this.runPreset={...p,project:structuredClone(p.project)};this.stopReplay();this.replay=null;this.navigation=null;const token=++this.sceneLoad;
   const ref=this.refOf(p);if(ref){const s=await loadNavigationScene(this.rt,ref.bundleDigest).catch(()=>null);if(token===this.sceneLoad)this.navigation=s;}
