@@ -61,3 +61,10 @@ test('WebGL failed: the 2D fallback note is in the viewport overlay',()=>{
  const html=w.html();
  expect(count(html,'twin-fallback-note')).toBe(1);expect(overlay(html)).toContain('data-testid="twin-fallback-note"');
 });
+test('a saved report opened without a runtime: no pairing problem, no count, no NOT_PAIRED in the strip',()=>{
+ const w=new TwinWorkspace(()=>{},{paired:false} as TwinRuntime);workspaces.push(w);
+ const {report}=coffeeReplay(),saved=captureEvidence(report,structuredClone(presetById('coffee')!.project));
+ Object.assign(w,{saved:[saved]});w.click('twin-open-evidence',saved.id);
+ const html=w.html();
+ expect(html).toContain('data-testid="run-status"');expect(html).not.toContain('NOT_PAIRED');expect(count(html,'problems-count')).toBe(0);
+});

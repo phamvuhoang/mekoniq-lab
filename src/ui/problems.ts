@@ -13,7 +13,8 @@ const runtimeBox=()=>({id:'twin-runtime-toggle',label:tr('Mở hộp runtime','�
 /** Blockers, then attention, then notices; input order within each group. */
 export function collectProblems(i:{paired:boolean;health:TwinHealth|null;healthChecked:boolean;checks:ReturnType<typeof preflight>;view:RunView|null;linkState:LinkState;notice:string}):Problem[]{
  const p:Problem[]=[];
- if(!i.paired)p.push(i.healthChecked&&!i.health
+ // pairing stands between the user and a run only before one starts (no view, or a run still `ready`); a saved report or replay needs no runtime
+ if(!i.paired&&(!i.view||i.view.run.status==='ready'))p.push(i.healthChecked&&!i.health
   ?{id:'runtime',severity:'blocker',text:tr('Không thấy runtime /lab/v2 trên máy này. Khởi động runtime rồi ghép nối.','このマシンで/lab/v2ランタイムが見つかりません。起動してからペアリングしてください。','No /lab/v2 runtime found on this machine. Start the runtime, then pair.'),codes:['RUNTIME_UNREACHABLE'],action:runtimeBox()}
   :{id:'runtime',severity:'blocker',text:tr('Chưa ghép nối runtime: nhập mã một lần in trong terminal của runtime.','ランタイム未ペアリング:ターミナルのワンタイムコードを入力してください。','The runtime is not paired: enter the one-time code printed by its terminal.'),codes:['NOT_PAIRED'],action:runtimeBox()});
  // the pairing row stands for the items that need a paired runtime or its health answer; the rest are listed as they are

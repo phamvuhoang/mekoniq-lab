@@ -17,6 +17,11 @@ test('not paired: one blocker whose action opens the runtime box; the pairing-de
  const p=collectProblems({...base,paired:false,checks:preflight(coffee,mockHealth,false)});
  expect(p).toHaveLength(1);expect(p[0]).toMatchObject({severity:'blocker',action:{id:'twin-runtime-toggle'}});expect(p[0]!.codes.length).toBeGreaterThan(0);
 });
+test('not paired with a finished run on screen (saved report, replay): no pairing problem',()=>{
+ const {view}=coffeeReplay() as {view:RunView};
+ expect(collectProblems({...base,paired:false,view})).toEqual([]);
+ expect(collectProblems({...base,paired:false,view:{...view,run:{...view.run,status:'ready'}}}).map(x=>x.codes)).toEqual([['NOT_PAIRED']]);
+});
 test('two failing preflight items: two blockers carrying their reason codes',()=>{
  const checks=preflight({...coffee,backendSetId:'nowhere',project:{...coffee.project,entities:coffee.project.entities.filter(e=>e.kind!=='arm')}},mockHealth,true).filter(c=>c.id!=='paired');
  expect(checks.filter(c=>!c.ok).map(c=>c.id)).toEqual(['backend','entity-arm']);
