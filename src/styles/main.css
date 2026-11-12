@@ -2271,11 +2271,25 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 .twin-runtime-chip[data-state="live"] i{background:var(--accent);border-color:var(--accent)}
 .twin-runtime-chip[data-state="slow"] i,.twin-runtime-chip[data-state="connecting"] i{border-color:var(--amber);border-style:dashed}
 .twin-runtime-chip[data-state="lost"] i{border-color:var(--danger);background:var(--danger)}
-.twin-problems{display:inline-flex;align-items:center;gap:6px;font:700 12px var(--mono);color:var(--amber)}
+.twin-problems{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 10px;font:700 12px var(--mono);color:var(--amber);background:none;border:1px solid var(--amber);border-radius:8px}
 .twin-popover{position:absolute;z-index:7;max-height:min(70dvh,560px);overflow:auto;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px #0008}
 .twin-popover[hidden],.twin-inspector[hidden],.twin-tabpanel[hidden]{display:none}
 .twin-popover h3{margin:0 0 8px;font-size:13px}
-.twin-picker{z-index:8;top:calc(100% + 6px);left:0;width:min(760px,calc(100vw - 32px));display:flex;flex-wrap:wrap;gap:10px}
+.twin-picker{z-index:8;top:calc(100% + 6px);left:0;width:min(760px,calc(100vw - 32px))}
+.picker-list{display:flex;flex-wrap:wrap;gap:10px;margin:0;padding:0;list-style:none}
+.picker-list li{display:flex;flex:1 1 240px}
+.preset-option:disabled{opacity:.6;cursor:not-allowed}
+.picker-reasons{display:block;margin-top:4px;color:var(--amber);overflow-wrap:anywhere}
+.twin-problems-box{top:calc(100% + 6px);right:0;width:min(520px,calc(100vw - 32px))}
+.problem-list{display:grid;gap:8px;margin:0 0 10px;padding:0;list-style:none}
+.problem{display:grid;gap:4px;padding:8px 10px;border-left:3px solid var(--muted);background:var(--bg);border-radius:6px}
+.problem[data-severity="blocker"]{border-left-color:var(--danger)}
+.problem[data-severity="attention"]{border-left-color:var(--amber)}
+.problem-severity{display:inline-flex;align-items:center;gap:6px;font:700 12px var(--mono);color:var(--muted)}
+.problem-codes code,.next-action code{font:12px var(--mono);overflow-wrap:anywhere}
+.problem-actions{display:flex;flex-wrap:wrap;gap:4px 12px}
+.twin-caveat{top:calc(100% + 6px);left:0;width:min(480px,calc(100vw - 32px))}
+.caveat-limitations{margin:0;padding-left:18px;font-size:12px;color:var(--muted)}
 .twin-runtime-box{top:calc(100% + 6px);left:0;width:min(420px,calc(100vw - 32px))}
 .twin-main{position:relative;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
 .twin-main.inspector-open{grid-template-columns:minmax(0,1fr) min(380px,45vw)}
@@ -2321,7 +2335,7 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
  .twin-shell{grid-template-rows:auto minmax(480px,1fr) auto}
  .twin-transport{position:sticky;bottom:0}
 }
-.twin-mode{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px dashed var(--muted);border-radius:6px;font:700 12px var(--mono);color:var(--muted);letter-spacing:.06em}
+.twin-mode{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:4px 10px;border:1px dashed var(--muted);border-radius:6px;font:700 12px var(--mono);color:var(--muted);letter-spacing:.06em}
 .twin-mode.live{border-style:solid;border-color:var(--accent);color:var(--accent)}
 .twin-identity{display:flex;flex-wrap:wrap;gap:4px 10px;margin:0 0 8px;font:12px var(--mono);color:var(--muted);min-width:0}
 .twin-identity span{overflow-wrap:anywhere}
@@ -2329,7 +2343,7 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 .twin-bar-item small{font-size: 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .twin-bar-item b{font-size: 13px}
 .twin-run-id{font:12px var(--mono);color:var(--muted);overflow-wrap:anywhere}
-.preset-option{display:flex;align-items:flex-start;gap:10px;flex:1 1 240px;text-align:left;padding:12px 14px;min-height:44px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.preset-option{display:flex;align-items:flex-start;gap:10px;flex:1 1 auto;text-align:left;padding:12px 14px;min-height:44px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:12px}
 .preset-option span{display:flex;flex-direction:column;gap:2px}
 .preset-option small{color:var(--muted);font-size: 12px}
 .preset-option[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}

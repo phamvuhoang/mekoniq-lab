@@ -4,18 +4,20 @@ import {runBar,type RunBarState} from '../../src/ui/run-bar';
 import {transportBar,type TransportState} from '../../src/ui/transport';
 import {inspector,loadUi,saveUi,type TwinUiState} from '../../src/ui/inspector';
 // U01 shell: run bar (level 1), transport bar (one for run and replay), details inspector (level 2, closed by default, four named tabs).
-const bar=(o:Partial<RunBarState>={}):RunBarState=>({scenarioTitle:'Cà phê sữa đá',runtime:{state:'live',label:'SSE',detail:''},mode:'MOCK · simulated',status:'Đang chạy',simTimeS:4.2,served:'1',problems:0,primary:null,inspectorOpen:false,...o});
+const bar=(o:Partial<RunBarState>={}):RunBarState=>({scenarioTitle:'Cà phê sữa đá',runtime:{state:'live',label:'SSE',detail:''},mode:'Mô phỏng · MOCK',status:'Đang chạy',simTimeS:4.2,served:'1',problems:0,primary:null,inspectorOpen:false,...o});
 const transport=(o:Partial<TransportState>={}):TransportState=>({mode:'live',playing:false,canPlay:true,canStep:true,canPause:true,paused:false,canCancel:true,speeds:[1,4,16,64],speed:4,simTimeS:4.2,tick:210,...o});
-const ui=(o:Partial<TwinUiState>={}):TwinUiState=>({inspectorOpen:false,tab:'objects',watch:false,displayOpen:false,problemsOpen:false,runtimeOpen:false,pickerOpen:false,...o});
+const ui=(o:Partial<TwinUiState>={}):TwinUiState=>({inspectorOpen:false,tab:'objects',watch:false,displayOpen:false,problemsOpen:false,runtimeOpen:false,pickerOpen:false,caveatOpen:false,...o});
 const memory=()=>{const m=new Map<string,string>();return {getItem:(k:string)=>m.get(k)??null,setItem:(k:string,v:string)=>{m.set(k,v);},m};};
 afterEach(()=>vi.unstubAllGlobals());
 test('the problem count shows only when there is a problem',()=>{
  expect(runBar(bar())).not.toContain('data-testid="problems-count"');
- expect(/data-testid="problems-count"[^>]*>([^]*?)<\/span>/.exec(runBar(bar({problems:2})))?.[1]).toContain('2');
+ expect(/data-testid="problems-count"[^>]*>([^]*?)<\/button>/.exec(runBar(bar({problems:2})))?.[1]).toContain('2');
+ expect(/<button[^>]*data-testid="problems-count"[^>]*>/.exec(runBar(bar({problems:2})))?.[0]).toContain('data-action="twin-problems-toggle"');
 });
-test('the simulated badge carries both an icon and text',()=>{
- const badge=/<span[^>]*data-testid="mode-badge"[^>]*>([^]*?)<\/span><\/span>/.exec(runBar(bar()))?.[1]??'';
- expect(badge).toContain('<svg');expect(badge).toContain('MOCK · simulated');
+test('the simulation label carries both an icon and text, and opens its explanation',()=>{
+ const html=runBar(bar({mode:'Mô phỏng · MOCK'})),badge=/<button[^>]*data-testid="mode-badge"[^>]*>([^]*?)<\/button>/.exec(html)?.[1]??'';
+ expect(badge).toContain('<svg');expect(badge).toContain('Mô phỏng · MOCK');
+ expect(/<button[^>]*data-testid="mode-badge"[^>]*>/.exec(html)?.[0]).toContain('data-action="twin-caveat-toggle"');
 });
 test('idle transport disables every button; replay adds the cursor',()=>{
  const idle=transportBar(transport({mode:'idle',canPlay:false,canStep:false,canPause:false,canCancel:false}));

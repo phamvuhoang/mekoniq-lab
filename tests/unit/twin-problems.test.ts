@@ -1,0 +1,70 @@
+// U02: one problems list (blockers, then attention, then notices), the next-step strip, the scenario picker order and the simulation label.
+import {expect,test,vi} from 'vitest';
+vi.mock('../../src/i18n',()=>({tr:(vi:string)=>vi}));
+import type {RunView,TwinHealth} from '../../src/scenarios/controls';
+import {preflight} from '../../src/scenarios/preflight';
+import {presets,presetById} from '../../src/scenarios/catalog';
+import {collectProblems,nextStrip,problemsPanel,type Problem} from '../../src/ui/problems';
+import {caveatPopover,pickerItems,scenarioPicker,simLabel} from '../../src/ui/run-bar';
+import {coffeeReplay} from '../support/coffee-replay';
+const coffee=presetById('coffee')!;
+const live=(id:string,modes=['mock'])=>({id,modes,installed:true,compatible:true,reachable:true,commissioned:true,enabled:true});
+/** A runtime with only mock backends (what the mock launcher offers). */
+const mockHealth:TwinHealth={protocolMajors:[2],sourceCommit:'a'.repeat(40),schemaHash:'b'.repeat(64),scenarioIds:['BV01','FD01','FD02-cups','CAMPAIGN-FD02-FD07-BV01-BV03'],
+ backends:[live('mock_amr'),live('mock_coffee'),live('mock_arm')],backendSets:[{id:'mock-default',mode:'mock',access:'simulated',backends:['mock_amr','mock_coffee','mock_arm']},{id:'mock-amr',mode:'mock',access:'simulated',backends:['mock_amr']}]};
+const base={paired:true,health:mockHealth,healthChecked:true,checks:[],view:null,linkState:'closed' as const,notice:''};
+test('not paired: one blocker whose action opens the runtime box; the pairing-dependent preflight items are not repeated',()=>{
+ const p=collectProblems({...base,paired:false,checks:preflight(coffee,mockHealth,false)});
+ expect(p).toHaveLength(1);expect(p[0]).toMatchObject({severity:'blocker',action:{id:'twin-runtime-toggle'}});expect(p[0]!.codes.length).toBeGreaterThan(0);
+});
+test('two failing preflight items: two blockers carrying their reason codes',()=>{
+ const checks=preflight({...coffee,backendSetId:'nowhere',project:{...coffee.project,entities:coffee.project.entities.filter(e=>e.kind!=='arm')}},mockHealth,true).filter(c=>c.id!=='paired');
+ expect(checks.filter(c=>!c.ok).map(c=>c.id)).toEqual(['backend','entity-arm']);
+ const p=collectProblems({...base,checks});
+ expect(p.map(x=>x.severity)).toEqual(['blocker','blocker']);
+ expect(p[0]!.codes).toEqual(['BACKEND_SET_UNKNOWN:nowhere']);expect(p[1]!.codes).toEqual(['ENTITY_MISSING:arm']);
+});
+test('a needs_attention run with two attention items: two attention rows, the reconcilable one offers reconcile; notices last',()=>{
+ const {view}=coffeeReplay() as {view:RunView};view.run.status='needs_attention';
+ view.coffee!.jobs[0]!.status='needs_attention';
+ view.attention=[{reason:'MEASUREMENT_MISSING',subjectId:'nobody',tick:10},{reason:'CUP_REMOVED',subjectId:view.coffee!.jobs[0]!.jobId,tick:250}];
+ const p=collectProblems({...base,view,notice:'Runtime refused: X',linkState:'runtime_lost'});
+ expect(p.map(x=>x.severity)).toEqual(['blocker','attention','attention','notice']);
+ expect(p[0]!.codes).toEqual(['LINK_RUNTIME_LOST']);
+ expect(p[1]!.codes).toEqual(['MEASUREMENT_MISSING']);expect(p[1]!.action).toBeUndefined();
+ expect(p[2]).toMatchObject({codes:['CUP_REMOVED'],entityId:view.coffee!.jobs[0]!.jobId,action:{id:'twin-reconcile'}});
+ const html=problemsPanel(p,true);
+ expect(html).toContain('data-testid="problems-panel"');expect(html).not.toMatch(/data-testid="problems-panel"[^>]*hidden/);
+ expect(html).toContain('<code>CUP_REMOVED</code>');expect(html).toContain(`data-action="twin-select" data-value="${view.coffee!.jobs[0]!.jobId}"`);
+ expect(html.indexOf('LINK_RUNTIME_LOST')).toBeLessThan(html.indexOf('CUP_REMOVED'));
+});
+test('dynamic text in a problem row is escaped',()=>{
+ const html=problemsPanel([{id:'n',severity:'notice',text:'<img onerror=x>',codes:['<b>']}],true);
+ expect(html).not.toContain('<img');expect(html).toContain('<code>&lt;b&gt;</code>');
+});
+test('nothing wrong: no problems, and no strip when the next step needs no person',()=>{
+ expect(collectProblems(base)).toEqual([]);
+ expect(nextStrip([],{title:'Continue',detail:'…'})).toBe('');
+ const strip=nextStrip([] as Problem[],{title:'Ready',detail:'d',action:{id:'twin-run',label:'Run mock'}});
+ expect(strip).toContain('data-testid="next-action"');expect(strip).not.toContain('<button');
+});
+test('picker with a mock-only runtime: mock presets first, IR-SIM and Webots disabled with reasons after them',()=>{
+ const items=pickerItems(presets,mockHealth),firstOff=items.findIndex(i=>!i.runnable);
+ expect(firstOff).toBeGreaterThan(0);expect(items.slice(firstOff).every(i=>!i.runnable)).toBe(true);
+ for(const i of items.filter(i=>/^(irsim|webots)-/.test(i.id))){expect(i.runnable,i.id).toBe(false);expect(i.reasons.length,i.id).toBeGreaterThan(0);}
+ expect(items.filter(i=>i.runnable).map(i=>i.id)).toEqual(presets.map(p=>p.id).filter(id=>items.find(i=>i.id===id)!.runnable));// catalog order kept
+ expect(pickerItems(presets,null).every(i=>i.runnable)).toBe(true);
+ const html=scenarioPicker(items,'coffee',true),webots=/<button[^>]*data-value="webots-coffee"[^>]*>/.exec(html)?.[0]??'';
+ expect(webots).toContain('data-action="twin-preset"');expect(webots).toMatch(/\sdisabled/);
+ expect(html.indexOf('data-value="coffee"')).toBeLessThan(html.indexOf('data-value="webots-coffee"'));
+});
+test('the simulation label: before a run, mock, uncalibrated and calibrated simulation; the caveat box names mode, notes and limitations',()=>{
+ expect(simLabel(null,false)).toBe('Mô phỏng · chưa chạy');
+ expect(simLabel('mock',false)).toBe('Mô phỏng · MOCK');
+ expect(simLabel('simulation',false)).toBe('Mô phỏng · SIMULATION · chưa hiệu chuẩn');
+ expect(simLabel('simulation',true)).toBe('Mô phỏng · SIMULATION');
+ const c=caveatPopover('SIMULATION · simulated',['no hardware <evidence>'],true);
+ expect(c).toContain('data-testid="caveat-detail"');expect(c).toContain('SIMULATION · simulated');expect(c).toContain('no hardware &lt;evidence&gt;');
+ expect(c).toContain('Mô hình minh họa');expect(c).toContain('Source runtime · chỉ mô phỏng nghiệp vụ');
+ expect(caveatPopover('—',[],false)).toMatch(/data-testid="caveat-detail"[^>]*hidden/);
+});

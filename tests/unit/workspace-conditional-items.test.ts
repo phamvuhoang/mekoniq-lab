@@ -1,5 +1,5 @@
 // U01 review: the honesty items that appear only in some run states are still rendered, and inside the container the layout gives them
-// (Display menu, viewport overlay, Objects tab). Same harnesses as workspace-navigation-scene / workspace-replay-freshness.
+// (Display menu, viewport overlay, problems box). Same harnesses as workspace-navigation-scene / workspace-replay-freshness.
 import 'fake-indexeddb/auto';
 import {afterEach,expect,test,vi} from 'vitest';
 import type {TwinRuntime} from '../../src/scenarios/controls';
@@ -19,7 +19,7 @@ afterEach(()=>{for(const w of workspaces.splice(0))w.leave();});
 const between=(html:string,from:string,to:string)=>{const a=html.indexOf(from),b=html.indexOf(to,a);expect(a,from).toBeGreaterThanOrEqual(0);expect(b,to).toBeGreaterThan(a);return html.slice(a,b);};
 const displayMenu=(html:string)=>between(html,'data-testid="display-menu"','class="twin-overlay"');
 const overlay=(html:string)=>between(html,'class="twin-overlay"','data-testid="twin-inspector"');
-const objectsTab=(html:string)=>between(html,'id="inspector-panel-objects"','id="inspector-panel-engineering"');
+const problemsBox=(html:string)=>between(html,'data-testid="problems-panel"','data-testid="caveat-detail"');
 const count=(html:string,testid:string)=>html.split(`data-testid="${testid}"`).length-1;
 const BUNDLE=D('1'),scene={...structuredClone(serveScene),sceneDigest:D('a')} as unknown as NavigationSceneV1;
 /** An opened IR-SIM report whose evidence names `scene`; `bundles` is what the runtime still holds. */
@@ -46,14 +46,14 @@ test('IR-SIM run whose scene is gone: the unavailable reason is in the Display m
  expect(count(html,'navigation-scene-unavailable')).toBe(1);
  expect(displayMenu(html)).toContain('data-testid="navigation-scene-unavailable"');expect(displayMenu(html)).toContain('NAVIGATION_SCENE_UNAVAILABLE');
 });
-test('a run with attention: the attention chain heads the Objects tab',()=>{
+test('a run with attention: the attention chain is in the problems box, after its rows',()=>{
  const w=new TwinWorkspace(()=>{},{paired:false} as TwinRuntime);workspaces.push(w);
  const fixture=coffeeReplay();fixture.view.run.status='needs_attention';fixture.view.attention=[{reason:'CUP_REMOVED',subjectId:'coffee-job-1',tick:250}];
  Object.assign(w,fixture,{runPreset:presetById('coffee')});
  const html=w.html();
  expect(count(html,'attention-reason')).toBe(1);
- const objects=objectsTab(html);expect(objects).toContain('data-testid="attention-reason"');expect(objects).toContain('CUP_REMOVED');
- expect(objects.indexOf('attention-reason')).toBeLessThan(objects.indexOf('data-testid="entity-list"'));
+ const box=problemsBox(html);expect(box).toContain('data-testid="attention-reason"');expect(box).toContain('CUP_REMOVED');
+ expect(box.indexOf('data-testid="problem-row"')).toBeLessThan(box.indexOf('attention-reason'));
 });
 test('WebGL failed: the 2D fallback note is in the viewport overlay',()=>{
  const w=new TwinWorkspace(()=>{},{paired:false} as TwinRuntime);workspaces.push(w);

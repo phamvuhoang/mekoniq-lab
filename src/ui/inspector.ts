@@ -2,12 +2,12 @@
 // (hidden when not shown) so in-place repaints keep finding their ids. Only `inspectorOpen` and `tab` survive a reload.
 import {tr} from '../i18n';
 export type InspectorTab='objects'|'engineering'|'report'|'setup';
-export interface TwinUiState {inspectorOpen:boolean;tab:InspectorTab;watch:boolean;displayOpen:boolean;problemsOpen:boolean;runtimeOpen:boolean;pickerOpen:boolean}
+export interface TwinUiState {inspectorOpen:boolean;tab:InspectorTab;watch:boolean;displayOpen:boolean;problemsOpen:boolean;runtimeOpen:boolean;pickerOpen:boolean;caveatOpen:boolean}
 const KEY='mekoniq-lab-twin-ui',TABS:InspectorTab[]=['objects','engineering','report','setup'];
 export function loadUi():TwinUiState{
  let saved:{inspectorOpen?:unknown;tab?:unknown}|null=null;
  try{saved=JSON.parse(localStorage.getItem(KEY)??'null');}catch{/* empty, broken or blocked storage: defaults */}
- return {inspectorOpen:saved?.inspectorOpen===true,tab:TABS.includes(saved?.tab as InspectorTab)?saved!.tab as InspectorTab:'objects',watch:false,displayOpen:false,problemsOpen:false,runtimeOpen:false,pickerOpen:false};
+ return {inspectorOpen:saved?.inspectorOpen===true,tab:TABS.includes(saved?.tab as InspectorTab)?saved!.tab as InspectorTab:'objects',watch:false,displayOpen:false,problemsOpen:false,runtimeOpen:false,pickerOpen:false,caveatOpen:false};
 }
 export function saveUi(s:TwinUiState):void{try{localStorage.setItem(KEY,JSON.stringify({inspectorOpen:s.inspectorOpen,tab:s.tab}));}catch{/* a view preference only */}}
 const label=(t:InspectorTab)=>({objects:tr('Đối tượng','対象','Objects'),engineering:tr('Kỹ thuật','エンジニアリング','Engineering'),report:tr('Báo cáo','レポート','Report'),setup:tr('Thiết lập','設定','Setup')})[t];

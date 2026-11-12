@@ -11,8 +11,13 @@ export async function openDisplayMenu(page:Page):Promise<void>{
  if(!await page.getByTestId('display-menu').isVisible())await page.locator('[data-action="twin-display-toggle"]').click();
  await expect(page.getByTestId('display-menu')).toBeVisible();
 }
-/** U01 keeps the preset list as the scenario picker's contents; U02 replaces them. */
+/** The scenario picker (U02): one button per preset, runnable ones first. */
 export async function openScenarioPicker(page:Page):Promise<void>{
  if(!await page.locator('#twin-picker').isVisible())await page.getByTestId('scenario-picker').click();
  await expect(page.locator('#twin-picker')).toBeVisible();
+}
+/** The problems list (U02) opens from the run bar's count, which exists only while there is a problem. */
+export async function openProblems(page:Page):Promise<void>{
+ if(!await page.getByTestId('problems-panel').isVisible())await page.getByTestId('problems-count').click();
+ await expect(page.getByTestId('problems-panel')).toBeVisible();
 }

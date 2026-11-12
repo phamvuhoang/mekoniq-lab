@@ -1,5 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
-import {openDisplayMenu,openInspector,openScenarioPicker} from '../support/twin';
+import {openDisplayMenu,openInspector,openProblems,openScenarioPicker} from '../support/twin';
 // U01: the twin page is three fixed regions (run bar, viewport, transport bar) plus a details inspector closed by default. Against the mock
 // launcher (scripts/test-mock-e2e.mjs twin-layout.spec.ts), preset coffee (BV01).
 const token=process.env.LAB_TEST_PAIRING_TOKEN,shots=process.env.LAB_EVIDENCE_DIR;
@@ -8,7 +8,8 @@ const LEVEL1=['scenario-picker','runtime-chip','mode-badge','run-status','run-ti
 // where every existing data-testid now lives (spec §6.3); `ids` are element ids
 const ROWS:{name:string;open:(page:Page)=>Promise<void>;container:string;testids:string[];ids?:string[]}[]=[
  {name:'display',open:openDisplayMenu,container:'[data-testid="display-menu"]',testids:['twin-legend','honesty-notes','layer-provenance','layers-2d-only','navigation-scene-unavailable']},
- {name:'objects',open:p=>openInspector(p,'objects'),container:'#inspector-panel-objects',testids:['cycle-queue','entity-list','cup-owner','attention-reason']},
+ {name:'objects',open:p=>openInspector(p,'objects'),container:'#inspector-panel-objects',testids:['cycle-queue','entity-list','cup-owner']},
+ {name:'problems',open:openProblems,container:'[data-testid="problems-panel"]',testids:['attention-reason']},
  {name:'engineering',open:p=>openInspector(p,'engineering'),container:'#inspector-panel-engineering',testids:['run-identity','run-id','run-revision','engineering-panel'],ids:['twin-fault']},
  {name:'report',open:p=>openInspector(p,'report'),container:'#inspector-panel-report',testids:['report-streams','saved-evidence','controller-verification'],ids:['twin-report-summary','twin-import-evidence']},
  {name:'setup',open:p=>openInspector(p,'setup'),container:'#inspector-panel-setup',testids:['preflight'],ids:['twin-backend-set','twin-fault-schedule','twin-speed-limit']},
@@ -50,6 +51,16 @@ test.describe.serial('viewport-first twin layout',()=>{
   expect(await noVerticalScroll(page)).toBe(true);
   expect(await sceneShare(page)).toBeGreaterThanOrEqual(0.6);
   await shot(page,'first-open-desktop-vi');
+  // U02: one problem (not paired); its row names it, carries a reason code and leads to the runtime box
+  await expect(page.getByTestId('problems-count')).toContainText('1');
+  await expect(page.getByTestId('mode-badge')).toContainText('Mô phỏng · chưa chạy');
+  await openProblems(page);
+  await expect(page.getByTestId('runtime-popover')).toBeHidden();// one run-bar box at a time
+  const row=page.getByTestId('problems-panel').getByTestId('problem-row');
+  await expect(row).toHaveCount(1);await expect(row).toContainText('ghép nối');await expect(row.locator('code')).not.toHaveCount(0);
+  await row.locator('[data-action="twin-runtime-toggle"]').click();
+  await expect(page.getByTestId('runtime-popover')).toBeVisible();await expect(page.getByTestId('problems-panel')).toBeHidden();
+  expect(await sceneShare(page)).toBeGreaterThanOrEqual(0.6);
   await rowReachable(page,ROWS.find(r=>r.name==='setup')!);
   await shot(page,'setup-desktop-vi');// preflight is shown until a run starts
   expect(await noVerticalScroll(page)).toBe(true);
@@ -71,7 +82,7 @@ test.describe.serial('viewport-first twin layout',()=>{
   await expect(page.getByTestId('mode-badge')).toContainText('MOCK');
   await expect(page.getByTestId('run-status')).toContainText('Đang chạy');
   for(const s of ['twin-scene','twin-fallback-note','next-action'].map(sel))expect(await page.locator('.twin-viewport').locator(s).count(),s).toBe(await page.locator(s).count());
-  for(const row of ROWS.filter(r=>r.name!=='setup')){await rowReachable(page,row);await shot(page,`${row.name}-desktop-vi`);}
+  for(const row of ROWS.filter(r=>r.name!=='setup'&&r.name!=='problems')){await rowReachable(page,row);await shot(page,`${row.name}-desktop-vi`);}
   // the app-wide honesty notes the twin page no longer shows in a footer/strip live in the Display menu
   await openDisplayMenu(page);
   await expect(page.getByTestId('honesty-notes')).toContainText('Mô hình minh họa · chưa nghiệm thu phần cứng');
@@ -109,6 +120,48 @@ test.describe.serial('viewport-first twin layout',()=>{
    expect(await sceneShare(page),tab).toBeGreaterThanOrEqual(0.45);
    await shot(page,`completed-${tab}-desktop-vi`);
   }
+ });
+
+ test('a fault: the problem count grows, the row leads to its object, the strip shows in the viewport; the label explains itself',async()=>{
+  const count=page.getByTestId('problems-count'),before=await count.count()?Number(/\d+/.exec(await count.textContent()??'')?.[0]??0):0;
+  await page.getByTestId('primary-action').click();// run again with the same inputs: a new run, started
+  await expect(page.getByTestId('run-status')).toContainText('Đang chạy');
+  await openInspector(page,'engineering');
+  await page.locator('#twin-fault').selectOption('cup-removed');
+  await page.getByRole('button',{name:'Chèn lỗi'}).click();
+  await expect(page.getByTestId('run-status')).toContainText('Cần kiểm tra');
+  await expect(count).toBeVisible();
+  expect(Number(/\d+/.exec(await count.textContent()??'')?.[0])).toBeGreaterThan(before);
+  await rowReachable(page,ROWS.find(r=>r.name==='problems')!);
+  const first=page.getByTestId('problems-panel').getByTestId('problem-row').first();
+  await expect(first).toContainText('CUP_REMOVED');
+  await expect(first.locator('[data-action="twin-select"]')).toHaveCount(1);
+  await expect(page.locator('.twin-viewport').getByTestId('next-action')).toBeVisible();
+  await shot(page,'problems-desktop-vi');
+  await first.locator('[data-action="twin-select"]').click();
+  await expect(page.getByTestId('inspector-title')).toContainText('coffee-job-1');
+  await expect(page.getByTestId('problems-panel')).toBeHidden();// following a problem to its object closes the box
+  // the label is a button: its box names the mode with the access word, the shared notes and the report's limitations
+  await expect(page.getByTestId('mode-badge')).toContainText('Mô phỏng · MOCK');
+  await page.getByTestId('mode-badge').click();
+  const caveat=page.getByTestId('caveat-detail');
+  await expect(caveat).toBeVisible();await expect(page.getByTestId('problems-panel')).toBeHidden();
+  await expect(caveat).toContainText('MOCK · simulated');
+  await expect(caveat).toContainText('Mô hình minh họa · chưa nghiệm thu phần cứng');
+  await expect(caveat.getByTestId('caveat-limitations').locator('li')).not.toHaveCount(0);
+  await shot(page,'caveat-desktop-vi');
+  // the picker: runnable presets first; a Webots preset this mock runtime cannot run stays listed, disabled, with its reason
+  await openScenarioPicker(page);
+  await expect(caveat).toBeHidden();
+  const buttons=page.locator('#twin-picker [data-action="twin-preset"]'),states=await buttons.evaluateAll(b=>b.map(x=>(x as HTMLButtonElement).disabled));
+  expect(states.indexOf(true)).toBeGreaterThan(0);expect(states.slice(states.indexOf(true)).every(Boolean)).toBe(true);
+  const webots=page.locator('#twin-picker [data-action="twin-preset"][data-value="webots-coffee"]');
+  await expect(webots).toBeDisabled();
+  await expect(webots.getByTestId('picker-reasons')).toContainText(/[A-Z_]{6,}/);
+  expect(await sceneShare(page)).toBeGreaterThanOrEqual(0.45);
+  await shot(page,'picker-desktop-vi');
+  await page.getByTestId('scenario-picker').click();
+  await expect(page.locator('#twin-picker')).toBeHidden();
  });
 
  test('the chosen tab survives a reload',async()=>{

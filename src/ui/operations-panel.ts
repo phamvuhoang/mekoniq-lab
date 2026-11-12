@@ -1,4 +1,4 @@
-// Operator view pieces of the twin page: one next action, run controls for the transport bar, the attention chain and the cycle/resource queue.
+// Operator view pieces of the twin page: one next action, run controls for the transport bar, the attention chain (shown in the problems box) and the cycle/resource queue.
 import type {ClockControls,RunView} from '../scenarios/controls';
 import {explain,jobsOf,reconcilable} from '../twin/coffee-cell';
 import {WEBOTS_ARM_SET,WEBOTS_SET,nameOf,type TwinPreset} from '../scenarios/catalog';
@@ -38,12 +38,6 @@ export function runControls(s:OpsState):{live:boolean;paused:boolean;canPlay:boo
  // a source fixed-step simulation is stepped by the runtime on request like mock
  const paused=v?.run.status==='paused',native=v?.run.mode==='simulation'&&s.clock?.clock!=='source_fixed_step',step=s.clock?s.clock.step:!native&&live&&!paused,play=s.clock?s.clock.play:!native&&live&&!paused;
  return {live,paused,canPlay:play&&live&&!paused&&!s.busy,canStep:step&&live&&!s.busy&&!s.playing,canPause:live&&!native&&!s.busy&&(paused||!s.playing),canCancel:!!v&&!['completed','cancelled','failed'].includes(v.run.status)&&!s.busy&&!s.playing};
-}
-/** The viewport strip: the recommended step when it needs a person (never for a run that is simply running). Its button is the run bar's primary action. */
-export function nextActionStrip(s:OpsState):string{
- const n=nextAction(s),v=s.view;
- if(!n.action||v?.run.status==='running'&&!v.attention.length)return '';
- return `<div class="next-action" data-testid="next-action" role="status"><span class="eyebrow">${tr('BƯỚC TIẾP THEO','次の操作','NEXT ACTION')}</span><b>${esc(n.title)}</b><span>${esc(n.detail)}</span></div>`;
 }
 /** Attention chain (waiting -> observed -> rule -> action) with entity links. */
 export function attentionChain(s:OpsState):string{

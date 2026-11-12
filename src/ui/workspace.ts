@@ -18,8 +18,9 @@ import {defaultLayers,LAYERS,layerLabel,legend,ONLY_2D_REASON,THREE_D_LAYERS,tog
 import {selectEntity,selectedEntity,onSelection} from '../twin/selection';
 import {inspect,identityItems} from '../twin/inspector';
 import {currentCup,reconciliationSubject} from '../twin/coffee-cell';
-import {attentionChain,cycleQueue,nextAction,nextActionStrip,runControls,statusText,type OpsState} from './operations-panel';
-import {runBar,runtimePopover,type RunBarState} from './run-bar';
+import {attentionChain,cycleQueue,nextAction,runControls,statusText,type OpsState} from './operations-panel';
+import {caveatPopover,pickerItems,runBar,runtimePopover,scenarioPicker,simLabel,type RunBarState} from './run-bar';
+import {collectProblems,nextStrip,problemsPanel} from './problems';
 import {transportBar,type TransportState} from './transport';
 import {inspector,loadUi,saveUi,type InspectorTab} from './inspector';
 import {engineeringPanel,engineeringInspection} from './engineering-panel';
@@ -38,7 +39,9 @@ import {EvidenceStore,captureEvidence,evidenceStatus,type SavedEvidence} from '.
 import {MAX_PROJECT_BYTES,validateProjectV2} from '../project/schema';
 const STEP_TICKS=250,PLAY_TICKS=25;
 /** Twin-page boxes that scroll on their own (the window does not at desktop sizes). */
-const SCROLL_BOXES=['inspector-panel-objects','inspector-panel-engineering','inspector-panel-report','inspector-panel-setup','twin-display-menu','twin-picker'];
+const SCROLL_BOXES=['inspector-panel-objects','inspector-panel-engineering','inspector-panel-report','inspector-panel-setup','twin-display-menu','twin-picker','twin-problems','twin-caveat'];
+/** The boxes the run bar and the viewport open: one at a time. */
+const BOXES={'twin-display-toggle':'displayOpen','twin-runtime-toggle':'runtimeOpen','twin-picker-toggle':'pickerOpen','twin-problems-toggle':'problemsOpen','twin-caveat-toggle':'caveatOpen'} as const;
 export class TwinWorkspace {
  private readiness:ReadinessSnapshot|null=null;private readinessRequest=0;private readinessExpiry:ReturnType<typeof setTimeout>|undefined;
  private health:TwinHealth|null=null;private healthChecked=false;private probing=false;
@@ -165,22 +168,26 @@ export class TwinWorkspace {
   const v=f.view,r=v?.run,ops=this.ops(f),n=nextAction(ops),c=runControls(ops);
   // the primary action is the recommended step; while a run is live with none, auto-run (or stopping it)
   const primary=n.action?{action:n.action.id,label:n.action.label,disabled:ops.busy}:c.live?this.playing?{action:'twin-stop',label:tr('Dừng','停止','Stop'),disabled:false}:{action:'twin-play',label:tr('Chạy tiếp','続行','Keep running'),disabled:!c.canPlay}:null;
-  const problems=(v?.attention.length??0)+(this.showChecks()?preflight(this.readinessPreset(),this.health,this.rt.paired,this.readiness).filter(x=>!x.ok).length:0);
-  const presetsHtml=presets.map(x=>`<button class="preset-option" data-action="twin-preset" data-value="${x.id}" aria-pressed="${x.id===this.preset.id}" aria-label="${esc(x.title())}" aria-describedby="preset-${x.id}-summary">${icon(x.id==='coffee'?'coffee':'robot',20)}<span><b>${esc(x.title())}</b><small id="preset-${x.id}-summary">${esc(x.summary())}</small></span></button>`).join('');
-  return runBar({scenarioTitle:f.preset.title(),runtime:this.runtimeState(),mode:r?`${r.mode.toUpperCase()} · ${r.access}`:`${tr('Mô phỏng','シミュレーション','Simulation')} · ${tr('CHƯA CHẠY','未実行','NOT RUN')}`,status:r?statusText(r.status):null,simTimeS:v?Number(v.simTimeNs)/1e9:null,served:v?v.served:null,problems,primary,inspectorOpen:this.ui.inspectorOpen},
-   {pickerOpen:this.ui.pickerOpen,pickerHtml:presetsHtml,runtimeOpen:this.ui.runtimeOpen,runtimeHtml:runtimePopover({open:this.ui.runtimeOpen,pairFormHtml:this.pairForm(),sourceCommit:this.rt.paired?this.health?.sourceCommit??null:null})});
+  const p=this.problems(f),u=this.ui;
+  const boxes=scenarioPicker(pickerItems(presets,this.health),this.preset.id,u.pickerOpen)+runtimePopover({open:u.runtimeOpen,pairFormHtml:this.pairForm(),sourceCommit:this.rt.paired?this.health?.sourceCommit??null:null})
+   +problemsPanel(p,u.problemsOpen,attentionChain(ops))+caveatPopover(r?`${r.mode.toUpperCase()} · ${r.access}`:'—',f.report?.limitations??[],u.caveatOpen);
+  return runBar({scenarioTitle:f.preset.title(),runtime:this.runtimeState(),mode:simLabel(r?.mode??null,f.report?.manifest.calibration?.status==='calibrated'),status:r?statusText(r.status):null,simTimeS:v?Number(v.simTimeNs)/1e9:null,served:v?v.served:null,problems:p.length,primary,inspectorOpen:u.inspectorOpen},
+   {pickerOpen:u.pickerOpen,runtimeOpen:u.runtimeOpen,problemsOpen:u.problemsOpen&&!!p.length,caveatOpen:u.caveatOpen,boxesHtml:boxes});
  }
  /** Engineering tab head: the run's locked identity and revision. */
  private identity(f:TwinFrame){
   const v=f.view,r=v?.run,p=f.preset;
   return `<div class="twin-identity-block" id="twin-identity"><p class="twin-identity" data-testid="run-identity">${r?identityItems(v!,f.report).map(x=>`<span>${esc(x)}</span>`).join(''):`<span>${esc(p.scenarioId)} · ${esc(p.backendSetId)} · ${tr('chưa khóa','未固定','not locked')}</span>`}</p>${r?`<p><span class="twin-bar-item" data-testid="run-revision"><small>Run rev.</small><b>${this.replay?'—':esc(r.runRevision)}</b></span> <span class="twin-run-id" data-testid="run-id">${esc(r.id)}</span></p>`:''}</div>`;
  }
- /** Objects tab head: attention first, then the cycle/resource queue and who holds the current cup. */
+ /** Every problem of the page (D64); preflight counts until a run starts, an opened report has no live link. */
+ private problems(f:TwinFrame){return collectProblems({paired:this.rt.paired,health:this.health,healthChecked:this.healthChecked,checks:this.showChecks()?preflight(this.readinessPreset(),this.health,this.rt.paired,this.readiness):[],view:f.view,linkState:this.archived?'closed':this.link.state,notice:this.notice});}
+ /** Objects tab head: the cycle/resource queue and who holds the current cup (the attention chain is in the problems box). */
  private objects(f:TwinFrame){
   const ops=this.ops(f),cup=currentCup(f.view);
-  return `<div class="twin-objects" id="twin-objects">${attentionChain(ops)}${cycleQueue(ops)}${f.view?`<p class="twin-bar-item"><small>${tr('Cốc hiện tại','現在のカップ','Current cup')}${cup?` ${esc(cup.cupId)}`:''}</small><b data-testid="cup-owner">${cup?esc(nameOf(f.preset,cup.ownerId)):'—'}</b></p>`:''}</div>`;
+  return `<div class="twin-objects" id="twin-objects">${cycleQueue(ops)}${f.view?`<p class="twin-bar-item"><small>${tr('Cốc hiện tại','現在のカップ','Current cup')}${cup?` ${esc(cup.cupId)}`:''}</small><b data-testid="cup-owner">${cup?esc(nameOf(f.preset,cup.ownerId)):'—'}</b></p>`:''}</div>`;
  }
- private strip(f:TwinFrame){return `<div class="twin-next" id="twin-next">${nextActionStrip(this.ops(f))}</div>`;}
+ /** A run that is simply running needs no person: its next step stays on the run bar. */
+ private strip(f:TwinFrame){const n=nextAction(this.ops(f)),v=f.view;return `<div class="twin-next" id="twin-next">${nextStrip(this.problems(f),v?.run.status==='running'&&!v.attention.length?{title:n.title,detail:n.detail}:n)}</div>`;}
  private transport(f:TwinFrame):TransportState{
   const v=f.view,c=runControls(this.ops(f)),r=this.replay,speeds=this.clock()?.speeds.length?this.clock()!.speeds:[1,4,16,64];
   return {mode:r?'replay':v?'live':'idle',playing:this.playing,canPlay:c.canPlay,canStep:c.canStep,canPause:c.canPause,paused:c.paused,canCancel:c.canCancel,speeds,speed:this.runSpeed,
@@ -310,14 +317,16 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   this.playing=false;this.rerender();
  }
  click(action:string,value?:string){
-  if((action==='twin-select'||action==='twin-pick')&&value)return selectEntity(value);
+  // following a problem to its object hands the view back to the viewport: the problems box closes
+  if((action==='twin-select'||action==='twin-pick')&&value){const was=this.ui.problemsOpen;this.ui={...this.ui,problemsOpen:false};if(value===selectedEntity()&&was)this.rerender();return selectEntity(value);}
   // panels and boxes are view state: they never reach the runtime
   if(action==='twin-inspector-toggle'||action==='twin-inspector-tab'){this.ui={...this.ui,inspectorOpen:action==='twin-inspector-tab'||!this.ui.inspectorOpen,tab:action==='twin-inspector-tab'&&['objects','engineering','report','setup'].includes(value??'')?value as InspectorTab:this.ui.tab};saveUi(this.ui);return this.rerender();}
-  if(action==='twin-display-toggle'||action==='twin-runtime-toggle'||action==='twin-picker-toggle'){const k=({'twin-display-toggle':'displayOpen','twin-runtime-toggle':'runtimeOpen','twin-picker-toggle':'pickerOpen'} as const)[action];this.ui={...this.ui,[k]:!this.ui[k]};return this.rerender();}
+  if(action in BOXES){const k=BOXES[action as keyof typeof BOXES],open=!this.ui[k];this.ui={...this.ui,displayOpen:false,runtimeOpen:false,pickerOpen:false,problemsOpen:false,caveatOpen:false,[k]:open};return this.rerender();}
   if(action==='twin-layer'&&this.vs.view==='3d'&&!THREE_D_LAYERS.includes(value as Layer))return;// drawn on the 2D plan only
   if(action==='twin-layer'){this.vs={...this.vs,layers:toggleLayer(this.vs.layers,value as Layer)};return this.rerender();}
   if(action==='twin-view'){if(value==='2d'){this.viewer?.dispose();this.viewer=null;}this.vs={...this.vs,view:value==='3d'&&!this.webglFailed?'3d':'2d'};return this.rerender();}
-  if(action==='twin-preset'){this.ui={...this.ui,pickerOpen:false};const p=presetById(value??'');if(p&&p!==this.preset){this.preset=p;if(p.mode==='simulation')this.scheduleDraft={...this.scheduleDraft,faultId:'cup-removed',targetId:''};void this.checkReadiness().then(()=>this.rerender());if(!this.view)selectEntity(null);}return this.rerender();}
+  // not paired: the pairing form comes back once the picker closes
+  if(action==='twin-preset'){this.ui={...this.ui,pickerOpen:false,runtimeOpen:this.ui.runtimeOpen||!this.rt.paired};const p=presetById(value??'');if(p&&p!==this.preset){this.preset=p;if(p.mode==='simulation')this.scheduleDraft={...this.scheduleDraft,faultId:'cup-removed',targetId:''};void this.checkReadiness().then(()=>this.rerender());if(!this.view)selectEntity(null);}return this.rerender();}
   if(action==='twin-readiness')return void this.call(()=>this.checkReadiness());
   if(action==='twin-dismiss'){this.notice='';return this.rerender();}
   if(action==='twin-reclaim'&&value&&this.rt.reclaim)return void this.call(async()=>{

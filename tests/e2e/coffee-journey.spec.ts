@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import runtimeLock from "../../config/source-runtime.lock.json" with { type: "json" };
-import { openDisplayMenu, openInspector, openScenarioPicker } from "../support/twin";
+import { openDisplayMenu, openInspector, openProblems, openScenarioPicker } from "../support/twin";
 // Against the real pinned source runtime (scripts/test-mock-e2e.mjs). The runtime latches attention for the life of a run, so the
 // correction after a missing cup is: reconcile the affected job (human confirmation), then a new run with the same locked inputs.
 const token = process.env.LAB_TEST_PAIRING_TOKEN;
@@ -24,12 +24,13 @@ test("missing cup: visible reason and entity, confirmed reconcile, corrected run
   await page.locator("#twin-fault").selectOption("cup-removed");
   await page.getByRole("button", { name: "Chèn lỗi" }).click();
   await expect(page.getByTestId("run-status")).toContainText("Cần kiểm tra");
+  await openProblems(page);
   const reason = page.getByTestId("attention-reason");
   await expect(reason).toContainText("CUP_REMOVED");
   await expect(reason).toContainText("cốc");
   await expect(page.getByTestId("next-action")).toContainText("đối soát");
   await expect(page.getByTestId("primary-action")).toHaveText("Đối soát");
-  await openInspector(page, "objects");
+  await openProblems(page); // the attention chain and its entity links live in the problems box (U02)
   await page.getByTestId("attention-entity").first().click();
   await expect(page.getByTestId("inspector-title")).toContainText("coffee-job-1");
   await openDisplayMenu(page);
