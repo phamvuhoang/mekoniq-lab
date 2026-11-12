@@ -2,6 +2,7 @@
 // see the arm's actual and commanded joints apart and the arm drawn as a joint chain in 3D, read the plant block (not_calibrated) in the report.
 // Without the launcher's pairing code this FAILS (it is never skipped). The screenshot is candidate evidence only, never backend evidence.
 import {test,expect,type Page} from '@playwright/test';
+import {openDisplayMenu,openInspector,openScenarioPicker} from '../support/twin';
 const token=process.env.LAB_TEST_PAIRING_TOKEN,shots=process.env.LAB_IRSIM_SCREENSHOTS;
 const runId=async(page:Page)=>(await page.getByTestId('run-id').textContent())!.trim();
 interface Report {outcome:{status:string;served:string};manifest:{scenario:{id:string};mode:string;backends:{id:string}[]};limitations:string[];
@@ -18,7 +19,7 @@ test('coffee with the arm on Webots: run to completed, actual and commanded join
  // the arm set is offered because health says webots_arm is live and advertises sim3d_arm_v1
  await expect(page.locator('#twin-backend-set option[value="engineering-webots-arm-v1"]')).toBeEnabled();
 
- await page.getByRole('button',{name:'Webots · coffee with a 3D arm'}).click();
+ await openScenarioPicker(page);await page.getByRole('button',{name:'Webots · coffee with a 3D arm'}).click();
  await expect(page.getByTestId('preflight').locator('li',{hasText:'Runtime readiness'})).toHaveClass(/ok/,{timeout:180000});
  await page.getByRole('button',{name:'Run Webots (arm)'}).click();
  await expect(page.getByTestId('mode-badge')).toContainText('SIMULATION');
@@ -26,14 +27,14 @@ test('coffee with the arm on Webots: run to completed, actual and commanded join
 
  // a step, then the arm: the joint rows have two columns, the source row says which is which
  await page.getByRole('button',{name:'+5 s'}).click();
- await page.getByTestId('entity-list').getByRole('button',{name:/Arm-1/}).click();
+ await openInspector(page,'objects');await page.getByTestId('entity-list').getByRole('button',{name:/Arm-1/}).click();
  const q1=page.getByTestId('eng-joint-1');
  await expect(q1.locator('td').nth(0)).toContainText(/-?\d/);await expect(q1.locator('td').nth(1)).toContainText(/-?\d/);
  await expect(page.getByTestId('eng-arm-source')).toContainText('actual (Webots) · commanded');
  await expect(page.getByTestId('eng-joint-1')).not.toContainText('no encoder');
 
  // 3D: the arm is a chain of links and joints now, not one cylinder
- await page.getByRole('button',{name:'3D',exact:true}).click();
+ await openDisplayMenu(page);await page.getByRole('button',{name:'3D',exact:true}).click();
  await expect(page.locator('canvas[aria-label^="3D twin view"]')).toBeVisible();
  await page.locator('#twin-run-speed').selectOption('64');
  await page.getByRole('button',{name:'Auto-run'}).click();

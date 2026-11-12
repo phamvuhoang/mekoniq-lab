@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { openDisplayMenu, openInspector, openScenarioPicker } from "../support/twin";
 // Plan 03 A05: against the pinned source runtime through the launcher (scripts/test-mock-e2e.mjs arm-simulation.spec.ts). The mock run shows the
 // arm as a commanded-only trace with provenance; the simulation preset is refused by preflight with the runtime's reason. Nothing here moves a
 // real arm and the mock joint animation never completes a pickup by itself (custody rows come from the source journal).
@@ -10,11 +11,14 @@ test("arm telemetry and ARM03 rows are honest in the mock run; the simulation se
   await page.goto("/#twin");
   await page.locator("#twin-pair-token").fill(token!);
   await page.getByRole("button", { name: "Ghép nối runtime" }).click();
+  await openScenarioPicker(page);
   await page.getByRole("button", { name: "Cà phê sữa đá" }).click();
   await page.getByRole("button", { name: "Chạy mock" }).click();
   await expect(page.getByTestId("mode-badge")).toContainText("MOCK");
   await expect(page.getByTestId("run-status")).not.toContainText("Sẵn sàng", { timeout: 60000 });
+  await openDisplayMenu(page);
   await page.getByRole("button", { name: "2D", exact: true }).click();
+  await openInspector(page, "objects");
   await page.getByTestId("entity-list").getByText("Cánh tay 1").click();
   await expect(page.getByTestId("inspector-title")).toContainText("arm-1");
   const inspector = page.locator("#twin-inspector");

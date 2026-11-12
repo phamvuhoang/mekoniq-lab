@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import runtimeLock from "../../config/source-runtime.lock.json" with { type: "json" };
+import { openDisplayMenu, openInspector, openScenarioPicker } from "../support/twin";
 // Against the real pinned source runtime (scripts/test-mock-e2e.mjs). The runtime latches attention for the life of a run, so the
 // correction after a missing cup is: reconcile the affected job (human confirmation), then a new run with the same locked inputs.
 const token = process.env.LAB_TEST_PAIRING_TOKEN;
@@ -11,6 +12,7 @@ test("missing cup: visible reason and entity, confirmed reconcile, corrected run
   await page.goto("/#twin");
   await page.locator("#twin-pair-token").fill(token!);
   await page.getByRole("button", { name: "Ghép nối runtime" }).click();
+  await openScenarioPicker(page);
   await page.getByRole("button", { name: "Cà phê sữa đá" }).click();
   await page.getByRole("button", { name: "Chạy mock" }).click();
   await expect(page.getByTestId("mode-badge")).toContainText("MOCK");
@@ -18,26 +20,30 @@ test("missing cup: visible reason and entity, confirmed reconcile, corrected run
   await expect(page.getByTestId("cup-owner")).toHaveText("Trạm cà phê");
   const firstRun = await page.getByTestId("run-id").textContent();
   // the cup is under the nozzle while brewing: remove it
+  await openInspector(page, "engineering");
   await page.locator("#twin-fault").selectOption("cup-removed");
   await page.getByRole("button", { name: "Chèn lỗi" }).click();
   await expect(page.getByTestId("run-status")).toContainText("Cần kiểm tra");
   const reason = page.getByTestId("attention-reason");
   await expect(reason).toContainText("CUP_REMOVED");
   await expect(reason).toContainText("cốc");
-  await expect(page.getByTestId("next-action")).toContainText("Đối soát");
+  await expect(page.getByTestId("next-action")).toContainText("đối soát");
+  await expect(page.getByTestId("primary-action")).toHaveText("Đối soát");
+  await openInspector(page, "objects");
   await page.getByTestId("attention-entity").first().click();
   await expect(page.getByTestId("inspector-title")).toContainText("coffee-job-1");
+  await openDisplayMenu(page);
   await page.getByRole("button", { name: "2D", exact: true }).click(); // the plan is DOM; the 3D canvas is not inspectable
   await expect(page.getByTestId("twin-scene").locator('[data-entity="coffee-job-1"][data-selected="true"]')).toHaveCount(1);
   await expect(page.getByTestId("cycle-queue")).toContainText("CUP_REMOVED");
   if (shots) await page.screenshot({ path: `${shots}/F05-missing-cup-desktop-vi.png`, fullPage: true });
   // reconcile needs an explicit human confirmation; cancelling the dialog changes nothing
-  await page.getByTestId("next-action").getByRole("button", { name: "Đối soát", exact: true }).click();
+  await page.getByTestId("primary-action").click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("coffee-job-1");
   await dialog.getByRole("button", { name: "Hủy" }).click();
   await expect(page.getByTestId("cycle-queue")).not.toContainText("Đã cách ly");
-  await page.getByTestId("next-action").getByRole("button", { name: "Đối soát", exact: true }).click();
+  await page.getByTestId("primary-action").click();
   await dialog.getByRole("button", { name: "Xác nhận đã kiểm tra" }).click();
   await expect(page.getByTestId("cycle-queue")).toContainText("Đã cách ly");
   // the run itself stays in attention: it is not relabelled completed

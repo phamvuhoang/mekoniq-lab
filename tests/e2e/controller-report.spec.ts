@@ -6,6 +6,7 @@ import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 const fixture=JSON.parse(readFileSync(new URL('../../fixtures/twins/coffee-cell-v2.json',import.meta.url),'utf8'));
 import {controllerReportFixture} from '../support/controller-report';
+import {openInspector} from '../support/twin';
 import {hashJson} from '../../src/twin/hash';
 // Fixture rendering/import evidence only. This test does not execute LinuxCNC or Gazebo.
 test('imported controller fixture is read-only and reveals collision only at the recorded cursor',async({page})=>{
@@ -15,7 +16,7 @@ test('imported controller fixture is read-only and reveals collision only at the
  let actions=0;page.on('request',r=>{if(r.method()==='POST'&&r.url().includes('/actions'))actions++;});
  try{
   await Promise.all([writeFile(join(directory,'report.json'),JSON.stringify(report)),writeFile(join(directory,'project.json'),JSON.stringify(project)),writeFile(join(directory,'trace.txt'),bytes)]);
-  await page.goto('/#twin');await page.locator('#twin-import-evidence').setInputFiles(directory);
+  await page.goto('/#twin');await openInspector(page,'report');await page.locator('#twin-import-evidence').setInputFiles(directory);
   await expect(page.getByTestId('saved-evidence')).toContainText('Đã nhập');await page.getByTestId('saved-evidence').getByRole('button',{name:/Đã nhập/}).click();
   await expect(page.getByTestId('controller-verification')).toContainText('protocol_double');
   const cursor=page.locator('#twin-replay-cursor');await cursor.fill('10');await cursor.dispatchEvent('input');

@@ -2,6 +2,7 @@
 // load the Serve robot with casters -> compile -> 10-table world -> WB-FD01 -> pause/step -> scripted load/handoff -> report -> replay in the 3D twin -> three languages.
 // Without the launcher's pairing code this FAILS (it is never skipped). Screenshots are candidate evidence only, never backend evidence.
 import {test,expect,type Page} from '@playwright/test';
+import {openDisplayMenu,openInspector,openScenarioPicker} from '../support/twin';
 const token=process.env.LAB_TEST_PAIRING_TOKEN,shots=process.env.LAB_IRSIM_SCREENSHOTS;
 const runId=async(page:Page)=>(await page.getByTestId('run-id').textContent())!.trim();
 interface Report {businessEvents:{type:string}[];confirmations:{confirmationType:string;provenance:string}[];manifest:{scenario:{id:string};backends:{id:string}[]};limitations:string[];coverage:{dynamics:boolean};
@@ -40,8 +41,8 @@ test('Serve on Webots 3D: compile, run WB-FD01 to completion, report and replay 
 
  // Twin: the 10-table world and WB-FD01
  await page.goto('/#twin');
- await page.getByRole('button',{name:'Webots 3D · FD01 delivery'}).click();
- await page.getByRole('button',{name:'2D',exact:true}).click();
+ await openScenarioPicker(page);await page.getByRole('button',{name:'Webots 3D · FD01 delivery'}).click();
+ await openDisplayMenu(page);await page.getByRole('button',{name:'2D',exact:true}).click();
  await expect(page.locator('#twin-scene-title')).toContainText('20 × 12 m');
  for(const t of ['T01','T10'])await expect(page.getByTestId('twin-scene')).toContainText(t);
  await expect(page.getByTestId('preflight').locator('li',{hasText:'Compiled bundle for this exact draft'})).toHaveClass(/ok/);
@@ -75,7 +76,7 @@ test('Serve on Webots 3D: compile, run WB-FD01 to completion, report and replay 
  await expect(nav).toHaveAttribute('data-supported','true');await expect(nav).toContainText('webots_3d');await expect(nav).toContainText('Webots R2025a');await expect(nav).not.toContainText('IR-SIM');
  await expect(nav).toHaveAttribute('data-complete','true',{timeout:30000});
  await expect(page.getByTestId('navigation-assertions').locator('tr')).not.toHaveCount(0);
- await page.getByRole('button',{name:'Save immutable report'}).click();
+ await openInspector(page,'report');await page.getByRole('button',{name:'Save immutable report'}).click();
  await expect(page.getByTestId('evidence-status').first()).toContainText('inputs match');
  await capture(page,'twin-completed');
 
@@ -85,7 +86,7 @@ test('Serve on Webots 3D: compile, run WB-FD01 to completion, report and replay 
  await page.locator('#twin-replay-cursor').fill('500');
  await expect(page.getByTestId('replay-time')).toContainText('tick 500');
  await expect(page.getByTestId('replay-entities')).toContainText('amr-1');
- await page.getByRole('button',{name:'3D',exact:true}).click();
+ await openDisplayMenu(page);await page.getByRole('button',{name:'3D',exact:true}).click();
  await expect(page.locator('canvas[aria-label^="3D twin view"]')).toBeVisible();
  await expect(nav).toHaveAttribute('data-complete','true');await expect(nav).not.toContainText('IDENTITY_MISMATCH');
  await capture(page,'twin-replay-3d');

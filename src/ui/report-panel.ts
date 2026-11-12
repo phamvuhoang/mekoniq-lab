@@ -63,7 +63,6 @@ export function reportPanel(report:RunReport|null,o:{replay:ReplayState|null;pre
  const verification=controllerVerificationHtml(report,o.replay?.tick??report.outcome.tick);
  const r=o.replay;
  const replay=r?`<div class="replay" data-testid="replay-panel"><div class="replay-controls"><button class="button secondary" data-action="twin-replay-play">${icon(r.playing?'cross':'play',16)}${r.playing?tr('Dừng phát','停止','Pause'):tr('Phát','再生','Play')}</button>
-<label for="twin-replay-cursor" class="visually-hidden">${tr('Vị trí xem lại (tick)','再生位置(tick)','Replay position (tick)')}</label><input id="twin-replay-cursor" type="range" min="0" max="${esc(r.rp.range.toTick)}" step="5" value="${esc(r.tick)}">
 <button class="button quiet" data-action="twin-replay-exit">${icon('cross',16)}${tr('Thoát xem lại','再生を終了','Exit replay')}</button></div>
 <p class="source-note">${icon('lock',14)}${tr('Chỉ đọc: xem lại không gửi lệnh, không nội suy qua khoảng trống.','読み取り専用:再生はコマンドを送らず、欠落を補間しません。','Read-only: replay sends no command and never interpolates across gaps.')}</p><div id="twin-replay-body">${replayBody(r,o.selected)}</div></div>`
   :`<button class="button secondary" data-action="twin-replay">${icon('play',16)}${tr('Xem lại (chỉ đọc)','再生(読み取り専用)','Replay (read-only)')}</button>`;

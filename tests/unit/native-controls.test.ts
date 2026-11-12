@@ -22,10 +22,10 @@ test('changing the backend environment renders the completed readiness response'
 });
 test('native controls never issue mock step or auto-run actions',async()=>{
  vi.stubGlobal('localStorage',{getItem:()=>null,setItem:()=>{}});vi.stubGlobal('innerWidth',600);
- const {TwinWorkspace}=await import('../../src/ui/workspace');const {coffeeReplay}=await import('../support/coffee-replay');const {operationsPanel}=await import('../../src/ui/operations-panel');
+ const {TwinWorkspace}=await import('../../src/ui/workspace');const {coffeeReplay}=await import('../support/coffee-replay');const {runControls}=await import('../../src/ui/operations-panel');const {transportBar}=await import('../../src/ui/transport');
  const {view}=coffeeReplay();view.run.mode='simulation';view.run.status='running';const act=vi.fn();
  const w=new TwinWorkspace(()=>{},{paired:true} as unknown as import('../../src/scenarios/controls').TwinRuntime);Object.assign(w,{view,act});
  w.click('twin-step');w.click('twin-play');await Promise.resolve();expect(act).not.toHaveBeenCalled();
- const html=operationsPanel({paired:true,ready:true,busy:false,playing:false,view,preset:presetById('coffee')!},'');
+ const html=transportBar({mode:'live',playing:false,...runControls({paired:true,ready:true,busy:false,playing:false,view,preset:presetById('coffee')!}),speeds:[1],speed:1,simTimeS:0,tick:0});
  expect(html).toMatch(/data-action="twin-step"[^>]*disabled/);expect(html).toMatch(/data-action="twin-play"[^>]*disabled/);w.leave();vi.unstubAllGlobals();
 });

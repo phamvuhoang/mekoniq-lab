@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { openDisplayMenu, openInspector, openScenarioPicker } from "../support/twin";
 // NR06: the existing multi-robot presets still run end to end from the UI against the real pinned runtime (scripts/test-mock-e2e.mjs). One pairing for the whole file.
 // Adding engineering must not remove or reroute them: same scenario ids, two AMRs both active in the campaign, served and cup owner read from the journal.
 const token = process.env.LAB_TEST_PAIRING_TOKEN;
@@ -15,8 +16,10 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => { await page?.close(); });
 const run = async (preset: string) => {
   const previous = await page.getByTestId("run-id").textContent({ timeout: 500 }).catch(() => null);
+  await openScenarioPicker(page);
   await page.getByRole("button", { name: preset }).click();
   // the first run starts with "Chạy mock"; once a run exists a different preset starts with new inputs
+  await openInspector(page, "setup");
   await page.getByRole("button", { name: /^(Chạy mock|Chạy với đầu vào mới)$/ }).first().click();
   await expect(page.getByTestId("mode-badge")).toContainText("MOCK");
   if (previous) await expect(page.getByTestId("run-id")).not.toHaveText(previous);   // the new run, not the one still on screen
@@ -36,6 +39,7 @@ test("two-robot campaign: both AMRs act, nothing is served twice, and the campai
   test.setTimeout(300000);
   await run("Chiến dịch hai robot");
   await expect(page.getByTestId("run-identity")).toContainText("CAMPAIGN-FD02-FD07-BV01-BV03");
+  await openDisplayMenu(page);
   await page.getByRole("button", { name: "2D", exact: true }).click();
   const scene = page.getByTestId("twin-scene");
   await expect(scene.locator('[data-entity="amr-1"]')).toHaveCount(1);

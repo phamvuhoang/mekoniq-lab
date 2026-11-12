@@ -5,6 +5,7 @@
 // contention rig (IR-RIG-ZONE), not here. Every metric read comes from the durable trace (navigation2d), never from the animation.
 // Without the launcher's pairing code this FAILS (never skipped).
 import {test,expect} from '@playwright/test';
+import {openDisplayMenu,openScenarioPicker} from '../support/twin';
 const token=process.env.LAB_TEST_PAIRING_TOKEN;
 interface Report {manifest:{scenario:{id:string};backends:{id:string}[];models:{id:string;hash:string}[]};outcome:{status:string;served:string;tick:number};
  entities:{id:string}[];businessEvents:{type:string;kind:string;state:Record<string,unknown>}[];
@@ -29,8 +30,8 @@ test('Two Serve robots on IR-SIM 2D: compile the fleet, run IR-FD07 to completio
 
  // Twin: IR-FD07 on the fleet; both footprints drawn from the compiled scene
  await page.goto('/#twin');
- await page.getByRole('button',{name:'IR-SIM 2D · two robots FD07'}).click();
- await page.getByRole('button',{name:'2D',exact:true}).click();
+ await openScenarioPicker(page);await page.getByRole('button',{name:'IR-SIM 2D · two robots FD07'}).click();
+ await openDisplayMenu(page);await page.getByRole('button',{name:'2D',exact:true}).click();
  await expect(page.getByTestId('preflight').locator('li',{hasText:'Compiled bundle for this exact draft'})).toHaveClass(/ok/);
  await expect(page.getByTestId('preflight').locator('li',{hasText:'Runtime readiness'})).toHaveClass(/ok/,{timeout:30000});
  await page.getByRole('button',{name:'Run IR-SIM 2D'}).click();

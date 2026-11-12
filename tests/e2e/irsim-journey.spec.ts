@@ -2,6 +2,7 @@
 // load Serve -> compile -> validate -> 10-table world -> IR-FD01 -> scripted load/handoff confirmations -> pause/step -> report -> replay -> edit width -> stale -> rerun.
 // Without the launcher's pairing code this FAILS (it is never skipped). Screenshots are candidate evidence only, never backend evidence.
 import {test,expect,type Page} from '@playwright/test';
+import {openDisplayMenu,openInspector,openScenarioPicker} from '../support/twin';
 const token=process.env.LAB_TEST_PAIRING_TOKEN,shots=process.env.LAB_IRSIM_SCREENSHOTS;
 const runId=async(page:Page)=>(await page.getByTestId('run-id').textContent())!.trim();
 async function report(page:Page){const id=await runId(page);return page.evaluate(async r=>(await fetch(`/lab/v2/runs/${r}/report`,{credentials:'same-origin'})).json(),id) as Promise<{businessEvents:{type:string}[];confirmations:{confirmationType:string;provenance:string}[];navigation2d?:{engine:{id:string}};manifest:{backends:{id:string}[];scenario:{id:string}}}>;}
@@ -47,8 +48,8 @@ test('Serve on IR-SIM 2D: validate, run IR-FD01 to completion, report and replay
 
  // Twin: the 10-table world and IR-FD01
  await page.goto('/#twin');
- await page.getByRole('button',{name:'IR-SIM 2D · FD01 delivery'}).click();
- await page.getByRole('button',{name:'2D',exact:true}).click();
+ await openScenarioPicker(page);await page.getByRole('button',{name:'IR-SIM 2D · FD01 delivery'}).click();
+ await openDisplayMenu(page);await page.getByRole('button',{name:'2D',exact:true}).click();
  await expect(page.locator('#twin-scene-title')).toContainText('20 × 12 m');
  for(const t of ['T01','T10'])await expect(page.getByTestId('twin-scene')).toContainText(t);
  await expect(page.getByTestId('preflight').locator('li',{hasText:'Compiled bundle for this exact draft'})).toHaveClass(/ok/);
@@ -60,7 +61,7 @@ test('Serve on IR-SIM 2D: validate, run IR-FD01 to completion, report and replay
  await expect(page.getByTestId('layer-provenance')).toContainText('drive → base');
  await expect(page.locator('.tw-compiled-obstacle').first()).toBeAttached();
  await expect(page.locator('polygon[data-layer="footprint"]')).toHaveCount(1);
- await page.getByRole('button',{name:'Safety envelope'}).click();await expect(page.locator('polygon[data-layer="safety"]')).toHaveCount(1);
+ await openDisplayMenu(page);await page.getByRole('button',{name:'Safety envelope'}).click();await expect(page.locator('polygon[data-layer="safety"]')).toHaveCount(1);
  await page.getByRole('button',{name:'LiDAR',exact:true}).click();await expect(page.getByTestId('scan-unavailable')).toContainText('SCAN_STREAM_NOT_EXPOSED');
 
  // pause is acknowledged by the backend; no step while paused (the set has manualStep:false); resume, then a step advances the run
@@ -73,7 +74,7 @@ test('Serve on IR-SIM 2D: validate, run IR-FD01 to completion, report and replay
  await page.getByRole('button',{name:'+5 s'}).click();
  await expect(page.getByTestId('run-tick')).not.toHaveText(tick!);
  await page.locator('#twin-run-speed').selectOption('64');
- await page.getByRole('button',{name:'Observed path'}).click();
+ await openDisplayMenu(page);await page.getByRole('button',{name:'Observed path'}).click();
  await page.getByRole('button',{name:'Auto-run'}).click();
  await expect(page.getByTestId('run-status')).toContainText('Completed',{timeout:420000});
 
@@ -89,7 +90,7 @@ test('Serve on IR-SIM 2D: validate, run IR-FD01 to completion, report and replay
  await expect(nav).toHaveAttribute('data-complete','true',{timeout:30000});
  await expect(page.getByTestId('navigation-assertions').locator('tr')).not.toHaveCount(0);
  await expect(page.locator('polyline[data-layer="observed"]').first()).toBeAttached();
- await page.getByRole('button',{name:'Save immutable report'}).click();
+ await openInspector(page,'report');await page.getByRole('button',{name:'Save immutable report'}).click();
  await expect(page.getByTestId('evidence-status').first()).toContainText('inputs match');
  await capture(page,'twin-completed');
 
@@ -121,7 +122,7 @@ test('Serve on IR-SIM 2D: validate, run IR-FD01 to completion, report and replay
  const secondReport=await compileAndValidate(page);
  expect(secondReport).not.toBe(firstReport);
  await page.goto('/#twin');
- await page.getByRole('button',{name:'Run with edited inputs'}).click();// create re-checks readiness against the new bundle before any run
+ await openInspector(page,'setup');await page.getByRole('button',{name:'Run with edited inputs'}).click();// create re-checks readiness against the new bundle before any run
  await expect(page.getByTestId('run-id')).not.toHaveText(firstRun,{timeout:60000});
  await expect(page.locator('#twin-scene-title')).toContainText('21 × 12 m');
  await expect(page.getByTestId('run-status')).toContainText(/Running|Awaiting/);

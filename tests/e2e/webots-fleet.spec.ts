@@ -2,6 +2,7 @@
 // fleet with casters, compile, run WB-FD07 to completion, then read the report. Both robots deliver through the source, one at a time (the venue-movement reservation
 // serialises them); the aisle zone is server-side only. Every metric read comes from the durable trace (navigation2d), never from the animation. Never skipped.
 import {test,expect} from '@playwright/test';
+import {openDisplayMenu,openScenarioPicker} from '../support/twin';
 const token=process.env.LAB_TEST_PAIRING_TOKEN;
 interface Report {manifest:{scenario:{id:string};backends:{id:string}[]};outcome:{status:string;served:string;tick:number};entities:{id:string}[];businessEvents:{type:string;kind:string;state:Record<string,unknown>}[];
  metrics:{maxConcurrentMovers:number;collision:{available:boolean;contacts:number|null};navigation?:{coverage:string;distanceM:Record<string,number>|null;collisionEpisodes:number|null}};navigation2d?:{engine:{id:string};completeness?:{status:string}}}
@@ -19,8 +20,8 @@ test('Two Serve robots on Webots 3D: compile the fleet, run WB-FD07 to completio
  await page.getByRole('button',{name:'Compile on runtime'}).click();
  await expect(page.getByTestId('asm-receipt')).toHaveAttribute('data-state','compiled',{timeout:120000});
  await page.goto('/#twin');
- await page.getByRole('button',{name:'Webots 3D · two robots FD07'}).click();
- await page.getByRole('button',{name:'2D',exact:true}).click();
+ await openScenarioPicker(page);await page.getByRole('button',{name:'Webots 3D · two robots FD07'}).click();
+ await openDisplayMenu(page);await page.getByRole('button',{name:'2D',exact:true}).click();
  await expect(page.getByTestId('preflight').locator('li',{hasText:'Compiled bundle for this exact draft'})).toHaveClass(/ok/);
  await expect(page.getByTestId('preflight').locator('li',{hasText:'Runtime readiness'})).toHaveClass(/ok/,{timeout:120000});
  await page.getByRole('button',{name:'Run Webots 3D'}).click();

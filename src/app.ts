@@ -213,12 +213,14 @@ export class LabApp {
 </div>
 </div>
 </aside>
-<main id="workspace" tabindex="-1" aria-busy="${this.busy}">
+<main id="workspace" tabindex="-1" aria-busy="${this.busy}">${
+      // the Digital twin page is viewport-first: its own run bar replaces the heading, runtime strip and footer
+      this.page === "twin" ? `<h1 class="visually-hidden">${ns.twin}</h1>` : `
 <div class="page-heading">
 <div>
 <div class="eyebrow">${tr("THIẾT KẾ. KIỂM CHỨNG. TRIỂN KHAI.", "設計。検証。運用。", "DESIGN. VALIDATE. DEPLOY.")}</div>
 <h1>${this.page === "design" ? tr("Robot của bạn, từng chi tiết.", "ロボットを、細部まで。", "Your robot, down to the details.") : ns[this.page]}</h1>
-<p>${this.page === "design" ? tr("Lắp ráp cấu hình phục vụ phù hợp với không gian của bạn.", "店舗に合ったサービスロボットを構成。", "Build a service robot around the way your space works.") : this.page === "restaurant" ? tr("Một mặt bằng chung cho thiết kế và kiểm chứng nghiệp vụ.", "設計と業務検証のための共通レイアウト。", "A shared layout for design and workflow validation.") : this.page === "scenarios" ? tr("Mỗi kết quả bắt đầu từ một lần chạy có nguồn gốc rõ ràng.", "根拠のある実行から結果が生まれます。", "Every result begins with a traceable run.") : this.page === "twin" ? tr("Cùng một lần chạy cho người vận hành và kỹ sư: quan sát, lệnh và mô hình được tách rõ.", "オペレーターとエンジニアが同じ実行を見る。観測・指令・モデルを区別。", "One run for operators and engineers: observed, commanded and modeled kept apart.") : this.page === "results" ? tr("Bằng chứng phần mềm, phạm vi được ghi rõ.", "範囲を明示したソフトウェア検証記録。", "Software evidence, with its limits in view.") : tr("Gói cấu hình dự thảo. Robot thật cần nghiệm thu riêng.", "設定ドラフト。実機は別途受入試験が必要です。", "A configuration draft. Physical robots require commissioning.")}</p>
+<p>${this.page === "design" ? tr("Lắp ráp cấu hình phục vụ phù hợp với không gian của bạn.", "店舗に合ったサービスロボットを構成。", "Build a service robot around the way your space works.") : this.page === "restaurant" ? tr("Một mặt bằng chung cho thiết kế và kiểm chứng nghiệp vụ.", "設計と業務検証のための共通レイアウト。", "A shared layout for design and workflow validation.") : this.page === "scenarios" ? tr("Mỗi kết quả bắt đầu từ một lần chạy có nguồn gốc rõ ràng.", "根拠のある実行から結果が生まれます。", "Every result begins with a traceable run.") : this.page === "results" ? tr("Bằng chứng phần mềm, phạm vi được ghi rõ.", "範囲を明示したソフトウェア検証記録。", "Software evidence, with its limits in view.") : tr("Gói cấu hình dự thảo. Robot thật cần nghiệm thu riêng.", "設定ドラフト。実機は別途受入試験が必要です。", "A configuration draft. Physical robots require commissioning.")}</p>
 </div>
 <div class="heading-actions">${btn(tr("Hoàn tác", "元に戻す", "Undo"), "undo", "undo", "quiet", this.history.length ? "" : "disabled")}${btn(tr("Làm lại", "やり直す", "Redo"), "redo", "rotate", "quiet", this.future.length ? "" : "disabled")}${btn(tr("Xuất dự án", "プロジェクト出力", "Export project"), "export-project", "download", "secondary")}</div>
 </div>
@@ -228,16 +230,21 @@ export class LabApp {
 </i>${this.health ? tr("Runtime đã kết nối", "ランタイム接続済み", "Runtime connected") : tr("Chế độ xem trước", "プレビューモード", "Preview mode")}</span>
 <span>${this.health ? tr("Source runtime · chỉ mô phỏng nghiệp vụ", "Source runtime · 業務シミュレーションのみ", "Source runtime · business simulation only") : tr("Thiết kế tự do · kết nối runtime cục bộ để chạy kịch bản", "自由に設計 · シナリオ実行にはローカル接続が必要", "Explore your design · connect a local runtime to run scenarios")}</span>
 <button class="text-button" data-action="goto-runtime">${tr("Kết nối", "接続", "Connect")}${icon("arrow", 14)}</button>
-</div>${
+</div>`
+    }${
       this.notice
         ? `<div class="notice" role="status">${icon("info", 17)}<span>${esc(this.notice)}</span>
 <button aria-label="${tr("Đóng", "閉じる", "Dismiss")}" data-action="dismiss">${icon("cross", 16)}</button>
 </div>`
         : ""
-    }${this.page === "design" ? this.design() : this.page === "restaurant" ? this.restaurant() : this.page === "scenarios" ? this.scenarios() : this.page === "twin" ? this.twin.html() : this.page === "assembly" ? this.assembly.html() : this.page === "results" ? this.results() : this.deployment()}<footer class="main-footer">
+    }${this.page === "design" ? this.design() : this.page === "restaurant" ? this.restaurant() : this.page === "scenarios" ? this.scenarios() : this.page === "twin" ? this.twin.html() : this.page === "assembly" ? this.assembly.html() : this.page === "results" ? this.results() : this.deployment()}${
+      this.page === "twin"
+        ? ""
+        : `<footer class="main-footer">
 <span>MEKONIQ ROBOT LAB <span class="footer-divider">/</span> ${tr("Không gian kỹ thuật mở", "オープンエンジニアリング", "An open engineering workspace")}</span>
 <span>${icon("info", 13)} ${tr("Mô hình minh họa · chưa nghiệm thu phần cứng", "参考モデル · 実機未検証", "Illustrative model · hardware unvalidated")}</span>
-</footer>
+</footer>`
+    }
 </main>
 </div>`;
   }

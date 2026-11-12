@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Request } from "@playwright/test";
 import { readFile, writeFile } from "node:fs/promises";
+import { openDisplayMenu, openInspector, openScenarioPicker } from "../support/twin";
 // Against the real pinned source runtime (scripts/test-mock-e2e.mjs): live SSE telemetry and business events, stale vs heartbeat,
 // acknowledged pause, dropped stream and reconnect, read-only replay with trace, A/B compare, exports, and a lost session.
 const token = process.env.LAB_TEST_PAIRING_TOKEN;
@@ -23,7 +24,9 @@ test("telemetry stream, stale/frozen states, reconnect, read-only replay, compar
   await page.goto("/#twin");
   await page.locator("#twin-pair-token").fill(token!);
   await page.getByRole("button", { name: "Ghép nối runtime" }).click();
+  await openScenarioPicker(page);
   await page.getByRole("button", { name: "Một đơn giao món" }).click();
+  await openDisplayMenu(page);
   await page.getByRole("button", { name: "2D", exact: true }).click();
   await page.getByRole("button", { name: "Chạy mock" }).click();
   await expect(page.getByTestId("mode-badge")).toContainText("MOCK");
@@ -68,15 +71,18 @@ test("telemetry stream, stale/frozen states, reconnect, read-only replay, compar
   await expect(page.getByTestId("report-streams")).toContainText("Sự kiện nghiệp vụ (bền");
   await expect(page.getByTestId("report-streams")).toContainText("Telemetry (có thể mất");
   const counted = commands(await report(page)), sent = actions.length;
+  await openInspector(page, "report");
   await page.getByRole("button", { name: "Xem lại (chỉ đọc)" }).click();
   const cursor = page.locator("#twin-replay-cursor");
   await cursor.fill("400");
   await expect(page.getByTestId("replay-time")).toContainText("tick 400");
   await expect(page.getByTestId("replay-events")).not.toBeEmpty();
   await expect(page.getByTestId("replay-entities")).toContainText("amr-1");
+  await openInspector(page, "objects");
   await page.getByTestId("entity-list").getByRole("button", { name: /amr-1|AMR/ }).first().click();
   await expect(page.getByTestId("trace-rows")).toContainText("command");
   await expect(page.getByTestId("trace-rows")).toContainText("observation");
+  await openInspector(page, "report");
   await page.getByRole("button", { name: "Phát", exact: true }).click();
   await expect(page.getByRole("button", { name: "Phát", exact: true })).toBeVisible({ timeout: 30000 }); // playback reached the end
   await shot(page, "replay-trace-desktop-vi");

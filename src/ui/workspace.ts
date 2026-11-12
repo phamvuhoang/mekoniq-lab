@@ -1,8 +1,8 @@
 import {faultScheduleEditor,draftEntry,type ScheduleDraft} from './fault-schedule';
 import {editSchedule} from '../scenarios/fault-schedule';
 import {ProjectStore} from '../project/store';
-// Twin workspace: persistent mode/backend/revision bar, scene (2D plan or optional 3D), layers + legend, entity list, operations and
-// engineering panels. All execution goes through TwinRuntime; selection/layers/view are local view state only.
+// Twin workspace: run bar, viewport (2D plan or optional 3D, Display menu with layers + legend), transport bar and a details inspector
+// (objects, engineering, report, setup). All execution goes through TwinRuntime; selection/layers/view/panels are local view state only.
 import {requestForPreset,httpTwinRuntime,TwinRuntimeError,clockControls,engineeringRefFor,type RunReport,type RunView,type TwinHealth,type TwinRuntime,type ReadinessSnapshot} from '../scenarios/controls';
 import {backendSetOptions} from '../scenarios/support';
 import {loadNavigationScene} from '../scenarios/engineering';
@@ -18,7 +18,10 @@ import {defaultLayers,LAYERS,layerLabel,legend,ONLY_2D_REASON,THREE_D_LAYERS,tog
 import {selectEntity,selectedEntity,onSelection} from '../twin/selection';
 import {inspect,identityItems} from '../twin/inspector';
 import {currentCup,reconciliationSubject} from '../twin/coffee-cell';
-import {operationsPanel,statusText} from './operations-panel';
+import {attentionChain,cycleQueue,nextAction,nextActionStrip,runControls,statusText,type OpsState} from './operations-panel';
+import {runBar,runtimePopover,type RunBarState} from './run-bar';
+import {transportBar,type TransportState} from './transport';
+import {inspector,loadUi,saveUi,type InspectorTab} from './inspector';
 import {engineeringPanel,engineeringInspection} from './engineering-panel';
 import type {Twin3d} from '../viewer/twin3d';
 import {icon,esc} from './icons';
@@ -56,11 +59,14 @@ export class TwinWorkspace {
  private irsimReport(){return !!this.report&&(this.report.navigation2d!==undefined||this.report.manifest.backends.some(b=>b.id==='irsim_2d'||b.id==='webots_3d'));}
  /** Replace the scene with the one of `bundle` (or none); a later load or create() wins over an earlier one. */
  private loadScene(bundle:string|undefined){this.navigation=null;const token=++this.sceneLoad;if(bundle)void loadNavigationScene(this.rt,bundle).catch(()=>null).then(s=>{if(token===this.sceneLoad){this.navigation=s;this.rerender();}});}
+ /** Which boxes and inspector tab are open: view state only (`inspectorOpen` and `tab` survive a reload). */
+ private ui=loadUi();
  private runSpeed=16;private evidenceStore=new EvidenceStore();private saved:SavedEvidence[]=[];private savedLoaded=false;private archived=false;
  private tokenDraft='';private busy=false;private playing=false;private notice='';private fault='cup-removed';private confirming:string|null=null;private confirmationKind:'reconcile'|'restoreCup'='reconcile';private reconcileTargets:string[]=[];
  /** `engineeringProjectDigest` is the digest of the engineering design the Assembly page holds now; saved engineering evidence is current only while it matches. */
  /** `engineeringInput` is the Assembly page's current design and receipt; an engineering preset runs from it only when its profile matches (re-checked against the receipt). */
  constructor(private rerender:()=>void,private rt:TwinRuntime=httpTwinRuntime(),private engineeringProjectDigest:()=>string|undefined=()=>undefined,private engineeringInput:()=>EngineeringPresetInput|undefined=()=>undefined){
+  this.ui.runtimeOpen=!rt.paired;// not paired: the pairing form is open from the start
   onSelection(id=>{this.vs={...this.vs,selected:id};this.rerender();});
  }
  /** The durable view, with AMR poses taken from newer telemetry (or from the replay cursor); stale/lost telemetry is drawn as unknown. */
@@ -81,26 +87,27 @@ export class TwinWorkspace {
    const fresh=freshness(s,this.link,now),newer=s.simTimeNs!==null&&BigInt(s.simTimeNs)>=BigInt(v.simTimeNs)&&(v.run.telemetryCursor===null||BigInt(s.seq)>=BigInt(v.run.telemetryCursor));
    return {...e,...newer?{pose:{x:o.xM as number,y:o.yM as number,yawRad:o.yawRad as number,...pose3dOf(o)},moving:typeof o.moving==='boolean'?o.moving:e.moving,hold:typeof o.hold==='string'?o.hold:null}:{},sampleAgeMs:fresh.ageMs??undefined,quality:fresh.state==='live'||fresh.state==='frozen_sim'?newer?(s.quality==='valid'?'valid':'stale'):e.quality:'stale'};})}};
  }
+ /** Plain text (escaped where it is written). */
  private linkText(){
   if(this.replay)return `${tr('Đã ghi','記録済み','Recorded')} · ${(this.replay.tick*this.replay.rp.range.tickMs/1000).toFixed(2)} s`;
   const l=this.link.state,label:Record<LinkState,string>={connecting:tr('đang kết nối','接続中','connecting'),live:'SSE',polling:tr('hỏi định kỳ','ポーリング','polling'),reconnecting:tr('đang nối lại','再接続中','reconnecting'),session_lost:tr('mất phiên · cần ghép nối lại','セッション喪失 · 再ペアリング','session lost · re-pair'),run_lost:tr('runtime không còn lần chạy này','実行が見つかりません','run no longer on runtime'),runtime_lost:tr('mất runtime','ランタイム喪失','runtime lost'),closed:tr('đã đóng','終了','closed')};
   const id=this.vs.selected&&this.store.entity(this.vs.selected)?this.vs.selected:this.view?.entities[0]?.id,s=id?this.store.entity(id):undefined,f=freshness(s,this.link,performance.now());
   const state={live:tr('mới','最新','live'),stale:tr('cũ','古い','stale'),frozen_sim:'FROZEN_SIM',disconnected:tr('mất kết nối','切断','disconnected'),unknown:tr('chưa rõ','不明','unknown')}[f.state];
   const g=this.store.gaps.length,d=this.store.stats.gapDropped+this.store.stats.dropped;
-  return `${label[l]} · ${id?esc(id):'—'} ${state}${f.ageMs===null?'':` ${(f.ageMs/1000).toFixed(1)} s`}${f.reason&&f.state!=='live'?` (${esc(f.reason)})`:''}${g||d?` · gap ${g} · drop ${d}`:''}`;
+  return `${label[l]} · ${id??'—'} ${state}${f.ageMs===null?'':` ${(f.ageMs/1000).toFixed(1)} s`}${f.reason&&f.state!=='live'?` (${f.reason})`:''}${g||d?` · gap ${g} · drop ${d}`:''}`;
  }
  /** Telemetry repaint without a full re-render: the bar chip, and the 2D plan or 3D view when samples changed. */
  private tick(){
-  const chip=document.getElementById('twin-telemetry');if(chip){chip.innerHTML=this.linkText();chip.dataset.state=this.replay?'recorded':freshness(this.vs.selected?this.store.entity(this.vs.selected):this.store.entities()[0],this.link,performance.now()).state;}
+  const chip=document.getElementById('twin-telemetry');if(chip){chip.textContent=this.linkText();chip.dataset.state=this.replay?'recorded':freshness(this.vs.selected?this.store.entity(this.vs.selected):this.store.entities()[0],this.link,performance.now()).state;}
   const now=performance.now(),n=JSON.stringify([this.store.stats.applied,this.store.stats.epochResets,this.link.state,this.link.paused,this.vs.selected,this.store.entities().map(s=>{const f=freshness(s,this.link,now);return [s.entityId,f.state,f.reason];})]);
   if(n===this.painted&&!this.replay)return;this.painted=n;
   const f=this.frame();
   if(this.vs.view==='2d'){const st=document.getElementById('twin-stage');if(st)st.innerHTML=renderTwin(f,this.vs);}else this.viewer?.update(f,this.vs);
   const inspector=document.getElementById('twin-inspector');if(inspector)inspector.innerHTML=engineeringInspection(inspect(f,this.vs.selected,f.seen??this.seen));
   if(this.replay){
-   const bar=document.getElementById('twin-run-bar');if(bar)bar.outerHTML=this.bar();
+   for(const [id,html] of [['twin-run-bar',this.bar(f)],['twin-objects',this.objects(f)],['twin-identity',this.identity(f)],['twin-next',this.strip(f)]] as const){const el=document.getElementById(id);if(el)el.outerHTML=html;}
    const list=document.getElementById('twin-entity-list');if(list)list.innerHTML=this.entityList(f);
-   const operations=document.getElementById('twin-operations');if(operations)operations.outerHTML=this.operations(f);
+   const time=document.getElementById('twin-transport-time');if(time)time.textContent=`${(this.replay.tick*this.replay.rp.range.tickMs/1000).toFixed(1)} s · tick ${this.replay.tick}`;
    const summary=document.getElementById('twin-report-summary');if(summary&&f.report)summary.outerHTML=reportSummary(f.report,this.business);
   }
  }
@@ -116,7 +123,7 @@ export class TwinWorkspace {
    onState:st=>{this.link={...this.link,state:st};
     // telemetry is not replayed after a drop: the hole is recorded as an explicit local gap
     if(st==='reconnecting'||st==='runtime_lost')this.store.gap({reason:`LINK_${st.toUpperCase()}`});
-    if(st==='session_lost'){this.rt.forget();this.playing=false;this.notice=tr('Runtime đã mất phiên (khởi động lại?). Ghép nối lại; lần chạy trong bộ nhớ không mở lại được, báo cáo cuối vẫn xem được.','ランタイムのセッションが失われました(再起動?)。再ペアリングしてください。メモリ上の実行は再開できませんが、最後のレポートは閲覧できます。','The runtime lost the session (restarted?). Pair again; the in-memory run cannot be reopened, the last report stays viewable.');this.rerender();}
+    if(st==='session_lost'){this.rt.forget();this.playing=false;this.ui.runtimeOpen=true;this.notice=tr('Runtime đã mất phiên (khởi động lại?). Ghép nối lại; lần chạy trong bộ nhớ không mở lại được, báo cáo cuối vẫn xem được.','ランタイムのセッションが失われました(再起動?)。再ペアリングしてください。メモリ上の実行は再開できませんが、最後のレポートは閲覧できます。','The runtime lost the session (restarted?). Pair again; the in-memory run cannot be reopened, the last report stays viewable.');this.rerender();}
     else if(st==='run_lost'||st==='runtime_lost'){this.playing=false;this.rerender();}
     else this.tick();}},
    {EventSource:this.health?.features?.sse===false?undefined:globalThis.EventSource});
@@ -128,7 +135,7 @@ export class TwinWorkspace {
  private evidenceHtml(){
   return `<section class="panel" data-testid="saved-evidence"><h3>${tr('Báo cáo đã lưu','保存済みレポート','Saved reports')}</h3><p class="field-help">${tr('Báo cáo được giữ nguyên. Phạm vi cũ cần chạy lại khi đầu vào đổi.','レポートは不変。入力変更時は該当範囲を再実行。','Reports stay unchanged. Changed inputs require new evidence for the affected scope.')}</p><label for="twin-import-evidence">${tr('Nhập thư mục bằng chứng (chỉ đọc)','検証フォルダを読み込む(読み取り専用)','Import evidence folder (read-only)')}</label><input id="twin-import-evidence" type="file" multiple webkitdirectory ${this.busy||this.playing?'disabled':''}>${this.saved.map(s=>{const state=evidenceStatus(s,this.resolve(this.preset).project,this.report?.manifest.scenario.id===s.report.manifest.scenario.id?this.report:null,{engineeringProjectDigest:this.engineeringProjectDigest()});return `<p><button class="text-button" data-action="twin-open-evidence" data-value="${esc(s.id)}">${s.origin==='imported'?tr('Đã nhập','インポート済み','Imported')+' · ':''}${esc(s.report.manifest.scenario.id)} · ${esc(s.report.manifest.runId.slice(0,8))} · tick ${esc(s.report.outcome.tick)}</button> <span data-testid="evidence-status">${state.stale?`${tr('bằng chứng cũ','古い検証記録','stale evidence')}: ${state.scopes.join(', ')}`:tr('khớp đầu vào','入力一致','inputs match')}${!state.runtimeChecked?` · ${tr('chưa so runtime','ランタイム未比較','runtime not compared')}`:''}</span></p>`;}).join('')||'<p>—</p>'}</section>`;
  }
- private runSettings(){const speed=this.preset.project.entities.find(e=>e.kind==='amr')?.speedLimitMps??0.5;return `<label>${tr('Môi trường cho lần chạy mới','新しい実行の環境','Environment for new run')}<select id="twin-backend-set" ${this.busy||this.playing||this.replay||this.archived?'disabled':''}>${(this.health?backendSetOptions(this.health):[{id:this.preset.backendSetId,mode:this.preset.mode??'mock',selectable:true,reasons:[]}]).map(s=>`<option value="${esc(s.id)}" ${s.id===this.preset.backendSetId?'selected':''} ${s.selectable||s.id===this.preset.backendSetId?'':'disabled'}>${esc(s.id)} · ${esc(s.mode)}${s.reasons.length?` · ${tr('không khả dụng','利用不可','unavailable')}: ${esc(s.reasons.join(', '))}`:''}</option>`).join('')}</select></label>${faultScheduleEditor(this.preset.project,this.scheduleDraft,this.busy||this.playing||!!this.replay||this.archived,this.preset.mode??'mock',this.scheduleOpen)}<div class="twin-settings"><label for="twin-run-speed">${tr('Tốc độ chạy','実行速度','Run speed')}</label><select id="twin-run-speed">${(this.clock()?.speeds.length?this.clock()!.speeds:[1,4,16,64]).map(n=>`<option value="${esc(n)}" ${n===this.runSpeed?'selected':''}>${esc(n)}×</option>`).join('')}</select><label for="twin-speed-limit">${tr('Giới hạn AMR cho lần chạy mới (m/s)','新しい実行のAMR速度上限(m/s)','AMR limit for new runs (m/s)')}</label><input id="twin-speed-limit" type="number" min="0.01" max="0.5" step="0.01" value="${speed}"><button class="button quiet" data-action="twin-run" ${this.busy||this.playing||!!this.replay||this.archived||!this.rt.paired?'disabled':''}>${tr('Chạy với đầu vào mới','変更した入力で実行','Run with edited inputs')}</button>${this.rt.paired?(this.rt.recoverableRunIds??[]).map(id=>`<button class="text-button" data-action="twin-reclaim" data-value="${esc(id)}" ${this.busy?'disabled':''}>${tr('Mở lại chỉ xem/đối soát','表示・照合のみで再開','Reopen for view/reconcile')} · ${esc(id.slice(0,8))}</button>`).join(''):''}</div>`;}
+ private runSettings(){const speed=this.preset.project.entities.find(e=>e.kind==='amr')?.speedLimitMps??0.5;return `<label>${tr('Môi trường cho lần chạy mới','新しい実行の環境','Environment for new run')}<select id="twin-backend-set" ${this.busy||this.playing||this.replay||this.archived?'disabled':''}>${(this.health?backendSetOptions(this.health):[{id:this.preset.backendSetId,mode:this.preset.mode??'mock',selectable:true,reasons:[]}]).map(s=>`<option value="${esc(s.id)}" ${s.id===this.preset.backendSetId?'selected':''} ${s.selectable||s.id===this.preset.backendSetId?'':'disabled'}>${esc(s.id)} · ${esc(s.mode)}${s.reasons.length?` · ${tr('không khả dụng','利用不可','unavailable')}: ${esc(s.reasons.join(', '))}`:''}</option>`).join('')}</select></label>${faultScheduleEditor(this.preset.project,this.scheduleDraft,this.busy||this.playing||!!this.replay||this.archived,this.preset.mode??'mock',this.scheduleOpen)}<div class="twin-settings"><label for="twin-speed-limit">${tr('Giới hạn AMR cho lần chạy mới (m/s)','新しい実行のAMR速度上限(m/s)','AMR limit for new runs (m/s)')}</label><input id="twin-speed-limit" type="number" min="0.01" max="0.5" step="0.01" value="${speed}"><button class="button quiet" data-action="twin-run" ${this.busy||this.playing||!!this.replay||this.archived||!this.rt.paired?'disabled':''}>${tr('Chạy với đầu vào mới','変更した入力で実行','Run with edited inputs')}</button>${this.view?`<button class="button quiet" data-action="twin-reset" ${this.busy||this.playing||this.replay?'disabled':''}>${icon('rotate',16)}${tr('Đặt lại (lần chạy mới)','リセット(新しい実行)','Reset (new run)')}</button>`:''}${this.rt.paired?(this.rt.recoverableRunIds??[]).map(id=>`<button class="text-button" data-action="twin-reclaim" data-value="${esc(id)}" ${this.busy?'disabled':''}>${tr('Mở lại chỉ xem/đối soát','表示・照合のみで再開','Reopen for view/reconcile')} · ${esc(id.slice(0,8))}</button>`).join(''):''}</div>`;}
  private readinessPreset(){return this.view?.run.status==='ready'&&this.runPreset?this.runPreset:this.resolve(this.preset);}
  private watchReadinessExpiry(){
   clearTimeout(this.readinessExpiry);
@@ -142,16 +149,41 @@ export class TwinWorkspace {
   try{const answer=await (ref?this.rt.readiness(p.scenarioId,p.backendSetId,undefined,ref):this.rt.readiness(p.scenarioId,p.backendSetId,p.project));if(request===this.readinessRequest&&p.id===this.readinessPreset().id&&p.backendSetId===this.readinessPreset().backendSetId){this.readiness=answer;this.watchReadinessExpiry();}}catch{/* the unknown state keeps Start disabled */}
  }
  async checkHealth(){try{this.health=await this.rt.health();}catch{this.health=null;}await this.checkReadiness();this.healthChecked=true;this.probing=false;this.rerender();}
- private bar(){
-  const f=this.frame(),v=f.view,p=f.preset,r=v?.run;
-  const badge=r?r.mode.toUpperCase():tr('CHƯA CHẠY','未実行','NOT RUN');
-  const cup=currentCup(v);
-  const item=(label:string,value:string,id='')=>`<span class="twin-bar-item"${id?` data-testid="${id}"`:''}><small>${label}</small><b>${esc(value)}</b></span>`;
-  return `<div class="twin-bar" id="twin-run-bar" role="region" aria-label="${tr('Chế độ, backend và revision của lần chạy','実行のモード・バックエンド・リビジョン','Run mode, backends and revisions')}">
-<span class="twin-mode ${r?'live':''}" data-testid="mode-badge">${icon(r?'lock':'info',14)}${esc(badge)}${r?` · ${esc(r.access)}`:''}</span>
-<span class="twin-identity" data-testid="run-identity">${r?identityItems(v!,f.report).map(x=>`<span>${esc(x)}</span>`).join(''):`<span>${esc(p.scenarioId)} · ${esc(p.backendSetId)} · ${tr('chưa khóa','未固定','not locked')}</span>`}</span>
-${r?`${item(tr('Trạng thái','状態','Status'),statusText(r.status),'run-status')}${item(tr('Thời gian mô phỏng','シミュレーション時間','Sim time'),`${(Number(v!.simTimeNs)/1e9).toFixed(1)} s`,'run-tick')}${item('Run rev.',this.replay?'—':String(r.runRevision),'run-revision')}${item(tr('Đã giao','提供数','Served'),v!.served,'run-served')}<span class="twin-bar-item"><small>${tr('Cốc hiện tại','現在のカップ','Current cup')}${cup?` ${esc(cup.cupId)}`:''}</small><b data-testid="cup-owner">${cup?esc(nameOf(p,cup.ownerId)):'—'}</b></span><span class="twin-bar-item"><small>Telemetry</small><b id="twin-telemetry" data-testid="twin-telemetry" aria-live="off">${this.linkText()}</b></span><span class="twin-run-id" data-testid="run-id">${esc(r.id)}</span>`:''}
-</div>`;
+ private ops(f:TwinFrame):OpsState{const clock=this.clock();return {paired:this.rt.paired,ready:ready(preflight(this.readinessPreset(),this.health,this.rt.paired,this.readiness)),busy:this.busy||!!this.replay,playing:this.playing,view:f.view,preset:f.preset,...clock&&!this.replay?{clock}:{}};}
+ /** Preflight matters until a run starts; afterwards the run's own state does. */
+ private showChecks(){return !this.view||this.view.run.status==='ready';}
+ private runtimeState():RunBarState['runtime']{
+  const detail=this.health?`source ${this.health.sourceCommit.slice(0,7)}`:'';
+  if(this.replay)return {state:'live',label:this.linkText(),detail};
+  if(this.view){const l=this.link.state;return {state:l==='live'?'live':l==='polling'?'slow':l==='connecting'||l==='reconnecting'?'connecting':l==='closed'?'none':'lost',label:this.linkText(),detail};}
+  if(!this.rt.paired)return {state:'none',label:this.healthChecked&&!this.health?tr('Không có runtime','ランタイムなし','No runtime'):tr('Chưa ghép nối','未ペアリング','Not paired'),detail};
+  return {state:'live',label:tr('Đã ghép nối','ペアリング済み','Paired'),detail};
+ }
+ private bar(f=this.frame()){
+  const v=f.view,r=v?.run,ops=this.ops(f),n=nextAction(ops),c=runControls(ops);
+  // the primary action is the recommended step; while a run is live with none, auto-run (or stopping it)
+  const primary=n.action?{action:n.action.id,label:n.action.label,disabled:ops.busy}:c.live?this.playing?{action:'twin-stop',label:tr('Dừng','停止','Stop'),disabled:false}:{action:'twin-play',label:tr('Chạy tiếp','続行','Keep running'),disabled:!c.canPlay}:null;
+  const problems=(v?.attention.length??0)+(this.showChecks()?preflight(this.readinessPreset(),this.health,this.rt.paired,this.readiness).filter(x=>!x.ok).length:0);
+  const presetsHtml=presets.map(x=>`<button class="preset-option" data-action="twin-preset" data-value="${x.id}" aria-pressed="${x.id===this.preset.id}" aria-label="${esc(x.title())}" aria-describedby="preset-${x.id}-summary">${icon(x.id==='coffee'?'coffee':'robot',20)}<span><b>${esc(x.title())}</b><small id="preset-${x.id}-summary">${esc(x.summary())}</small></span></button>`).join('');
+  return runBar({scenarioTitle:f.preset.title(),runtime:this.runtimeState(),mode:r?`${r.mode.toUpperCase()} · ${r.access}`:`${tr('Mô phỏng','シミュレーション','Simulation')} · ${tr('CHƯA CHẠY','未実行','NOT RUN')}`,status:r?statusText(r.status):null,simTimeS:v?Number(v.simTimeNs)/1e9:null,served:v?v.served:null,problems,primary,inspectorOpen:this.ui.inspectorOpen},
+   {pickerOpen:this.ui.pickerOpen,pickerHtml:presetsHtml,runtimeOpen:this.ui.runtimeOpen,runtimeHtml:runtimePopover({open:this.ui.runtimeOpen,pairFormHtml:this.pairForm(),sourceCommit:this.rt.paired?this.health?.sourceCommit??null:null})});
+ }
+ /** Engineering tab head: the run's locked identity and revision. */
+ private identity(f:TwinFrame){
+  const v=f.view,r=v?.run,p=f.preset;
+  return `<div class="twin-identity-block" id="twin-identity"><p class="twin-identity" data-testid="run-identity">${r?identityItems(v!,f.report).map(x=>`<span>${esc(x)}</span>`).join(''):`<span>${esc(p.scenarioId)} · ${esc(p.backendSetId)} · ${tr('chưa khóa','未固定','not locked')}</span>`}</p>${r?`<p><span class="twin-bar-item" data-testid="run-revision"><small>Run rev.</small><b>${this.replay?'—':esc(r.runRevision)}</b></span> <span class="twin-run-id" data-testid="run-id">${esc(r.id)}</span></p>`:''}</div>`;
+ }
+ /** Objects tab head: attention first, then the cycle/resource queue and who holds the current cup. */
+ private objects(f:TwinFrame){
+  const ops=this.ops(f),cup=currentCup(f.view);
+  return `<div class="twin-objects" id="twin-objects">${attentionChain(ops)}${cycleQueue(ops)}${f.view?`<p class="twin-bar-item"><small>${tr('Cốc hiện tại','現在のカップ','Current cup')}${cup?` ${esc(cup.cupId)}`:''}</small><b data-testid="cup-owner">${cup?esc(nameOf(f.preset,cup.ownerId)):'—'}</b></p>`:''}</div>`;
+ }
+ private strip(f:TwinFrame){return `<div class="twin-next" id="twin-next">${nextActionStrip(this.ops(f))}</div>`;}
+ private transport(f:TwinFrame):TransportState{
+  const v=f.view,c=runControls(this.ops(f)),r=this.replay,speeds=this.clock()?.speeds.length?this.clock()!.speeds:[1,4,16,64];
+  return {mode:r?'replay':v?'live':'idle',playing:this.playing,canPlay:c.canPlay,canStep:c.canStep,canPause:c.canPause,paused:c.paused,canCancel:c.canCancel,speeds,speed:this.runSpeed,
+   simTimeS:r?r.tick*r.rp.range.tickMs/1000:v?Number(v.simTimeNs)/1e9:0,tick:r?r.tick:v?.tick??0,measuredSpeed:undefined,// U01: nothing measures the auto-run speed yet
+   ...r?{replay:{fromTick:r.rp.range.fromTick,toTick:r.rp.range.toTick,tick:r.tick,playing:r.playing,marks:[]}}:{}};
  }
  private pairForm(){
   if(this.rt.paired)return '';
@@ -163,29 +195,30 @@ ${r?`${item(tr('Trạng thái','状態','Status'),statusText(r.status),'run-stat
   const c=preflight(this.readinessPreset(),this.health,this.rt.paired,this.readiness);
   return `<div class="preflight" data-testid="preflight"><h3>${tr('Kiểm tra trước khi chạy','実行前チェック','Preflight')}</h3><ul>${c.map(x=>`<li class="${x.ok?'ok':'fail'}"><span class="check-mark" aria-hidden="true">${icon(x.ok?'check':'cross',14)}</span><span><b>${esc(x.label)}</b> <span class="state-text">${x.ok?tr('đạt','合格','pass'):tr('chưa đạt','未達','fail')}</span><br><small>${esc(x.detail)}</small></span>${x.entityId?`<button class="text-button" data-action="twin-select" data-value="${esc(x.entityId)}">${tr('Xem','表示','Show')}</button>`:''}</li>`).join('')}</ul>${this.health?.features?.readiness&&this.rt.paired?`<button class="button quiet" data-action="twin-readiness" ${this.busy?'disabled':''}>${tr('Kiểm tra lại','再確認','Check again')}</button>`:''}</div>`;
  }
- private operations(f:TwinFrame){const clock=this.clock();return operationsPanel({paired:this.rt.paired,ready:ready(preflight(this.readinessPreset(),this.health,this.rt.paired,this.readiness)),busy:this.busy||!!this.replay,playing:this.playing,view:f.view,preset:f.preset,...clock&&!this.replay?{clock}:{}},this.checks());}
  private entityList(f:TwinFrame){return sceneEntities(f).map(e=>`<li><button data-action="twin-select" data-value="${esc(e.id)}" aria-pressed="${e.id===this.vs.selected}"><span class="entity-kind">${esc(kindLabel(e.kind))}</span><b>${esc(e.name)}</b>${e.name!==e.id?`<small>${esc(e.id)}</small>`:''}${e.status?`<span class="state-text">${esc(stateLabel(e.status))}</span>`:''}</button></li>`).join('');}
  html():string {
   this.scheduleOpen=(document.getElementById('twin-fault-schedule') as HTMLDetailsElement|null)?.open??this.scheduleOpen;
   const f=this.frame(),ents=sceneEntities(f),sel=this.vs.selected,insp=inspect(f,sel,f.seen??this.seen),p=f.preset;
-  const presetsHtml=`<div class="twin-presets" role="group" aria-label="${tr('Preset kịch bản','シナリオプリセット','Scenario presets')}">${presets.map(x=>`<button class="preset-option" data-action="twin-preset" data-value="${x.id}" aria-pressed="${x.id===this.preset.id}" aria-label="${esc(x.title())}" aria-describedby="preset-${x.id}-summary">${icon(x.id==='coffee'?'coffee':'robot',20)}<span><b>${esc(x.title())}</b><small id="preset-${x.id}-summary">${esc(x.summary())}</small></span></button>`).join('')}</div>`;
   // IR-SIM runs add safety/observed/scan layers, each with its provenance; other runs keep the four legacy layers
   const shown=LAYERS.filter(l=>f.navigation||!['safety','observed','scan'].includes(l));
   const layers=`<div class="twin-layers" role="group" aria-label="${tr('Lớp hiển thị','表示レイヤー','Layers')}">${shown.map(l=>{const only2d=this.vs.view==='3d'&&!THREE_D_LAYERS.includes(l);return `<button data-action="twin-layer" data-value="${l}" aria-pressed="${!only2d&&this.vs.layers[l]}"${only2d?' disabled aria-describedby="layers-2d-only"':''}>${layerLabel(l)}</button>`;}).join('')}</div>${this.vs.view==='3d'&&shown.some(l=>!THREE_D_LAYERS.includes(l))?`<p class="source-note" id="layers-2d-only" data-testid="layers-2d-only">${esc(shown.filter(l=>!THREE_D_LAYERS.includes(l)).map(layerLabel).join(', '))}: ${esc(ONLY_2D_REASON())}</p>`:''}${f.navigation?`<ul class="layer-provenance" data-testid="layer-provenance">${shown.filter(l=>l!=='frames').map(l=>`<li data-layer="${l}"><b>${layerLabel(l)}</b>: ${esc(layerProvenance(l))}</li>`).join('')}</ul>`:''}${(this.runPreset?.engineering||this.irsimReport())&&!f.navigation?`<p class="source-note" data-testid="navigation-scene-unavailable" role="status">${icon('info',15)}${tr('Lớp hình học điều hướng không khả dụng','ナビゲーション形状レイヤーは利用できません','Navigation geometry layers unavailable')}: ${esc(this.scene().reason??'')}</p>`:''}`;
   const viewSwitch=`<div class="viewer-switch" role="group" aria-label="${tr('Kiểu xem','表示形式','View')}"><button data-action="twin-view" data-value="3d" aria-pressed="${this.vs.view==='3d'}" ${this.webglFailed?'disabled':''}>3D</button><button data-action="twin-view" data-value="2d" aria-pressed="${this.vs.view==='2d'}">2D</button></div>`;
   const legendHtml=`<ul class="twin-legend" data-testid="twin-legend" aria-label="${tr('Chú giải','凡例','Legend')}">${legend().map(x=>`<li><i class="mark ${x.mark}" aria-hidden="true"></i><b>${x.label}</b><small>${x.note}</small></li>`).join('')}</ul>`;
+  const display=`<div class="twin-popover twin-display-menu" id="twin-display-menu" data-testid="display-menu" role="group" aria-labelledby="twin-scene-title"${this.ui.displayOpen?'':' hidden'}><h2 id="twin-scene-title" class="small-code">${esc(p.project.name)} · ${p.project.world.width} × ${p.project.world.height} m</h2>${viewSwitch}${layers}
+${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớp vùng chiếm chỗ thể hiện hình học mô hình.','3D形状は模式図です。占有領域レイヤーがモデル形状を示します。','3D shapes are schematic. The footprint layer shows model geometry.')}</p>`:''}${legendHtml}<p class="source-note">${icon('info',15)}${tr('Cảnh chỉ đọc: vị trí lấy từ runtime, canvas không quyết định đến đích hay hoàn thành.','表示は読み取り専用。位置はランタイムから取得し、描画は到着や完了を判定しません。','Read-only scene: positions come from the runtime; the canvas never decides arrival or completion.')}</p></div>`;
+  const viewport=`<section class="twin-viewport" aria-label="${tr('Khung nhìn','ビューポート','Viewport')}"><div class="twin-stage" id="twin-stage" data-testid="twin-scene">${renderTwin(f,this.vs)}</div>
+<div class="twin-viewport-tools"><button class="button quiet" data-action="twin-display-toggle" aria-expanded="${this.ui.displayOpen}" aria-controls="twin-display-menu">${icon('design',16)}${tr('Hiển thị','表示','Display')}</button>${display}</div>
+${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(this.notice)}</span><button aria-label="${tr('Đóng','閉じる','Dismiss')}" data-action="twin-dismiss">${icon('cross',16)}</button></div>`:''}
+<div class="twin-overlay">${this.webglFailed?`<p class="source-note" data-testid="twin-fallback-note" role="status">${icon('info',15)}${tr('WebGL không khả dụng · đang hiển thị mặt bằng 2D với cùng dữ liệu và lựa chọn.','WebGLを利用できません · 同じデータと選択で2D平面図を表示中。','WebGL unavailable · showing the 2D plan with the same data and selection.')}</p>`:''}${this.strip(f)}</div></section>`;
   const list=`<ul class="entity-list" id="twin-entity-list" data-testid="entity-list" aria-label="${tr('Đối tượng trong twin','ツイン内の対象','Twin objects')}">${this.entityList(f)}</ul>`;
-  const scene=`<section class="panel twin-scene-panel" aria-labelledby="twin-scene-title"><div class="twin-scene-top"><h2 id="twin-scene-title" class="small-code">${esc(p.project.name)} · ${p.project.world.width} × ${p.project.world.height} m</h2>${viewSwitch}</div>${layers}
-<div class="twin-stage" id="twin-stage" data-testid="twin-scene">${renderTwin(f,this.vs)}</div>
-${this.webglFailed?`<p class="source-note" data-testid="twin-fallback-note" role="status">${icon('info',15)}${tr('WebGL không khả dụng · đang hiển thị mặt bằng 2D với cùng dữ liệu và lựa chọn.','WebGLを利用できません · 同じデータと選択で2D平面図を表示中。','WebGL unavailable · showing the 2D plan with the same data and selection.')}</p>`:''}
-${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớp vùng chiếm chỗ thể hiện hình học mô hình.','3D形状は模式図です。占有領域レイヤーがモデル形状を示します。','3D shapes are schematic. The footprint layer shows model geometry.')}</p>`:''}${legendHtml}<p class="source-note">${icon('info',15)}${tr('Cảnh chỉ đọc: vị trí lấy từ runtime, canvas không quyết định đến đích hay hoàn thành.','表示は読み取り専用。位置はランタイムから取得し、描画は到着や完了を判定しません。','Read-only scene: positions come from the runtime; the canvas never decides arrival or completion.')}</p></section>`;
-  const ops=this.operations(f);
-  const eng=engineeringPanel(insp,{hasRun:!!this.view,busy:this.busy||this.playing||!!this.replay,fault:this.fault,coffee:!!f.view?.coffee});
+  const panels={
+   objects:`${this.objects(f)}<div class="panel-heading"><h3 id="ent-title">${tr('Đối tượng trong twin','ツイン内の対象','Twin objects')}</h3><span class="pill">${ents.length}</span></div>${list}`,
+   engineering:`${this.identity(f)}${engineeringPanel(insp,{hasRun:!!this.view,busy:this.busy||this.playing||!!this.replay,fault:this.fault,coffee:!!f.view?.coffee})}`,
+   report:`${reportPanel(f.report,{replay:this.replay,previous:this.previous,selected:sel,business:this.business,full:this.report})||`<p class="empty-inline">${tr('Chưa có báo cáo: báo cáo xuất hiện khi một lần chạy bắt đầu.','レポートなし:実行を開始すると表示されます。','No report yet: it appears once a run starts.')}</p>`}${this.evidenceHtml()}`,
+   setup:`${this.runSettings()}${this.showChecks()?this.checks():''}`};
   const selection=this.reconcileTargets.length>1?`<label for="twin-reconcile-target">${tr('Chọn đối tượng đối soát','照合対象を選択','Choose reconciliation target')}</label><select id="twin-reconcile-target"><option value="">${tr('Chọn đối tượng','対象を選択','Select a target')}</option>${this.reconcileTargets.map(id=>`<option value="${esc(id)}" ${this.confirming===id?'selected':''}>${esc(nameOf(p,id))} · ${esc(id)}</option>`).join('')}</select>`:'';
   const dialog=this.confirming||this.reconcileTargets.length?`<dialog id="twin-confirm" aria-labelledby="twin-confirm-title"><h2 id="twin-confirm-title">${this.confirmationKind==='restoreCup'?tr('Xác nhận đã đặt đúng cốc','カップ位置の修正を確認','Confirm cup correction'):tr('Xác nhận đối soát','照合の確認','Confirm reconciliation')}</h2>${selection}<p>${!this.confirming?tr('Chọn đúng đối tượng đã kiểm tra trước khi xác nhận.','確認した対象を選んでから実行してください。','Select the target you checked before confirming.'):this.confirmationKind==='restoreCup'?tr('Đã đặt đúng cốc rỗng dưới vòi? Runtime sẽ kiểm trạng thái chưa rót và nhận quan sát mới từ cảm biến mock.','正しい空のカップをノズル下に置きましたか。ランタイムが未抽出状態を確認し、新しいモックセンサー観測を受け取ります。','Confirm the correct empty cup is under the nozzle. The runtime checks that no dispensing started and receives a fresh mock sensor observation.'):this.view?.run.mode==='simulation'?tr('Ghi lại yêu cầu đối soát. Cần kiểm tra controller bên ngoài; lần chạy vẫn giữ và không tiếp tục chuyển động.','照合要求を記録します。外部コントローラーの確認が必要です。実行は保持され、動作は再開しません。','Record the reconciliation request. External controller checks are still required; the run stays held and motion does not resume.'):tr(`Đối soát ${esc(this.confirming)}: Lab yêu cầu runtime hỏi thiết bị theo command id và ghi lại câu trả lời. Lab không gửi lại lệnh; kết quả là những gì runtime báo về sau đó. Chỉ xác nhận sau khi đã kiểm tra tại chỗ.`,`${esc(this.confirming)} を照合:LabはランタイムにコマンドIDで機器へ問い合わせ、回答を記録するよう依頼します。Labはコマンドを再送しません。結果はその後ランタイムが報告する内容です。現場確認後のみ確認してください。`,`Reconcile ${esc(this.confirming)}: the Lab asks the runtime to query the device by command id and record the answer. The Lab resends nothing; the outcome is whatever the runtime then reports. Confirm only after checking on site.`)}</p><div class="dialog-actions"><button class="button quiet" data-action="twin-confirm-cancel">${tr('Hủy','キャンセル','Cancel')}</button><button class="button primary" data-action="twin-confirm-ok" ${!this.confirming?'disabled':''}>${icon('check',16)}${tr('Xác nhận đã kiểm tra','確認済みとして実行','Confirm checked')}</button></div></dialog>`:'';
-  return `${this.bar()}${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(this.notice)}</span><button aria-label="${tr('Đóng','閉じる','Dismiss')}" data-action="twin-dismiss">${icon('cross',16)}</button></div>`:''}
-<div class="twin-top">${presetsHtml}${this.pairForm()}</div>${this.runSettings()}
-<div class="twin-grid">${scene}<div class="twin-side">${ops}${reportPanel(f.report,{replay:this.replay,previous:this.previous,selected:sel,business:this.business,full:this.report})}${this.evidenceHtml()}<section class="panel" aria-labelledby="ent-title"><div class="panel-heading"><h2 id="ent-title">${tr('Đối tượng','対象','Objects')}</h2><span class="pill">${ents.length}</span></div>${list}</section></div>${eng}</div>${dialog}`;
+  return `<div class="twin-shell">${this.bar(f)}<div class="twin-main${this.ui.inspectorOpen?' inspector-open':''}">${viewport}${inspector(this.ui,panels)}</div>${transportBar(this.transport(f))}</div>${dialog}`;
  }
  /** After the host HTML is replaced: modal dialog, optional 3D view. The 2D plan is already in the DOM and stays the fallback. */
  mounted(){
@@ -273,10 +306,13 @@ ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớ
  }
  click(action:string,value?:string){
   if((action==='twin-select'||action==='twin-pick')&&value)return selectEntity(value);
+  // panels and boxes are view state: they never reach the runtime
+  if(action==='twin-inspector-toggle'||action==='twin-inspector-tab'){this.ui={...this.ui,inspectorOpen:action==='twin-inspector-tab'||!this.ui.inspectorOpen,tab:action==='twin-inspector-tab'&&['objects','engineering','report','setup'].includes(value??'')?value as InspectorTab:this.ui.tab};saveUi(this.ui);return this.rerender();}
+  if(action==='twin-display-toggle'||action==='twin-runtime-toggle'||action==='twin-picker-toggle'){const k=({'twin-display-toggle':'displayOpen','twin-runtime-toggle':'runtimeOpen','twin-picker-toggle':'pickerOpen'} as const)[action];this.ui={...this.ui,[k]:!this.ui[k]};return this.rerender();}
   if(action==='twin-layer'&&this.vs.view==='3d'&&!THREE_D_LAYERS.includes(value as Layer))return;// drawn on the 2D plan only
   if(action==='twin-layer'){this.vs={...this.vs,layers:toggleLayer(this.vs.layers,value as Layer)};return this.rerender();}
   if(action==='twin-view'){if(value==='2d'){this.viewer?.dispose();this.viewer=null;}this.vs={...this.vs,view:value==='3d'&&!this.webglFailed?'3d':'2d'};return this.rerender();}
-  if(action==='twin-preset'){const p=presetById(value??'');if(p&&p!==this.preset){this.preset=p;if(p.mode==='simulation')this.scheduleDraft={...this.scheduleDraft,faultId:'cup-removed',targetId:''};void this.checkReadiness().then(()=>this.rerender());if(!this.view)selectEntity(null);}return this.rerender();}
+  if(action==='twin-preset'){this.ui={...this.ui,pickerOpen:false};const p=presetById(value??'');if(p&&p!==this.preset){this.preset=p;if(p.mode==='simulation')this.scheduleDraft={...this.scheduleDraft,faultId:'cup-removed',targetId:''};void this.checkReadiness().then(()=>this.rerender());if(!this.view)selectEntity(null);}return this.rerender();}
   if(action==='twin-readiness')return void this.call(()=>this.checkReadiness());
   if(action==='twin-dismiss'){this.notice='';return this.rerender();}
   if(action==='twin-reclaim'&&value&&this.rt.reclaim)return void this.call(async()=>{
@@ -342,7 +378,7 @@ ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớ
  submit(form:HTMLFormElement){
   if(form.id!=='twin-pair-form')return false;
   const token=(form.querySelector('#twin-pair-token') as HTMLInputElement).value;this.tokenDraft='';
-  void this.call(async()=>{if(!this.health)await this.checkHealth();await this.rt.pair(token);await this.checkReadiness();this.notice=tr('Runtime v2 đã ghép nối.','ランタイムv2とペアリングしました。','Runtime v2 paired.');});
+  void this.call(async()=>{if(!this.health)await this.checkHealth();await this.rt.pair(token);this.ui={...this.ui,runtimeOpen:false};await this.checkReadiness();this.notice=tr('Runtime v2 đã ghép nối.','ランタイムv2とペアリングしました。','Runtime v2 paired.');});
   return true;
  }
  get selected(){return selectedEntity();}
