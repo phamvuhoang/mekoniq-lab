@@ -2252,6 +2252,7 @@ label.button:has(+ input:focus-visible) {
    the page does not scroll at >= 700 px tall; the details inspector is a 380 px column right of the viewport, a bottom sheet on phones. */
 #app:has(.twin-shell){display:flex;flex-direction:column;height:100dvh}
 #app:has(.twin-shell)>.app-layout{flex:1;min-height:0;grid-template-rows:minmax(0,1fr)}
+#app:has(.twin-shell) .sidebar{min-height:0;overflow-y:auto}/* a short window: the nav scrolls on its own, the twin page does not */
 main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8px}
 .twin-shell{flex:1;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:6px}
 .twin-runbar{position:relative;z-index:6;display:flex;align-items:center;justify-content:space-between;gap:6px 14px;padding:2px 8px;background:var(--panel);border-radius:10px}
@@ -2271,6 +2272,11 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 .twin-runtime-chip[data-state="live"] i{background:var(--accent);border-color:var(--accent)}
 .twin-runtime-chip[data-state="slow"] i,.twin-runtime-chip[data-state="connecting"] i{border-color:var(--amber);border-style:dashed}
 .twin-runtime-chip[data-state="lost"] i{border-color:var(--danger);background:var(--danger)}
+.twin-runtime-chip[data-state="recorded"] i{border-color:var(--blue);border-style:dotted}
+.twin-recorded{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;font:700 12px var(--mono);color:var(--blue);border:1px dashed var(--blue);border-radius:6px;white-space:nowrap}
+.twin-mode span{white-space:nowrap}
+.twin-telemetry-line{margin:0 0 8px;font:12px var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.twin-runtime-box .twin-telemetry{margin:8px 0 0;font:12px var(--mono);overflow-wrap:anywhere}
 .twin-problems{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 10px;font:700 12px var(--mono);color:var(--amber);background:none;border:1px solid var(--amber);border-radius:8px}
 .twin-popover{position:absolute;z-index:7;max-height:min(70dvh,560px);overflow:auto;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px #0008}
 .twin-popover[hidden],.twin-inspector[hidden],.twin-tabpanel[hidden]{display:none}
@@ -2316,13 +2322,14 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 .twin-tabpanel .eng-panel>*:not(.panel-heading),.twin-tabpanel .report-panel>*:not(.panel-heading){margin-left:0;margin-right:0}
 .twin-transport{position:relative;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:2px 8px;background:var(--panel);border-radius:10px}
 .twin-speed{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap}
-.twin-transport input[type="range"],.twin-transport-fill{flex:1 1 160px;min-height:44px}
+.twin-transport input[type="range"],.twin-transport-fill{flex:1 1 120px;min-height:44px}
+.twin-transport-fill{flex-basis:0}
 .twin-transport-time,.twin-measured{font:12px var(--mono);color:var(--muted);white-space:nowrap}
 .twin-measured{color:var(--amber)}
 /* U03: disabled transport buttons look disabled in every state (the brand rules reset the global dimming) */
 .twin-transport .button:disabled{opacity:.45;cursor:default}
 /* watch mode (W): the viewport, the simulation label, run status, sim time and the transport; Escape gives the rest back */
-#app:has(.twin-shell.watch) .topbar,#app:has(.twin-shell.watch) .sidebar,.twin-shell.watch .twin-runbar-left>:not([data-testid="mode-badge"]),.twin-shell.watch .twin-runbar-right>:not([data-testid="run-status"],[data-testid="run-tick"]),.twin-shell.watch .twin-runbar>.twin-popover,.twin-shell.watch .twin-inspector,.twin-shell.watch .twin-viewport-tools{display:none}
+#app:has(.twin-shell.watch) .topbar,#app:has(.twin-shell.watch) .sidebar,.twin-shell.watch .twin-runbar-left>:not([data-testid="mode-badge"]),.twin-shell.watch .twin-runbar-right>:not([data-testid="run-status"],[data-testid="run-tick"],[data-testid="recorded-tag"]),.twin-shell.watch .twin-runbar>.twin-popover:not(.twin-caveat),.twin-shell.watch .twin-inspector,.twin-shell.watch .twin-viewport-tools{display:none}
 #app:has(.twin-shell.watch)>.app-layout{grid-template-columns:minmax(0,1fr)}
 .twin-shell.watch .twin-main{grid-template-columns:minmax(0,1fr)}
 .twin-shortcuts{position:fixed;inset:0;z-index:20;margin:auto;width:min(440px,calc(100vw - 32px));height:fit-content;padding:16px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px #0008}
@@ -2344,6 +2351,14 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
  .twin-transport .button:not([data-action="twin-step"])>span,.twin-speed>span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 }
 @media (max-width:1023px){.twin-runbar,.twin-runbar-left,.twin-runbar-right{flex-wrap:wrap}.twin-runbar-right{flex:1 1 auto}}
+/* U07: 1024-1279 px (the app sidebar stays): the run bar and the transport keep one row; shortened texts stay in the accessible name */
+.twin-runbar .twin-runtime-chip{flex:none}
+@media (max-width:1279px){
+ .twin-narrow-hide,.twin-runbar [data-testid="run-tick"] small,.twin-speed>span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+ .twin-runbar-right{gap:6px 8px}
+ .twin-scenario,.twin-runtime-chip{padding:0 8px}
+ .twin-mode{letter-spacing:0;padding:4px 8px}
+}
 @media (max-height:699px){
  #app:has(.twin-shell){height:auto}
  .twin-shell{grid-template-rows:auto minmax(480px,1fr) auto}
@@ -2424,8 +2439,8 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 .eng-panel>*:not(.panel-heading){margin-left:16px;margin-right:16px}
 .next-action{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:10px 14px;border:1px solid var(--accent);border-radius:10px;background:var(--panel)}
 .next-action span:last-child{color:var(--muted);flex:1 1 240px}
-.attention-chain{display:grid;gap:10px;margin-top:12px}
-.attention-chain article{padding:12px;border:1px dashed var(--danger);border-radius:10px;background:var(--panel)}
+.attention-chain{margin-top:4px}
+.problem .text-button{margin-left:0}
 .attention-chain strong{display:flex;align-items:center;gap:6px;font:700 12px var(--mono);color:var(--danger)}
 .attention-chain dl{display:grid;gap:4px;margin:8px 0}
 .attention-chain dl div{display:grid;grid-template-columns:90px 1fr;gap:8px}
@@ -2451,6 +2466,14 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 .eng-table th,.eng-table td{padding:7px 8px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
 .eng-table thead th{font:700 12px var(--mono);color:var(--muted);text-transform:uppercase}
 .eng-table td{font-family:var(--mono)}
+/* U07: the Engineering tab's values, one block per quantity (the inspector is 380 px wide) */
+.eng-list{margin:0;padding:0;list-style:none}
+.eng-row{position:relative;display:grid;gap:4px;padding:8px 0;border-bottom:1px solid var(--line);min-width:0}/* holds its visually hidden label: never past the scroll box */
+.eng-row dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;margin:0}
+.eng-row dt,.eng-meta small{font:700 12px var(--mono);color:var(--muted);text-transform:uppercase}
+.eng-row dd{margin:0;font:12px var(--mono);overflow-wrap:anywhere}
+.eng-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin:0;font:12px var(--mono)}
+.twin-objects>.twin-bar-item{margin-top:12px}
 .source-tag{display:inline-block;padding:1px 6px;border:1px solid currentColor;border-radius:4px;font-size: 12px}
 .source-tag.observed{color:var(--ink)}
 .source-tag.commanded{color:var(--accent);border-style:dashed}
@@ -2462,8 +2485,8 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 .dialog-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 @media (max-width:600px){.attention-chain dl div{grid-template-columns:1fr}.eng-table{font-size: 12px}}
 /* F06: telemetry chip, replay, compare, export */
-#twin-telemetry[data-state="stale"],#twin-telemetry[data-state="disconnected"]{color:var(--amber)}
-#twin-telemetry[data-state="frozen_sim"]{color:var(--blue)}
+.twin-telemetry[data-state="stale"],.twin-telemetry[data-state="disconnected"]{color:var(--amber)}
+.twin-telemetry[data-state="frozen_sim"]{color:var(--blue)}
 .report-panel .replay-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .report-panel h4{margin:12px 0 4px;font-size: 13px}
 .replay-events,.replay-entities,.trace-rows{margin:0;padding-left:18px;font-size: 13px;display:grid;gap:2px}
@@ -2500,8 +2523,8 @@ input::placeholder { color: var(--muted); }
 select option { background: var(--panel); color: var(--ink); }
 .panel { border-radius: var(--mq-radius-panel); }
 .pill, .source-tag, .twin-mode { background: var(--panel); border-radius: var(--mq-radius-badge); }
-#twin-telemetry[data-state="stale"], #twin-telemetry[data-state="disconnected"] { color: var(--amber); }
-#twin-telemetry[data-state="frozen_sim"] { color: var(--blue); }
+.twin-telemetry[data-state="stale"], .twin-telemetry[data-state="disconnected"] { color: var(--amber); }
+.twin-telemetry[data-state="frozen_sim"] { color: var(--blue); }
 #twin-confirm { border-radius: var(--mq-radius-modal); }
 .eng-table-wrap { max-width: 100%; }
 .heading-actions, .viewer-top, .model-caption, .panel-heading { flex-wrap: wrap; }

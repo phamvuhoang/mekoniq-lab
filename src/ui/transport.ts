@@ -1,5 +1,5 @@
 // Transport bar of the twin page: one bar for a live run and for replay. It only names runtime requests (auto-run, +5 s, pause/resume,
-// cancel) and the view's run speed; in replay its play/stop, scrubber (with event marks) and exit only move the local cursor, never the runtime.
+// cancel) and the view's run speed (not in replay, whose rate is fixed); in replay its play/stop, scrubber (with event marks) and exit only move the local cursor, never the runtime.
 // Idle (no run) disables every button.
 import {icon,esc} from './icons';
 import {tr} from '../i18n';
@@ -18,6 +18,6 @@ export function transportBar(s:TransportState):string{
  const measured=s.measuredSpeed!==undefined&&Math.abs(s.measuredSpeed-s.speed)>0.1*s.speed?`<span class="twin-measured" data-testid="measured-speed">${tr('đo được','実測','measured')} ${esc(decimal(s.measuredSpeed))}×</span>`:'';
  const cursor=r?`<label for="twin-replay-cursor" class="visually-hidden">${tr('Vị trí xem lại (tick)','再生位置(tick)','Replay position (tick)')}</label><input id="twin-replay-cursor" type="range" min="${esc(r.fromTick)}" max="${esc(r.toTick)}" step="5" value="${esc(r.tick)}"${r.marks.length?' list="twin-replay-marks"':''}>${r.marks.length?`<datalist id="twin-replay-marks">${r.marks.map(m=>`<option value="${esc(m.tick)}" label="${esc(m.label)}"></option>`).join('')}</datalist>`:''}`:'<span class="twin-transport-fill"></span>';
  return `<div class="twin-transport" id="twin-transport" data-testid="twin-transport" role="group" aria-label="${tr('Điều khiển lần chạy','実行の操作','Run controls')}">
-${play}${btn('+5 s','twin-step','arrow',run&&s.canStep)}${pause}<label class="twin-speed"><span>${tr('Tốc độ chạy','実行速度','Run speed')}</span><select id="twin-run-speed">${s.speeds.map(n=>`<option value="${esc(n)}"${n===s.speed?' selected':''}>${esc(n)}×</option>`).join('')}</select></label>${measured}
+${play}${btn('+5 s','twin-step','arrow',run&&s.canStep)}${pause}${r?'':`<label class="twin-speed"><span>${tr('Tốc độ chạy','実行速度','Run speed')}</span><select id="twin-run-speed">${s.speeds.map(n=>`<option value="${esc(n)}"${n===s.speed?' selected':''}>${esc(n)}×</option>`).join('')}</select></label>${measured}`}
 ${cursor}<span class="twin-transport-time" id="twin-transport-time"${r?' data-testid="replay-time"':''}>${esc(transportTime(s.simTimeS,s.tick,r?.toTick))}</span>${r?btn(tr('Thoát xem lại','再生を終了','Exit replay'),'twin-replay-exit','cross',true,'quiet'):btn(tr('Hủy lần chạy','実行をキャンセル','Cancel run'),'twin-cancel','cross',run&&s.canCancel,'quiet')}</div>`;
 }

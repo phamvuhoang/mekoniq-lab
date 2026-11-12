@@ -24,7 +24,7 @@ export function replayMarks(report:RunReport,max=200):{tick:number;label:string}
  const {eventTick}=reportClock(report),byTick=new Map<number,Set<string>>();
  for(const e of report.businessEvents){const t=eventTick(e.at);if(Number.isFinite(t))byTick.set(t,(byTick.get(t)??new Set()).add(e.type));}
  const all=[...byTick].sort((a,b)=>a[0]-b[0]).map(([tick,types])=>({tick,label:[...types].join(', ')}));
- return all.length<=max?all:Array.from({length:max},(_,i)=>all[Math.round(i*(all.length-1)/(max-1))]!);
+ return all.length<=max?all:Array.from({length:max},(_,i)=>all[max===1?0:Math.round(i*(all.length-1)/(max-1))]!);
 }
 /** Body of the replay section: re-rendered on scrub without replacing the range input. */
 export function replayBody(r:ReplayState,selected:string|null):string{

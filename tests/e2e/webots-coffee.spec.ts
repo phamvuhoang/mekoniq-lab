@@ -25,11 +25,11 @@ test('coffee with the arm on Webots: run to completed, actual and commanded join
  await expect(page.getByTestId('mode-badge')).toContainText('SIMULATION');
  await expect(page.getByTestId('run-identity')).toContainText('WB-BV01');
 
- // a step, then the arm: the joint rows have two columns, the source row says which is which
+ // a step, then the arm: each joint block has two values (observed, commanded), the source row says which is which
  await page.getByRole('button',{name:'+5 s'}).click();
  await openInspector(page,'objects');await page.getByTestId('entity-list').getByRole('button',{name:/Arm-1/}).click();
  const q1=page.getByTestId('eng-joint-1');
- await expect(q1.locator('td').nth(0)).toContainText(/-?\d/);await expect(q1.locator('td').nth(1)).toContainText(/-?\d/);
+ await expect(q1.locator('dd').nth(0)).toContainText(/-?\d/);await expect(q1.locator('dd').nth(1)).toContainText(/-?\d/);
  await expect(page.getByTestId('eng-arm-source')).toContainText('actual (Webots) · commanded');
  await expect(page.getByTestId('eng-joint-1')).not.toContainText('no encoder');
 

@@ -30,6 +30,7 @@ test("telemetry stream, stale/frozen states, reconnect, read-only replay, compar
   await page.getByRole("button", { name: "2D", exact: true }).click();
   await page.getByRole("button", { name: "Chạy mock" }).click();
   await expect(page.getByTestId("mode-badge")).toContainText("MOCK");
+  await openInspector(page, "engineering"); // the link detail lives in the Engineering tab (the run bar shows one word)
 
   // live SSE: samples arrive over the telemetry stream; with no step the pose stops refreshing while heartbeats continue -> stale, not live
   await expect(chip(page)).toContainText("SSE");
@@ -117,12 +118,14 @@ test("telemetry stream, stale/frozen states, reconnect, read-only replay, compar
 
   // lost session (as after a runtime restart): the stream reconnect is refused with 401 -> re-pair prompt; the last report stays viewable
   await context.clearCookies();
+  await openInspector(page, "engineering");
   await context.setOffline(true);
   await expect(chip(page)).not.toContainText("SSE", { timeout: 10000 });
   await context.setOffline(false);
   await expect(page.locator("#twin-pair-token")).toBeVisible({ timeout: 15000 });
   await expect(page.locator(".notice")).toContainText("Ghép nối lại");
   await expect(chip(page)).toContainText("cần ghép nối lại");
+  await openInspector(page, "report");
   await page.getByRole("button", { name: "Xem lại (chỉ đọc)" }).click();
   await expect(page.getByTestId("replay-panel")).toBeVisible();
   await shot(page, "session-lost-desktop-vi");

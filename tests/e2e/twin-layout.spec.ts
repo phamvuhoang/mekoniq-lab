@@ -10,7 +10,7 @@ const ROWS:{name:string;open:(page:Page)=>Promise<void>;container:string;testids
  {name:'display',open:openDisplayMenu,container:'[data-testid="display-menu"]',testids:['twin-legend','honesty-notes','layer-provenance','layers-2d-only','navigation-scene-unavailable']},
  {name:'objects',open:p=>openInspector(p,'objects'),container:'#inspector-panel-objects',testids:['cycle-queue','entity-list','cup-owner']},
  {name:'problems',open:openProblems,container:'[data-testid="problems-panel"]',testids:['attention-reason']},
- {name:'engineering',open:p=>openInspector(p,'engineering'),container:'#inspector-panel-engineering',testids:['run-identity','run-id','run-revision','engineering-panel'],ids:['twin-fault']},
+ {name:'engineering',open:p=>openInspector(p,'engineering'),container:'#inspector-panel-engineering',testids:['twin-telemetry','run-identity','run-id','run-revision','engineering-panel'],ids:['twin-fault']},
  {name:'report',open:p=>openInspector(p,'report'),container:'#inspector-panel-report',testids:['report-streams','saved-evidence','controller-verification'],ids:['twin-report-summary','twin-import-evidence']},
  {name:'setup',open:p=>openInspector(p,'setup'),container:'#inspector-panel-setup',testids:['preflight'],ids:['twin-backend-set','twin-fault-schedule','twin-speed-limit']},
 ];
@@ -159,8 +159,11 @@ test.describe.serial('viewport-first twin layout',()=>{
  });
 
  test('a completed run still fits the window with the inspector closed and on every tab',async()=>{
-  await page.locator('#twin-run-speed').selectOption('64');
-  await page.getByTestId('twin-transport').getByRole('button',{name:'Tự chạy',exact:true}).click();
+  // the 3D test's auto-run (about 9 s at 16×) can already have finished the 100 s run on a fast machine: Auto-run is then disabled
+  if(!(await page.getByTestId('run-status').innerText()).includes('Hoàn thành')){
+   await page.locator('#twin-run-speed').selectOption('64');
+   await page.getByTestId('twin-transport').getByRole('button',{name:'Tự chạy',exact:true}).click();
+  }
   await expect(page.getByTestId('run-status')).toContainText('Hoàn thành',{timeout:150000});
   await page.locator('[data-action="twin-inspector-toggle"]').click();
   await expect(page.getByTestId('twin-inspector')).toBeHidden();
@@ -187,10 +190,10 @@ test.describe.serial('viewport-first twin layout',()=>{
   await rowReachable(page,ROWS.find(r=>r.name==='problems')!);
   const first=page.getByTestId('problems-panel').getByTestId('problem-row').first();
   await expect(first).toContainText('CUP_REMOVED');
-  await expect(first.locator('[data-action="twin-select"]')).toHaveCount(1);
+  await expect(first.locator('[data-action="twin-select"]').first()).toHaveText('coffee-job-1');// one card: its attention chain carries the object buttons
   await expect(page.locator('.twin-viewport').getByTestId('next-action')).toBeVisible();
   await shot(page,'problems-desktop-vi');
-  await first.locator('[data-action="twin-select"]').click();
+  await first.locator('[data-action="twin-select"]').first().click();
   await expect(page.getByTestId('inspector-title')).toContainText('coffee-job-1');
   await expect(page.getByTestId('problems-panel')).toBeHidden();// following a problem to its object closes the box
   // the label is a button: its box names the mode with the access word, the shared notes and the report's limitations

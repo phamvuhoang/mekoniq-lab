@@ -25,7 +25,7 @@ test("arm telemetry and ARM03 rows are honest in the mock run; the simulation se
   await expect(inspector).toContainText("q1");
   await expect(inspector).toContainText("mock");                 // commanded-only provenance, never an encoder claim
   await expect(inspector).toContainText("ARM03");
-  const arm03 = await inspector.locator("tr", { hasText: "ARM03" }).first().textContent();
+  const arm03 = await inspector.locator('[data-testid^="eng-"]', { hasText: "ARM03" }) /* one block per quantity (U07) */.first().textContent();
   expect(arm03).toMatch(/đạt|không đạt|chưa chạy/);             // a result or an explicit not-run, never blank
   const cupOwner = page.getByTestId("cup-owner");
   await expect(cupOwner).toHaveText(/Trạm cà phê|Cánh tay 1|AMR-1|Khách/);

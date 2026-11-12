@@ -3,18 +3,19 @@
 import {engineeringRefFor,TwinRuntimeError,type TwinHealth,type ReadinessSnapshot} from './controls';
 import type {TwinPreset} from './catalog';
 import {tr} from '../i18n';
+import {setReasons} from './support';
 /** `codes`: the reason codes of a failing item (diagnosis only; the problems list shows them). */
 export interface Check {id:string;ok:boolean;label:string;detail:string;entityId?:string;codes?:string[]}
 export function preflight(p:TwinPreset,health:TwinHealth|null,paired:boolean,snapshot:ReadinessSnapshot|null=null,now=Date.now()):Check[] {
  const matching=snapshot?.scenarioId===p.scenarioId&&snapshot.backendSetId===p.backendSetId;
- const set=health?.backendSets.find(s=>s.id===p.backendSetId),required=matching?snapshot.checks.filter(c=>c.id.startsWith('backend:')).map(c=>c.id.slice(8)):set?.backends;
- const off=required?.filter(b=>!health!.backends.find(x=>x.id===b)?.enabled)??[];
+ const set=health?.backendSets.find(s=>s.id===p.backendSetId),required=matching?snapshot.checks.filter(c=>c.id.startsWith('backend:')).map(c=>c.id.slice(8)):undefined;
+ const why=health?backendReasons(p,health,required):[],backend=why.filter(c=>c!=='SCENARIO_NOT_OFFERED');
  const checks:Check[]=[
   {id:'runtime',ok:!!health,label:tr('Runtime cục bộ','ローカルランタイム','Local runtime'),detail:health?`source ${health.sourceCommit.slice(0,7)} · protocol ${health.protocolMajors.join('/')}`:tr('Không kết nối được /lab/v2. Khởi động runtime trên máy phát triển.','/lab/v2に接続できません。開発機でランタイムを起動してください。','Cannot reach /lab/v2. Start the runtime on your development machine.'),codes:['RUNTIME_UNREACHABLE']},
   {id:'protocol',ok:!!health?.protocolMajors.includes(2),label:'Protocol v2',detail:health?(health.protocolMajors.includes(2)?'v2':tr('Runtime không hỗ trợ v2','v2非対応','Runtime does not offer v2')):'—',codes:['PROTOCOL_V2_MISSING']},
   {id:'paired',ok:paired,label:tr('Ghép nối','ペアリング','Pairing'),detail:paired?tr('Phiên v2 đã ghép nối','v2セッション済み','v2 session paired'):tr('Nhập mã một lần từ terminal','ターミナルのワンタイムコードを入力','Enter the one-time code from your terminal'),codes:['NOT_PAIRED']},
-  {id:'backend',ok:!!set&&set.mode===(p.mode??'mock')&&!off.length,label:`${tr('Bộ backend','バックエンドセット','Backend set')} ${p.backendSetId}`,detail:!health?'—':!set?tr('Runtime không có bộ này','このセットなし','Set not offered by this runtime'):off.length?`${tr('Chưa bật','無効','Not enabled')}: ${off.map(b=>`${b}${health.backends.find(x=>x.id===b)?.reason?` (${health.backends.find(x=>x.id===b)!.reason})`:''}`).join(', ')}`:`${set.mode} · ${set.backends.join(', ')}`,codes:!set?[`BACKEND_SET_UNKNOWN:${p.backendSetId}`]:off.length?off.map(b=>`BACKEND_NOT_ENABLED:${b}`):[`BACKEND_SET_MODE:${set.mode}`]},
-  {id:'scenario',ok:!!health?.scenarioIds.includes(p.scenarioId),label:`${tr('Kịch bản','シナリオ','Scenario')} ${p.scenarioId}`,detail:!health?'—':health.scenarioIds.includes(p.scenarioId)?`r${p.scenarioRevision}`:tr('Runtime không có kịch bản này','このシナリオなし','Scenario not offered by this runtime'),codes:['SCENARIO_NOT_OFFERED']},
+  {id:'backend',ok:!!health&&!backend.length,label:`${tr('Bộ backend','バックエンドセット','Backend set')} ${p.backendSetId}`,detail:!health?'—':!set?tr('Runtime không có bộ này','このセットなし','Set not offered by this runtime'):backend.length?`${tr('Chưa sẵn sàng','未準備','Not available')}: ${backend.map(c=>{const why=health.backends.find(x=>x.id===c.split(':')[1])?.reason;return why?`${c} (${why})`:c;}).join(', ')}`:`${set.mode} · ${set.backends.join(', ')}`,codes:backend},
+  {id:'scenario',ok:!!health&&!why.includes('SCENARIO_NOT_OFFERED'),label:`${tr('Kịch bản','シナリオ','Scenario')} ${p.scenarioId}`,detail:!health?'—':health.scenarioIds.includes(p.scenarioId)?`r${p.scenarioRevision}`:tr('Runtime không có kịch bản này','このシナリオなし','Scenario not offered by this runtime'),codes:['SCENARIO_NOT_OFFERED']},
  ];
  if(p.engineering){let ok=false,detail:string,code='ENGINEERING_NOT_COMPILED';
   try{const ref=engineeringRefFor(p.engineering.project,p.engineering.receipt);ok=true;detail=`bundle ${ref.bundleDigest.slice(0,12)} · ${p.engineering.project.requestedProfile}`;}
@@ -30,5 +31,11 @@ export function preflight(p:TwinPreset,health:TwinHealth|null,paired:boolean,sna
   checks.push({id:'readiness',ok,codes:codes.length?codes:['READINESS_UNKNOWN'],label:tr('Sẵn sàng theo runtime','ランタイムの準備状況','Runtime readiness'),detail:!matching?'READINESS_NOT_CHECKED':!fresh?'READINESS_EXPIRED':ok?tr('Đủ điều kiện bắt đầu; chưa phải kết quả nghiệm thu','開始条件を満たしています。検収結果ではありません','Ready to start; this is not acceptance evidence'):snapshot.checks.flatMap(c=>c.reasonCodes).join(', ')||'READINESS_UNKNOWN'});
  }
  return checks;
+}
+/** Why `health` cannot run preset `p` (the picker and preflight both use this): the set, its mode, one reason per backend, then the scenario
+ * (`required`: the backends a matching readiness answer names; default the set's). Empty: nothing known against it. */
+export function backendReasons(p:TwinPreset,health:TwinHealth,required?:readonly string[]):string[]{
+ const set=health.backendSets.find(s=>s.id===p.backendSetId);
+ return [...!set?[`BACKEND_SET_UNKNOWN:${p.backendSetId}`]:[...set.mode===(p.mode??'mock')?[]:[`BACKEND_SET_MODE:${set.mode}`],...setReasons(health,set,required)],...health.scenarioIds.includes(p.scenarioId)?[]:['SCENARIO_NOT_OFFERED']];
 }
 export const ready=(checks:Check[])=>checks.every(c=>c.ok);

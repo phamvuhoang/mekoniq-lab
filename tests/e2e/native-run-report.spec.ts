@@ -10,7 +10,7 @@ test('native UI pairing, start, SSE, report download and read-only replay',async
  await page.goto('/#twin');await page.getByRole('button',{name:'EN',exact:true}).click();await openScenarioPicker(page);await page.locator('[data-action="twin-preset"][data-value="native-bv01"]').click();
  await page.locator('#twin-pair-token').fill(token!);await page.getByRole('button',{name:'Pair runtime',exact:true}).click();
  const start=page.getByRole('button',{name:'Run native simulation',exact:true});await expect(start).toBeEnabled({timeout:15000});await start.click();
- await expect(page.getByTestId('twin-telemetry')).toContainText('SSE',{timeout:20000});
+ await openInspector(page,'engineering');await expect(page.getByTestId('twin-telemetry')).toContainText('SSE',{timeout:20000});
  await expect(page.getByTestId('run-status')).toHaveText('Completed',{timeout:210000});await expect(page.getByTestId('run-served')).toHaveText('2');
  await openInspector(page,'report');const downloaded=page.waitForEvent('download');await page.locator('[data-action="twin-export"][data-value="json"]').click();const report=JSON.parse(await readFile(await (await downloaded).path(),'utf8')) as RunReport;
  expect(report.manifest.mode).toBe('simulation');expect(report.manifest.runId).toBe(await page.getByTestId('run-id').textContent());expect(report.verification).toMatchObject({execution:'ran',result:'pass',blockers:[]});expect(report.verification?.arm?.result).toBe('pass');expect(report.coffee?.armTrace.samples).toEqual([]);

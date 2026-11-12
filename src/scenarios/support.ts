@@ -10,13 +10,19 @@ export interface SetOption {id:string;mode:string;selectable:boolean;reasons:str
 export const PORTABLE_CAPABILITY:Readonly<Record<string,string>>={irsim_2d:'irsim_navigation_v1',webots_3d:'sim3d_navigation_v1',webots_arm:'sim3d_arm_v1'};
 /** Backend sets the run selector offers. Portable sets (execution.host portable_python, i.e. IR-SIM 2D or Webots 3D) are selectable only when health reports every backend
  * installed, enabled, compatible and reachable and advertises the provider's capability (PORTABLE_CAPABILITY); legacy sets keep their behaviour (always listed and selectable). */
+/** Why the set's backends (`required`, default all of them) cannot run: one reason per backend, its first failing condition, then a missing
+ * provider capability. A legacy set (not portable_python) is only asked whether each backend is enabled. */
+export function setReasons(health:TwinHealth,s:TwinHealth['backendSets'][number],required:readonly string[]=s.backends):string[]{
+ const portable=s.execution?.host==='portable_python',reasons:string[]=[];
+ for(const id of required){const b=health.backends.find(x=>x.id===id);
+  reasons.push(...!portable?(b?.enabled?[]:[`BACKEND_NOT_ENABLED:${id}`]):!b?[`BACKEND_UNKNOWN:${id}`]:!b.installed?[`BACKEND_NOT_INSTALLED:${id}${b.reason?` (${b.reason})`:''}`]:!b.enabled?[`BACKEND_NOT_ENABLED:${id}`]:!b.compatible?[`BACKEND_INCOMPATIBLE:${id}`]:!b.reachable?[`BACKEND_UNREACHABLE:${id}`]:[]);}
+ if(portable)for(const [backend,capability] of Object.entries(PORTABLE_CAPABILITY))if(s.backends.includes(backend)&&!health.capabilities?.includes(capability))reasons.push(`CAPABILITY_MISSING:${capability}`);
+ return reasons;
+}
 export function backendSetOptions(health:TwinHealth|null):SetOption[]{
  return (health?.backendSets??[]).filter(s=>['mock','simulation'].includes(s.mode)&&s.access==='simulated').map(s=>{
   if(s.execution?.host!=='portable_python')return {id:s.id,mode:s.mode,selectable:true,reasons:[]};
-  const reasons:string[]=[];
-  for(const id of s.backends){const b=health!.backends.find(x=>x.id===id);
-   reasons.push(...!b?[`BACKEND_UNKNOWN:${id}`]:!b.installed?[`BACKEND_NOT_INSTALLED:${id}${b.reason?` (${b.reason})`:''}`]:!b.enabled?[`BACKEND_NOT_ENABLED:${id}`]:!b.compatible?[`BACKEND_INCOMPATIBLE:${id}`]:!b.reachable?[`BACKEND_UNREACHABLE:${id}`]:[]);}
-  for(const [backend,capability] of Object.entries(PORTABLE_CAPABILITY))if(s.backends.includes(backend)&&!health!.capabilities?.includes(capability))reasons.push(`CAPABILITY_MISSING:${capability}`);
+  const reasons=setReasons(health!,s);
   return {id:s.id,mode:s.mode,selectable:!reasons.length,reasons};
  });
 }

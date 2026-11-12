@@ -114,9 +114,9 @@ test.describe.serial("paired source runtime", () => {
     await openInspector(page, "objects");
     await page.getByTestId("entity-list").getByRole("button", { name: /Cánh tay 1/ }).click();
     await openInspector(page, "engineering");
-    // Mock has no observed encoder samples; the commanded angle is a separate column.
-    await expect(eng.getByTestId("eng-joint-1").locator("td").nth(0)).toHaveText("không có");
-    await expect(eng.getByTestId("eng-joint-1").locator("td").nth(1)).toContainText("0.0000");
+    // Mock has no observed encoder samples; the commanded angle is a separate value (observed, then commanded: one block per quantity, U07).
+    await expect(eng.getByTestId("eng-joint-1").locator("dd").nth(0)).toHaveText("không có");
+    await expect(eng.getByTestId("eng-joint-1").locator("dd").nth(1)).toContainText("0.0000");
     for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "+5 s" }).click();
     await expect(page.getByTestId("run-tick")).toContainText("35.0 s");
     await expect(eng.getByTestId("eng-joint-1")).toContainText("rad");

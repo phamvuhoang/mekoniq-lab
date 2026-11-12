@@ -36,6 +36,7 @@ test("missing cup: visible reason and entity, confirmed reconcile, corrected run
   await openDisplayMenu(page);
   await page.getByRole("button", { name: "2D", exact: true }).click(); // the plan is DOM; the 3D canvas is not inspectable
   await expect(page.getByTestId("twin-scene").locator('[data-entity="coffee-job-1"][data-selected="true"]')).toHaveCount(1);
+  await openInspector(page, "objects"); // the cycle queue lives in the Objects tab
   await expect(page.getByTestId("cycle-queue")).toContainText("CUP_REMOVED");
   if (shots) await page.screenshot({ path: `${shots}/F05-missing-cup-desktop-vi.png`, fullPage: true });
   // reconcile needs an explicit human confirmation; cancelling the dialog changes nothing

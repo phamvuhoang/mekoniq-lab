@@ -1,6 +1,7 @@
 import {afterEach,expect,test,vi} from 'vitest';
 vi.mock('../../src/i18n',()=>({tr:(vi:string)=>vi}));
-import {runBar,type RunBarState} from '../../src/ui/run-bar';
+import {runBar,runtimeWord,type RunBarState} from '../../src/ui/run-bar';
+import type {LinkState} from '../../src/runtime/stream';
 import {transportBar,type TransportState} from '../../src/ui/transport';
 import {inspector,loadUi,saveUi,type TwinUiState} from '../../src/ui/inspector';
 // U01 shell: run bar (level 1), transport bar (one for run and replay), details inspector (level 2, closed by default, four named tabs).
@@ -54,4 +55,31 @@ test('loadUi falls back to the defaults on empty or broken storage; saveUi keeps
  expect(loadUi()).toMatchObject({inspectorOpen:true,tab:'engineering',watch:false});
  vi.stubGlobal('localStorage',{getItem:()=>{throw new Error('blocked');},setItem:()=>{throw new Error('blocked');}});
  expect(loadUi()).toMatchObject({inspectorOpen:false,tab:'objects'});expect(()=>saveUi(ui())).not.toThrow();
+});
+test('runtime word: one plain word per state, never the telemetry detail',()=>{
+ const w=(link:LinkState,f:Parameters<typeof runtimeWord>[1],paired=true,replay=false)=>runtimeWord(link,f,paired,replay);
+ expect(w('closed','unknown',false)).toEqual({state:'none',label:'Chưa ghép nối'});
+ expect(w('live','live',false)).toEqual({state:'none',label:'Chưa ghép nối'});
+ expect(w('closed','unknown',false,true)).toEqual({state:'recorded',label:'Bản ghi'});
+ expect(w('live','live',true,true)).toEqual({state:'recorded',label:'Bản ghi'});
+ expect(w('connecting','disconnected')).toEqual({state:'connecting',label:'Đang kết nối'});
+ for(const f of ['live','frozen_sim'] as const)expect(w('live',f),f).toEqual({state:'live',label:'Trực tiếp'});
+ for(const f of ['stale','unknown'] as const)expect(w('live',f),f).toEqual({state:'slow',label:'Chậm'});
+ for(const l of ['polling','reconnecting'] as const)expect(w(l,'disconnected'),l).toEqual({state:'slow',label:'Chậm'});
+ for(const l of ['session_lost','run_lost','runtime_lost'] as const)expect(w(l,'disconnected'),l).toEqual({state:'lost',label:'Mất kết nối'});
+ expect(w('live','disconnected')).toEqual({state:'lost',label:'Mất kết nối'});
+ expect(w('closed','unknown')).toEqual({state:'live',label:'Sẵn sàng'});// paired, no run (yet)
+});
+test('the runtime chip shows the word and its state; a replay drops the primary action and tags the status as recorded',()=>{
+ const html=runBar(bar({runtime:{state:'slow',label:'Chậm',detail:''},primary:{action:'twin-play',label:'Chạy tiếp',disabled:false}}));
+ const chip=/<button[^>]*data-testid="runtime-chip"[^>]*>([^]*?)<\/button>/.exec(html);
+ expect(chip?.[0]).toContain('data-state="slow"');expect(chip?.[1]).toContain('Chậm');expect(chip?.[1]).not.toContain('twin-telemetry');
+ expect(html).not.toContain('recorded-tag');expect(html).toContain('data-testid="primary-action"');
+ const replay=runBar(bar({runtime:{state:'recorded',label:'Bản ghi',detail:''},primary:null}));
+ expect(replay).toContain('data-testid="recorded-tag"');expect(replay).not.toContain('primary-action');
+ expect(replay.indexOf('data-testid="run-status"')).toBeLessThan(replay.indexOf('recorded-tag'));
+});
+test('replay: the run speed is not on the transport',()=>{
+ expect(transportBar(transport())).toContain('id="twin-run-speed"');
+ expect(transportBar(transport({mode:'replay',replay:{fromTick:0,toTick:400,tick:100,playing:false,marks:[]}}))).not.toContain('twin-run-speed');
 });

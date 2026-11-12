@@ -5,6 +5,7 @@ import {WEBOTS_ARM_SET,WEBOTS_SET,nameOf,type TwinPreset} from '../scenarios/cat
 import {icon,esc} from './icons';
 import {tr} from '../i18n';
 import {stateLabel} from './labels';
+import {entityButton} from './problems';
 export const statusText=(s:string)=>({ready:tr('Sẵn sàng','準備完了','Ready'),running:tr('Đang chạy','実行中','Running'),paused:tr('Tạm dừng','一時停止','Paused'),awaiting_confirmation:tr('Chờ xác nhận','確認待ち','Awaiting confirmation'),needs_attention:tr('Cần kiểm tra','要確認','Needs attention'),completed:tr('Hoàn thành','完了','Completed'),cancelled:tr('Đã hủy','キャンセル済み','Cancelled'),failed:tr('Thất bại','失敗','Failed')})[s]??s;
 export interface OpsState {paired:boolean;ready:boolean;busy:boolean;playing:boolean;view:RunView|null;preset:TwinPreset;/** from the set's execution metadata; absent = legacy behaviour */clock?:ClockControls}
 export type NextAction={title:string;detail:string;action?:{id:string;label:string;primary?:boolean}};
@@ -39,10 +40,9 @@ export function runControls(s:OpsState):{live:boolean;paused:boolean;canPlay:boo
  const paused=v?.run.status==='paused',native=v?.run.mode==='simulation'&&s.clock?.clock!=='source_fixed_step',step=s.clock?s.clock.step:!native&&live&&!paused,play=s.clock?s.clock.play:!native&&live&&!paused;
  return {live,paused,canPlay:play&&live&&!paused&&!s.busy,canStep:step&&live&&!s.busy&&!s.playing,canPause:live&&!native&&!s.busy&&(paused||!s.playing),canCancel:!!v&&!['completed','cancelled','failed'].includes(v.run.status)&&!s.busy&&!s.playing};
 }
-/** Attention chain (waiting -> observed -> rule -> action) with entity links. */
-export function attentionChain(s:OpsState):string{
- const attn=s.view?.attention??[];
- return attn.length?`<div class="attention-chain" data-testid="attention-reason">${attn.map(a=>{const x=explain(a);return `<article><strong>${icon('info',15)} ${esc(a.reason)} · tick ${a.tick}</strong><dl><div><dt>${tr('Đang chờ','待機','Waiting')}</dt><dd>${esc(x.waiting)}</dd></div><div><dt>${tr('Quan sát','観測','Observed')}</dt><dd>${esc(x.observed)}</dd></div><div><dt>${tr('Quy tắc','ルール','Rule')}</dt><dd>${esc(x.rule)}</dd></div><div><dt>${tr('Hành động','操作','Action')}</dt><dd>${esc(x.action)}</dd></div></dl><div class="entity-links">${x.entities.map(id=>`<button class="text-button" data-testid="attention-entity" data-action="twin-select" data-value="${esc(id)}">${icon('pin',14)}${esc(nameOf(s.preset,id))}</button>`).join('')}</div></article>`;}).join('')}</div>`:'';
+/** Attention chain (waiting -> observed -> rule -> action) with entity links, one block per attention keyed by its problem id (`attention-<n>`, problems.ts). */
+export function attentionChain(s:OpsState):Record<string,string>{
+ return Object.fromEntries((s.view?.attention??[]).map((a,n)=>{const x=explain(a);return [`attention-${n}`,`<div class="attention-chain" data-testid="attention-reason"><strong>${icon('info',15)} ${esc(a.reason)} · tick ${a.tick}</strong><dl><div><dt>${tr('Đang chờ','待機','Waiting')}</dt><dd>${esc(x.waiting)}</dd></div><div><dt>${tr('Quan sát','観測','Observed')}</dt><dd>${esc(x.observed)}</dd></div><div><dt>${tr('Quy tắc','ルール','Rule')}</dt><dd>${esc(x.rule)}</dd></div><div><dt>${tr('Hành động','操作','Action')}</dt><dd>${esc(x.action)}</dd></div></dl><div class="entity-links">${x.entities.map(id=>entityButton(id,nameOf(s.preset,id),'attention-entity')).join('')}</div></div>`];}));
 }
 export function cycleQueue(s:OpsState):string{
  const v=s.view,attn=v?.attention??[],jobs=jobsOf(v),work=v?.workload??[];
