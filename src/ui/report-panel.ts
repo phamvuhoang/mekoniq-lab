@@ -7,6 +7,7 @@ import {compareRuns} from '../reports/compare';
 import {engineeringView} from '../reports/engineering-view';
 import {engineVersionOf,navigationEvidence,navigationEvidenceView,navigationRows} from '../reports/navigation2d';
 import {summarizeReportV2} from '../reports/metrics';
+import {reportClock} from '../reports/clock';
 import {icon,esc} from './icons';
 import {tr} from '../i18n';
 export interface ReplayState {rp:ReturnType<typeof openReplayV2>;tick:number;playing:boolean}
@@ -18,11 +19,17 @@ const sampleText=(s:{entityId:string;quality:string;observed:Record<string,unkno
  if(o&&'cycleState' in o)return `${o.cycleState} · ${tr('cốc','カップ','cup')} ${o.cupPresent===null?'?':o.cupPresent?tr('có','あり','present'):tr('không','なし','absent')} · ${o.machineStatus??'?'}`;
  return s.quality;
 };
+/** Scrubber marks: one per tick with a business event (labelled with its event types); above `max`, evenly spaced ones, first and last kept. */
+export function replayMarks(report:RunReport,max=200):{tick:number;label:string}[]{
+ const {eventTick}=reportClock(report),byTick=new Map<number,Set<string>>();
+ for(const e of report.businessEvents){const t=eventTick(e.at);if(Number.isFinite(t))byTick.set(t,(byTick.get(t)??new Set()).add(e.type));}
+ const all=[...byTick].sort((a,b)=>a[0]-b[0]).map(([tick,types])=>({tick,label:[...types].join(', ')}));
+ return all.length<=max?all:Array.from({length:max},(_,i)=>all[Math.round(i*(all.length-1)/(max-1))]!);
+}
 /** Body of the replay section: re-rendered on scrub without replacing the range input. */
 export function replayBody(r:ReplayState,selected:string|null):string{
  const f=r.rp.seek(r.tick),last=f.events.slice(-6).reverse(),trace=selected?r.rp.trace(selected).filter(row=>row.tick<=f.tick):[];
- return `<p class="replay-time" data-testid="replay-time">${tr('Thời điểm ghi','記録時刻','Recorded time')} ${esc((r.tick*r.rp.range.tickMs/1000).toFixed(2))} s · tick ${esc(r.tick)} / ${esc(r.rp.range.toTick)}</p>
-${f.gaps.length?`<p class="unknown-text" data-testid="replay-gaps">${icon('info',14)}${f.gaps.map(g=>`${tr('Khoảng trống telemetry','テレメトリ欠落','Telemetry gap')}: ${esc(g.reason)}`).join(' · ')}</p>`:''}
+ return `${f.gaps.length?`<p class="unknown-text" data-testid="replay-gaps">${icon('info',14)}${f.gaps.map(g=>`${tr('Khoảng trống telemetry','テレメトリ欠落','Telemetry gap')}: ${esc(g.reason)}`).join(' · ')}</p>`:''}
 <h4>${tr('Sự kiện nghiệp vụ tới thời điểm này','この時点までの業務イベント','Business events up to here')} (${f.events.length})</h4>
 <ol class="replay-events" data-testid="replay-events">${last.map(e=>`<li><code>#${esc(e.sequence)}</code> ${esc(e.type)} <small>${esc(e.kind)} ${esc(e.id)}</small></li>`).join('')||`<li class="empty-inline">—</li>`}</ol>
 <h4>${tr('Lỗi đã chèn tới thời điểm này','この時点までの注入障害','Injected faults up to here')}</h4><ol data-testid="replay-faults">${f.faults.map(x=>`<li>tick ${esc(x.tick)} · ${esc(x.faultId)} · ${esc(x.entityId??'—')}</li>`).join('')||'<li>—</li>'}</ol>
@@ -62,9 +69,7 @@ export function reportPanel(report:RunReport|null,o:{replay:ReplayState|null;pre
  const streams=reportSummary(report,o.business);
  const verification=controllerVerificationHtml(report,o.replay?.tick??report.outcome.tick);
  const r=o.replay;
- const replay=r?`<div class="replay" data-testid="replay-panel"><div class="replay-controls"><button class="button secondary" data-action="twin-replay-play">${icon(r.playing?'cross':'play',16)}${r.playing?tr('Dừng phát','停止','Pause'):tr('Phát','再生','Play')}</button>
-<button class="button quiet" data-action="twin-replay-exit">${icon('cross',16)}${tr('Thoát xem lại','再生を終了','Exit replay')}</button></div>
-<p class="source-note">${icon('lock',14)}${tr('Chỉ đọc: xem lại không gửi lệnh, không nội suy qua khoảng trống.','読み取り専用:再生はコマンドを送らず、欠落を補間しません。','Read-only: replay sends no command and never interpolates across gaps.')}</p><div id="twin-replay-body">${replayBody(r,o.selected)}</div></div>`
+ const replay=r?`<div class="replay" data-testid="replay-panel"><p class="source-note">${icon('lock',14)}${tr('Chỉ đọc: xem lại không gửi lệnh, không nội suy qua khoảng trống.','読み取り専用:再生はコマンドを送らず、欠落を補間しません。','Read-only: replay sends no command and never interpolates across gaps.')}</p><div id="twin-replay-body">${replayBody(r,o.selected)}</div></div>`
   :`<button class="button secondary" data-action="twin-replay">${icon('play',16)}${tr('Xem lại (chỉ đọc)','再生(読み取り専用)','Replay (read-only)')}</button>`;
  const compare=cmp?`<div class="compare" data-testid="compare-panel"><h3>${tr('So sánh với lần chạy trước','前回の実行と比較','Compare with the previous run')}</h3><p><b>${cmp.comparable?tr('So sánh được','比較可能','Comparable'):tr('Không so sánh được','比較不可','Not comparable')}</b>${cmp.reasons.length?`: ${esc(cmp.reasons.join(', '))}`:''} · ${esc(cmp.note)}</p>
 ${cmp.inputs.length?`<p class="field-help">${tr('Đầu vào khác','異なる入力','Changed inputs')}: ${cmp.inputs.map(i=>`${esc(i.field)} ${esc(String(i.a).slice(0,12))} → ${esc(String(i.b).slice(0,12))}`).join(' · ')}</p>`:''}

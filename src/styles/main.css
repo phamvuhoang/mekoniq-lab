@@ -2316,6 +2316,17 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 .twin-transport input[type="range"],.twin-transport-fill{flex:1 1 160px;min-height:44px}
 .twin-transport-time,.twin-measured{font:12px var(--mono);color:var(--muted);white-space:nowrap}
 .twin-measured{color:var(--amber)}
+/* U03: disabled transport buttons look disabled in every state (the brand rules reset the global dimming) */
+.twin-transport .button:disabled{opacity:.45;cursor:default}
+/* watch mode (W): the viewport, the simulation label, run status, sim time and the transport; Escape gives the rest back */
+#app:has(.twin-shell.watch) .topbar,#app:has(.twin-shell.watch) .sidebar,.twin-shell.watch .twin-runbar-left>:not([data-testid="mode-badge"]),.twin-shell.watch .twin-runbar-right>:not([data-testid="run-status"],[data-testid="run-tick"]),.twin-shell.watch .twin-runbar>.twin-popover,.twin-shell.watch .twin-inspector,.twin-shell.watch .twin-viewport-tools{display:none}
+#app:has(.twin-shell.watch)>.app-layout{grid-template-columns:minmax(0,1fr)}
+.twin-shell.watch .twin-main{grid-template-columns:minmax(0,1fr)}
+.twin-shortcuts{position:fixed;inset:0;z-index:20;margin:auto;width:min(440px,calc(100vw - 32px));height:fit-content;padding:16px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px #0008}
+.twin-shortcuts h2{margin:0 0 10px;font-size:15px}
+.twin-shortcuts dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0 0 12px;font-size:13px}
+.twin-shortcuts dd{margin:0;color:var(--muted)}
+.twin-shortcuts kbd{display:inline-block;min-width:28px;padding:2px 6px;font:12px var(--mono);text-align:center;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
 @media (max-width:600px){#app:has(.twin-shell)>.app-layout{display:flex;flex-direction:column}main:has(>.twin-shell){flex:1}}
 /* phones: the page scrolls; the inspector is a sheet under the viewport (max 60 % of the height) and the transport bar sticks to the bottom */
 @media (max-width:767px){

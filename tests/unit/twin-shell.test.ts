@@ -26,6 +26,14 @@ test('idle transport disables every button; replay adds the cursor',()=>{
  expect(idle).not.toContain('twin-replay-cursor');
  expect(transportBar(transport({mode:'replay',replay:{fromTick:0,toTick:400,tick:100,playing:false,marks:[]}}))).toMatch(/<input[^>]*id="twin-replay-cursor"[^>]*type="range"|<input[^>]*type="range"[^>]*id="twin-replay-cursor"/);
 });
+test('replay: the transport carries play/stop, the marked scrubber, the recorded time and exit; no runtime action is enabled',()=>{
+ const html=transportBar(transport({mode:'replay',replay:{fromTick:0,toTick:400,tick:100,playing:true,marks:[{tick:50,label:'job.started'}]}}));
+ for(const a of ['twin-replay-play','twin-replay-exit'])expect(new RegExp(`<button[^>]*data-action="${a}"[^>]*>`).exec(html)?.[0],a).toMatch(/^<button(?![^>]*disabled)/);
+ for(const a of ['twin-play','twin-stop','twin-cancel'])expect(html).not.toContain(`data-action="${a}"`);
+ for(const a of ['twin-step','twin-pause'])expect(new RegExp(`<button[^>]*data-action="${a}"[^>]*disabled`).test(html),a).toBe(true);
+ expect(html).toContain('Dừng phát');expect(html).toContain('list="twin-replay-marks"');expect(html).toContain('<option value="50" label="job.started">');
+ expect(/data-testid="replay-time"[^>]*>([^<]*)</.exec(html)?.[1]).toBe('4.2 s · tick 210 / 400');
+});
 test('the measured speed shows only when it differs from the chosen speed by more than 10 %',()=>{
  expect(transportBar(transport({speed:4,measuredSpeed:3.9}))).not.toContain('measured-speed');
  expect(/data-testid="measured-speed"[^>]*>([^<]*)</.exec(transportBar(transport({speed:4,measuredSpeed:2.5})))?.[1]).toContain('2,5×');

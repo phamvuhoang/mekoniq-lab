@@ -21,7 +21,8 @@ import {currentCup,reconciliationSubject} from '../twin/coffee-cell';
 import {attentionChain,cycleQueue,nextAction,runControls,statusText,type OpsState} from './operations-panel';
 import {caveatPopover,pickerItems,runBar,runtimePopover,scenarioPicker,simLabel,type RunBarState} from './run-bar';
 import {collectProblems,nextStrip,problemsPanel} from './problems';
-import {transportBar,type TransportState} from './transport';
+import {transportBar,transportTime,type TransportState} from './transport';
+import {keyAction,shortcutsDialog} from './keys';
 import {inspector,loadUi,saveUi,type InspectorTab} from './inspector';
 import {engineeringPanel,engineeringInspection} from './engineering-panel';
 import type {Twin3d} from '../viewer/twin3d';
@@ -31,7 +32,7 @@ import {freshness,type Link} from '../twin/freshness';
 import {openRunStreams,type LinkState} from '../runtime/stream';
 import {openReplayV2} from '../reports/replay';
 import {reportCsv,reportHtml,reportJson} from '../reports/metrics';
-import {reportPanel,reportSummary,replayBody,controllerVerificationHtml,type ReplayState} from './report-panel';
+import {reportPanel,reportSummary,replayBody,replayMarks,controllerVerificationHtml,type ReplayState} from './report-panel';
 import {tr} from '../i18n';
 import {businessSimulationNote,illustrativeNote,stateLabel} from './labels';
 import {importControllerBundle} from '../reports/verification';
@@ -65,7 +66,15 @@ export class TwinWorkspace {
  /** Replace the scene with the one of `bundle` (or none); a later load or create() wins over an earlier one. */
  private loadScene(bundle:string|undefined){this.navigation=null;const token=++this.sceneLoad;if(bundle)void loadNavigationScene(this.rt,bundle).catch(()=>null).then(s=>{if(token===this.sceneLoad){this.navigation=s;this.rerender();}});}
  /** Which boxes and inspector tab are open: view state only (`inspectorOpen` and `tab` survive a reload). */
- private ui=loadUi();private scrolls:Record<string,number>={};
+ private ui=loadUi();private scrolls:Record<string,number>={};private helpOpen=false;private keys=false;
+ /** Keys (D66) while the page is shown: registered in mounted() (the same listener is added once), removed in leave(). */
+ private onKey=(e:KeyboardEvent)=>{
+  const t=e.target as HTMLElement|null;
+  // the app already acted on it (Space/Enter on a scene object), or Space on a control keeps its native meaning
+  if(e.defaultPrevented||e.key===' '&&t?.closest?.('button,a[href],summary,[role="button"],[data-action]'))return;
+  const a=keyAction({key:e.key,ctrlKey:e.ctrlKey,metaKey:e.metaKey,altKey:e.altKey,target:t},!!document.querySelector('dialog[open]'));
+  if(a){e.preventDefault();this.click(a);}
+ };
  private runSpeed=16;private evidenceStore=new EvidenceStore();private saved:SavedEvidence[]=[];private savedLoaded=false;private archived=false;
  private tokenDraft='';private busy=false;private playing=false;private notice='';private fault='cup-removed';private confirming:string|null=null;private confirmationKind:'reconcile'|'restoreCup'='reconcile';private reconcileTargets:string[]=[];
  /** `engineeringProjectDigest` is the digest of the engineering design the Assembly page holds now; saved engineering evidence is current only while it matches. */
@@ -112,7 +121,7 @@ export class TwinWorkspace {
   if(this.replay){
    for(const [id,html] of [['twin-run-bar',this.bar(f)],['twin-objects',this.objects(f)],['twin-identity',this.identity(f)],['twin-next',this.strip(f)]] as const){const el=document.getElementById(id);if(el)el.outerHTML=html;}
    const list=document.getElementById('twin-entity-list');if(list)list.innerHTML=this.entityList(f);
-   const time=document.getElementById('twin-transport-time');if(time)time.textContent=`${(this.replay.tick*this.replay.rp.range.tickMs/1000).toFixed(1)} s · tick ${this.replay.tick}`;
+   const time=document.getElementById('twin-transport-time');if(time)time.textContent=transportTime(this.replay.tick*this.replay.rp.range.tickMs/1000,this.replay.tick,this.replay.rp.range.toTick);
    const summary=document.getElementById('twin-report-summary');if(summary&&f.report)summary.outerHTML=reportSummary(f.report,this.business);
   }
  }
@@ -192,7 +201,7 @@ export class TwinWorkspace {
   const v=f.view,c=runControls(this.ops(f)),r=this.replay,speeds=this.clock()?.speeds.length?this.clock()!.speeds:[1,4,16,64];
   return {mode:r?'replay':v?'live':'idle',playing:this.playing,canPlay:c.canPlay,canStep:c.canStep,canPause:c.canPause,paused:c.paused,canCancel:c.canCancel,speeds,speed:this.runSpeed,
    simTimeS:r?r.tick*r.rp.range.tickMs/1000:v?Number(v.simTimeNs)/1e9:0,tick:r?r.tick:v?.tick??0,measuredSpeed:undefined,// U01: nothing measures the auto-run speed yet
-   ...r?{replay:{fromTick:r.rp.range.fromTick,toTick:r.rp.range.toTick,tick:r.tick,playing:r.playing,marks:[]}}:{}};
+   ...r?{replay:{fromTick:r.rp.range.fromTick,toTick:r.rp.range.toTick,tick:r.tick,playing:r.playing,marks:this.report?replayMarks(this.report):[]}}:{}};
  }
  private pairForm(){
   if(this.rt.paired)return '';
@@ -229,10 +238,11 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
    setup:`${this.runSettings()}${this.showChecks()?this.checks():''}`};
   const selection=this.reconcileTargets.length>1?`<label for="twin-reconcile-target">${tr('Chọn đối tượng đối soát','照合対象を選択','Choose reconciliation target')}</label><select id="twin-reconcile-target"><option value="">${tr('Chọn đối tượng','対象を選択','Select a target')}</option>${this.reconcileTargets.map(id=>`<option value="${esc(id)}" ${this.confirming===id?'selected':''}>${esc(nameOf(p,id))} · ${esc(id)}</option>`).join('')}</select>`:'';
   const dialog=this.confirming||this.reconcileTargets.length?`<dialog id="twin-confirm" aria-labelledby="twin-confirm-title"><h2 id="twin-confirm-title">${this.confirmationKind==='restoreCup'?tr('Xác nhận đã đặt đúng cốc','カップ位置の修正を確認','Confirm cup correction'):tr('Xác nhận đối soát','照合の確認','Confirm reconciliation')}</h2>${selection}<p>${!this.confirming?tr('Chọn đúng đối tượng đã kiểm tra trước khi xác nhận.','確認した対象を選んでから実行してください。','Select the target you checked before confirming.'):this.confirmationKind==='restoreCup'?tr('Đã đặt đúng cốc rỗng dưới vòi? Runtime sẽ kiểm trạng thái chưa rót và nhận quan sát mới từ cảm biến mock.','正しい空のカップをノズル下に置きましたか。ランタイムが未抽出状態を確認し、新しいモックセンサー観測を受け取ります。','Confirm the correct empty cup is under the nozzle. The runtime checks that no dispensing started and receives a fresh mock sensor observation.'):this.view?.run.mode==='simulation'?tr('Ghi lại yêu cầu đối soát. Cần kiểm tra controller bên ngoài; lần chạy vẫn giữ và không tiếp tục chuyển động.','照合要求を記録します。外部コントローラーの確認が必要です。実行は保持され、動作は再開しません。','Record the reconciliation request. External controller checks are still required; the run stays held and motion does not resume.'):tr(`Đối soát ${esc(this.confirming)}: Lab yêu cầu runtime hỏi thiết bị theo command id và ghi lại câu trả lời. Lab không gửi lại lệnh; kết quả là những gì runtime báo về sau đó. Chỉ xác nhận sau khi đã kiểm tra tại chỗ.`,`${esc(this.confirming)} を照合:LabはランタイムにコマンドIDで機器へ問い合わせ、回答を記録するよう依頼します。Labはコマンドを再送しません。結果はその後ランタイムが報告する内容です。現場確認後のみ確認してください。`,`Reconcile ${esc(this.confirming)}: the Lab asks the runtime to query the device by command id and record the answer. The Lab resends nothing; the outcome is whatever the runtime then reports. Confirm only after checking on site.`)}</p><div class="dialog-actions"><button class="button quiet" data-action="twin-confirm-cancel">${tr('Hủy','キャンセル','Cancel')}</button><button class="button primary" data-action="twin-confirm-ok" ${!this.confirming?'disabled':''}>${icon('check',16)}${tr('Xác nhận đã kiểm tra','確認済みとして実行','Confirm checked')}</button></div></dialog>`:'';
-  return `<div class="twin-shell">${this.bar(f)}<div class="twin-main${this.ui.inspectorOpen?' inspector-open':''}">${viewport}${inspector(this.ui,panels)}</div>${transportBar(this.transport(f))}</div>${dialog}`;
+  return `<div class="twin-shell${this.ui.watch?' watch':''}">${this.bar(f)}<div class="twin-main${this.ui.inspectorOpen?' inspector-open':''}">${viewport}${inspector(this.ui,panels)}</div>${transportBar(this.transport(f))}</div>${shortcutsDialog(this.helpOpen)}${dialog}`;
  }
  /** After the host HTML is replaced: modal dialog, optional 3D view. The 2D plan is already in the DOM and stays the fallback. */
  mounted(){
+  if(!this.keys){document.addEventListener('keydown',this.onKey);this.keys=true;}
   for(const [id,top] of Object.entries(this.scrolls)){const el=document.getElementById(id);if(el)el.scrollTop=top;}
   this.watchReadinessExpiry();
   const importer=document.getElementById('twin-import-evidence') as HTMLInputElement|null;
@@ -258,7 +268,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   },()=>{this.mounting=false;this.fallback();});
  }
  private fallback(){this.viewer?.dispose();this.viewer=null;this.webglFailed=true;this.vs={...this.vs,view:'2d'};this.rerender();}
- leave(){this.playing=false;this.viewer?.dispose();this.viewer=null;this.streams?.close();this.streams=null;clearInterval(this.ticker);clearTimeout(this.readinessExpiry);this.stopReplay();}
+ leave(){if(this.keys){document.removeEventListener('keydown',this.onKey);this.keys=false;}this.ui.watch=false;this.helpOpen=false;this.playing=false;this.viewer?.dispose();this.viewer=null;this.streams?.close();this.streams=null;clearInterval(this.ticker);clearTimeout(this.readinessExpiry);this.stopReplay();}
  private stopReplay(){clearInterval(this.replayTimer);this.replayTimer=undefined;if(this.replay)this.replay.playing=false;}
  private track(v:RunView){for(const c of v.coffee?.cups??[]){const k=`${c.cupId}:${c.ownerKind}:${c.ownerId}`;if(!(k in this.seen))this.seen[k]=v.tick;}}
  private async call(task:()=>Promise<void>){
@@ -316,11 +326,20 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   });
   this.playing=false;this.rerender();
  }
- click(action:string,value?:string){
+ click(action:string,value?:string):void{
   // following a problem to its object hands the view back to the viewport: the problems box closes
   if((action==='twin-select'||action==='twin-pick')&&value){const was=this.ui.problemsOpen;this.ui={...this.ui,problemsOpen:false};if(value===selectedEntity()&&was)this.rerender();return selectEntity(value);}
   // panels and boxes are view state: they never reach the runtime
   if(action==='twin-inspector-toggle'||action==='twin-inspector-tab'){this.ui={...this.ui,inspectorOpen:action==='twin-inspector-tab'||!this.ui.inspectorOpen,tab:action==='twin-inspector-tab'&&['objects','engineering','report','setup'].includes(value??'')?value as InspectorTab:this.ui.tab};saveUi(this.ui);return this.rerender();}
+  if(action==='twin-toggle-play')return this.click(this.replay?'twin-replay-play':this.playing?'twin-stop':'twin-play');
+  if(action==='twin-watch'){this.ui={...this.ui,watch:!this.ui.watch};return this.rerender();}
+  if(action==='twin-help'){this.helpOpen=!this.helpOpen;return this.rerender();}
+  // one step per press: watch mode, then the open run-bar/viewport box, then the key list, then the inspector; the modal confirm closes itself
+  if(action==='twin-escape'){
+   const u=this.ui,box=Object.values(BOXES).find(k=>u[k]);if(this.confirming||this.reconcileTargets.length)return;
+   if(u.watch)this.ui={...u,watch:false};else if(box)this.ui={...u,[box]:false};else if(this.helpOpen)this.helpOpen=false;else if(u.inspectorOpen){this.ui={...u,inspectorOpen:false};saveUi(this.ui);}else return;
+   return this.rerender();
+  }
   if(action in BOXES){const k=BOXES[action as keyof typeof BOXES],open=!this.ui[k];this.ui={...this.ui,displayOpen:false,runtimeOpen:false,pickerOpen:false,problemsOpen:false,caveatOpen:false,[k]:open};return this.rerender();}
   if(action==='twin-layer'&&this.vs.view==='3d'&&!THREE_D_LAYERS.includes(value as Layer))return;// drawn on the 2D plan only
   if(action==='twin-layer'){this.vs={...this.vs,layers:toggleLayer(this.vs.layers,value as Layer)};return this.rerender();}
