@@ -177,7 +177,7 @@ export class TwinWorkspace {
  private showChecks(){return !this.view||this.view.run.status==='ready';}
  private runtimeState():RunBarState['runtime']{/* one word for the run bar; `connecting` until the health check answers (no run) or the first heartbeat arrives (a run) */
   const l=this.link,link=this.archived?'closed':!this.view?this.healthChecked?'closed':'connecting':l.state==='live'&&l.lastHeartbeatMs===null?'connecting':l.state;
-  return {...runtimeWord(link,this.fresh().f.state,this.rt.paired,!!this.replay),detail:this.health?`source ${this.health.sourceCommit.slice(0,7)}`:''};
+  return {...runtimeWord(link,this.fresh().f.state,this.rt.paired,!!this.replay,this.playing),detail:this.health?`source ${this.health.sourceCommit.slice(0,7)}`:''};
  }
  private bar(f=this.frame()){
   const v=f.view,r=v?.run,ops=this.ops(f),n=nextAction(ops),c=runControls(ops);

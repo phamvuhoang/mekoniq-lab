@@ -190,7 +190,7 @@ test.describe.serial('viewport-first twin layout',()=>{
   await rowReachable(page,ROWS.find(r=>r.name==='problems')!);
   const first=page.getByTestId('problems-panel').getByTestId('problem-row').first();
   await expect(first).toContainText('CUP_REMOVED');
-  await expect(first.locator('[data-action="twin-select"]').first()).toHaveText('coffee-job-1');// one card: its attention chain carries the object buttons
+  await expect(first.locator('[data-action="twin-select"]')).toHaveText(['coffee-job-1','cup-1']);// one card: its attention chain carries the object buttons (job, then its cup)
   await expect(page.locator('.twin-viewport').getByTestId('next-action')).toBeVisible();
   await shot(page,'problems-desktop-vi');
   await first.locator('[data-action="twin-select"]').first().click();

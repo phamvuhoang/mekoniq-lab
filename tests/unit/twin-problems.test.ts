@@ -87,14 +87,25 @@ test('one card per attention problem: its chain sits inside the row; the object 
 const irsimHealth:TwinHealth={...mockHealth,scenarioIds:[...mockHealth.scenarioIds,'IR-FD01','IR-FD07'],
  backends:[...mockHealth.backends,{...live('irsim_2d',['simulation']),installed:false,enabled:false,reachable:false,reason:'venv missing'}],
  backendSets:[...mockHealth.backendSets,{id:IRSIM_SET,mode:'simulation',access:'simulated',backends:['irsim_2d'],execution:{host:'portable_python',clock:'source_fixed_step',manualStep:true,speedMultipliers:[1]}}]};
-test('picker and preflight give the same reasons from the same health: one reason per backend',()=>{
+test('picker and the preflight rows list the same reasons from the same health: one reason per backend',()=>{
  for(const h of [mockHealth,irsimHealth])for(const p of presets){
-  const fromPreflight=preflight(p,h,true).filter(c=>!c.ok&&['backend','scenario'].includes(c.id)).flatMap(c=>c.codes??[]);
-  expect(pickerItems([p],h)[0]!.reasons,p.id).toEqual(fromPreflight);
-  expect(backendReasons(p,h),p.id).toEqual(fromPreflight);
+  const rows=preflight(p,h,true),backend=rows.find(c=>c.id==='backend')!,scenario=rows.find(c=>c.id==='scenario')!;
+  const shown=[...backend.codes??[],...scenario.ok?[]:scenario.codes??[]];
+  expect(pickerItems([p],h)[0]!.reasons,p.id).toEqual(shown);
+  expect(backendReasons(p,h),p.id).toEqual(shown);
  }
  const irsim=pickerItems([presetById('irsim-fd01')!],irsimHealth)[0]!;
  expect(irsim.runnable).toBe(false);
  expect(irsim.reasons.filter(r=>/^BACKEND_[A-Z_]+:irsim_2d/.test(r))).toEqual(['BACKEND_NOT_INSTALLED:irsim_2d (venv missing)']);
  expect(irsim.reasons).toContain('CAPABILITY_MISSING:irsim_navigation_v1');
+});
+test('the preflight gate is the one of fa6fa35: a portable backend that is enabled but unreachable (capability missing) still passes the backend row',()=>{
+ // fa6fa35: ok = set exists && set.mode === preset mode && every required backend enabled; reachability and capabilities were not part of the gate
+ const h:TwinHealth={...irsimHealth,backends:irsimHealth.backends.map(b=>b.id==='irsim_2d'?{...b,installed:true,enabled:true,reachable:false}:b)};
+ const row=preflight(presetById('irsim-fd01')!,h,true).find(c=>c.id==='backend')!;
+ expect(row.ok).toBe(true);
+ expect(row.codes).toEqual(['BACKEND_UNREACHABLE:irsim_2d','CAPABILITY_MISSING:irsim_navigation_v1']);
+ expect(pickerItems([presetById('irsim-fd01')!],h)[0]!.reasons).toEqual(row.codes);
+ // the old gate still refuses a disabled backend
+ expect(preflight(presetById('irsim-fd01')!,irsimHealth,true).find(c=>c.id==='backend')!.ok).toBe(false);
 });

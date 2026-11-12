@@ -42,12 +42,15 @@ test.describe.serial('twin page polish',()=>{
  test('running: a plain runtime word on the bar, the telemetry detail in the Engineering tab and the runtime box, repainted live',async()=>{
   await page.getByTestId('primary-action').click();
   await expect(page.getByTestId('run-status')).toContainText('Đang chạy');
-  expect(['Đang kết nối','Trực tiếp','Chậm']).toContain(await chipWord(page));
+  // not auto-running, samples age between steps (the mock arm has no encoder): the word describes the link, which is live
+  await expect.poll(()=>chipWord(page),{timeout:5000}).toBe('Trực tiếp');
+  await expect(page.getByTestId('runtime-chip')).toHaveAttribute('data-state','live');
   await expect(page.locator('#twin-run-bar [data-testid="twin-telemetry"]')).toHaveCount(0);
   await expect(page.getByTestId('twin-telemetry')).toHaveCount(1);
   await openInspector(page,'engineering');
   const detail=page.locator('#inspector-panel-engineering').getByTestId('twin-telemetry');
   await expect(detail).toBeVisible();await expect(detail).toContainText('SSE');
+  await expect(detail).toHaveText(/^SSE · \S+ (mới|cũ|chưa rõ|FROZEN_SIM)/);// the detail keeps the sample's freshness (and age, reason)
   const before=await detail.textContent();
   await expect.poll(()=>detail.textContent(),{timeout:5000}).not.toBe(before);// the 100 ms repaint (sample age)
  });
@@ -91,7 +94,7 @@ test.describe.serial('twin page polish',()=>{
   const buttons=cards.locator('[data-action="twin-select"]');
   expect(await buttons.count()).toBeGreaterThan(0);
   for(const b of await buttons.all()){const name=((await b.textContent())??'').trim();expect(name.length).toBeGreaterThan(0);expect(await b.getAttribute('aria-label')).toContain(name);}
-  await expect(buttons.first()).toHaveText('coffee-job-1');
+  await expect(buttons).toHaveText(['coffee-job-1','cup-1']);
   await shot(page,'problems-desktop-vi');
   await page.getByTestId('problems-count').click();
   await expect(page.getByTestId('problems-panel')).toBeHidden();
@@ -176,6 +179,10 @@ test.describe.serial('twin page polish',()=>{
   expect(await noVerticalScroll(page)).toBe(true);
   expect(await runBarHeight(page)).toBe(wide);
   expect(await page.getByTestId('mode-badge').evaluate(el=>el.getBoundingClientRect().height)).toBeLessThanOrEqual(46);
+  // the narrow-width tightening of the label is in effect (not overridden by the base rule)
+  const [spacing,...padding]=await page.getByTestId('mode-badge').evaluate(el=>{const s=getComputedStyle(el);return [s.letterSpacing,s.paddingLeft,s.paddingRight];});
+  expect(['normal','0px'],`letter-spacing ${spacing} (the base rule gives .06em = 0.72px)`).toContain(spacing);// Chrome reports 0 as "normal"
+  expect(padding).toEqual(['8px','8px']);// the base rule gives 10px
   await shot(page,'1024x700-vi');
  });
 });

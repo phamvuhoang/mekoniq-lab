@@ -2357,7 +2357,6 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
  .twin-narrow-hide,.twin-runbar [data-testid="run-tick"] small,.twin-speed>span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
  .twin-runbar-right{gap:6px 8px}
  .twin-scenario,.twin-runtime-chip{padding:0 8px}
- .twin-mode{letter-spacing:0;padding:4px 8px}
 }
 @media (max-height:699px){
  #app:has(.twin-shell){height:auto}
@@ -2366,6 +2365,7 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 }
 .twin-mode{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:4px 10px;border:1px dashed var(--muted);border-radius:6px;font:700 12px var(--mono);color:var(--muted);letter-spacing:.06em}
 .twin-mode.live{border-style:solid;border-color:var(--accent);color:var(--accent)}
+@media (max-width:1279px){.twin-mode{letter-spacing:0;padding:4px 8px}}/* U07: after the base rule, which it tightens */
 .twin-identity{display:flex;flex-wrap:wrap;gap:4px 10px;margin:0 0 8px;font:12px var(--mono);color:var(--muted);min-width:0}
 .twin-identity span{overflow-wrap:anywhere}
 .twin-bar-item{display:flex;flex-direction:column;line-height:1.2}

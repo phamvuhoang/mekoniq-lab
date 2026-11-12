@@ -17,9 +17,12 @@ test('accessible twin page: each details tab open, then the Display menu open (w
 });
 test('compact heading controls retain touch targets',async({page})=>{
  await page.setViewportSize({width:390,height:844});await page.goto('/#design');
- for(const button of await page.locator('.heading-actions button').all()){
-  const box=await button.boundingBox();expect(box?.height).toBeGreaterThanOrEqual(44);expect(box?.width).toBeGreaterThanOrEqual(44);
- }
+ // the Design page re-renders once shortly after load: measure every heading button of one render, retrying until a render holds still
+ await expect(async()=>{
+  const boxes=await page.locator('.heading-actions button').evaluateAll(bs=>bs.map(b=>{const r=b.getBoundingClientRect();return {text:b.textContent?.trim(),connected:b.isConnected,width:r.width,height:r.height};}));
+  expect(boxes.length).toBeGreaterThan(0);
+  for(const b of boxes){expect(b.connected,b.text).toBe(true);expect(b.height,b.text).toBeGreaterThanOrEqual(44);expect(b.width,b.text).toBeGreaterThanOrEqual(44);}
+ }).toPass({timeout:10000});
 });
 test('print captions and highlighted values use dark ink',async({page})=>{
  await page.goto('/#design');await page.emulateMedia({media:'print'});

@@ -13,10 +13,11 @@ export type RuntimeState='none'|'connecting'|'live'|'slow'|'lost'|'recorded';
 /** `runtime.label` is one word (runtimeWord); the telemetry detail lives in the Engineering tab and the runtime box. */
 export interface RunBarState {scenarioTitle:string;runtime:{state:RuntimeState;label:string;detail:string};mode:string;
  status:string|null;simTimeS:number|null;served:string|null;problems:number;primary:{action:string;label:string;disabled:boolean}|null;inspectorOpen:boolean}
-/** The run bar's runtime word. `link` is `closed` while paired with no run (ready) and `connecting` while the health check is pending. */
-export function runtimeWord(link:LinkState,freshness:Freshness['state'],paired:boolean,replay:boolean):{state:RuntimeState;label:string}{
+/** The run bar's runtime word: it describes the link. `link` is `closed` while paired with no run (ready) and `connecting` while the health check is
+ * pending. Between steps no sample is due (the browser pumps the clock), so an old sample means a slow link only while auto-run is `playing`. */
+export function runtimeWord(link:LinkState,freshness:Freshness['state'],paired:boolean,replay:boolean,playing:boolean):{state:RuntimeState;label:string}{
  const state:RuntimeState=replay?'recorded':!paired?'none':link==='connecting'?'connecting':link==='closed'?'live':['session_lost','run_lost','runtime_lost'].includes(link)?'lost'
-  :link==='polling'||link==='reconnecting'?'slow':freshness==='disconnected'?'lost':freshness==='live'||freshness==='frozen_sim'?'live':'slow';
+  :link==='polling'||link==='reconnecting'?'slow':freshness==='disconnected'?'lost':playing&&freshness==='stale'?'slow':'live';
  const label=state==='live'&&link==='closed'?tr('Sẵn sàng','準備完了','Ready'):{none:tr('Chưa ghép nối','未ペアリング','Not paired'),connecting:tr('Đang kết nối','接続中','Connecting'),live:tr('Trực tiếp','ライブ','Live'),slow:tr('Chậm','遅延','Slow'),lost:tr('Mất kết nối','切断','Disconnected'),recorded:tr('Bản ghi','記録','Recorded')}[state];
  return {state,label};
 }

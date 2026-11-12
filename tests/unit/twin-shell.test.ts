@@ -56,18 +56,21 @@ test('loadUi falls back to the defaults on empty or broken storage; saveUi keeps
  vi.stubGlobal('localStorage',{getItem:()=>{throw new Error('blocked');},setItem:()=>{throw new Error('blocked');}});
  expect(loadUi()).toMatchObject({inspectorOpen:false,tab:'objects'});expect(()=>saveUi(ui())).not.toThrow();
 });
-test('runtime word: one plain word per state, never the telemetry detail',()=>{
- const w=(link:LinkState,f:Parameters<typeof runtimeWord>[1],paired=true,replay=false)=>runtimeWord(link,f,paired,replay);
- expect(w('closed','unknown',false)).toEqual({state:'none',label:'Chưa ghép nối'});
- expect(w('live','live',false)).toEqual({state:'none',label:'Chưa ghép nối'});
- expect(w('closed','unknown',false,true)).toEqual({state:'recorded',label:'Bản ghi'});
- expect(w('live','live',true,true)).toEqual({state:'recorded',label:'Bản ghi'});
+test('runtime word: one plain word per state of the link, never the telemetry detail',()=>{
+ const w=(link:LinkState,f:Parameters<typeof runtimeWord>[1],o:{paired?:boolean;replay?:boolean;playing?:boolean}={})=>runtimeWord(link,f,o.paired??true,!!o.replay,!!o.playing);
+ expect(w('closed','unknown',{paired:false})).toEqual({state:'none',label:'Chưa ghép nối'});
+ expect(w('live','live',{paired:false})).toEqual({state:'none',label:'Chưa ghép nối'});
+ expect(w('closed','unknown',{paired:false,replay:true})).toEqual({state:'recorded',label:'Bản ghi'});
+ expect(w('live','live',{replay:true,playing:true})).toEqual({state:'recorded',label:'Bản ghi'});
  expect(w('connecting','disconnected')).toEqual({state:'connecting',label:'Đang kết nối'});
- for(const f of ['live','frozen_sim'] as const)expect(w('live',f),f).toEqual({state:'live',label:'Trực tiếp'});
- for(const f of ['stale','unknown'] as const)expect(w('live',f),f).toEqual({state:'slow',label:'Chậm'});
- for(const l of ['polling','reconnecting'] as const)expect(w(l,'disconnected'),l).toEqual({state:'slow',label:'Chậm'});
- for(const l of ['session_lost','run_lost','runtime_lost'] as const)expect(w(l,'disconnected'),l).toEqual({state:'lost',label:'Mất kết nối'});
- expect(w('live','disconnected')).toEqual({state:'lost',label:'Mất kết nối'});
+ // not auto-running: no sample is due (the browser pumps the clock; the mock arm has no encoder), so the word follows the link alone
+ for(const f of ['live','frozen_sim','stale','unknown'] as const)expect(w('live',f),f).toEqual({state:'live',label:'Trực tiếp'});
+ // auto-running: an old sample means the link is slow; a sample of unknown quality does not
+ for(const f of ['live','frozen_sim','unknown'] as const)expect(w('live',f,{playing:true}),f).toEqual({state:'live',label:'Trực tiếp'});
+ expect(w('live','stale',{playing:true})).toEqual({state:'slow',label:'Chậm'});
+ for(const l of ['polling','reconnecting'] as const)for(const playing of [false,true])expect(w(l,'disconnected',{playing}),l).toEqual({state:'slow',label:'Chậm'});
+ for(const l of ['session_lost','run_lost','runtime_lost'] as const)for(const playing of [false,true])expect(w(l,'disconnected',{playing}),l).toEqual({state:'lost',label:'Mất kết nối'});
+ for(const playing of [false,true])expect(w('live','disconnected',{playing})).toEqual({state:'lost',label:'Mất kết nối'});
  expect(w('closed','unknown')).toEqual({state:'live',label:'Sẵn sàng'});// paired, no run (yet)
 });
 test('the runtime chip shows the word and its state; a replay drops the primary action and tags the status as recorded',()=>{
