@@ -53,6 +53,8 @@ const onLoopbackPage=()=>typeof location==='undefined'||loopbackPage(location.ho
 /** Replace an element's content with `html` in place: kept nodes stay (morph). */
 // a node that cannot be cloned (the unit tests' stand-in DOM) is simply rewritten
 const morphInner=(el:Element|null,html:string)=>{if(!el)return;if(typeof el.cloneNode!=='function'){el.innerHTML=html;return;}const t=el.cloneNode(false) as Element;t.innerHTML=html;morph(el,t);};
+/** Replace an element with `html` (one element of the same id) in place: kept nodes stay (morph). */
+const morphOuter=(el:Element|null,html:string)=>{if(!el)return;const t=document.createElement('template');t.innerHTML=html;const next=t.content.firstElementChild;if(next&&next.id===el.id)morph(el,next);else el.outerHTML=html;};
 /** Twin-page boxes that scroll on their own (the window does not at desktop sizes). */
 const SCROLL_BOXES=['inspector-panel-objects','inspector-panel-engineering','inspector-panel-report','inspector-panel-setup','twin-display-menu','twin-picker','twin-problems','twin-caveat'];
 /** The boxes the run bar and the viewport open: one at a time. */
@@ -161,17 +163,19 @@ export class TwinWorkspace {
  private tick(){
   const t=this.linkText(),state=this.replay?'recorded':this.fresh().f.state,w=this.runtimeState(),chip=document.getElementById('twin-runtime-chip'),word=document.getElementById('twin-runtime-word');
   for(const id of ['twin-telemetry','twin-telemetry-box']){const el=document.getElementById(id);if(el){el.textContent=t;el.dataset.state=state;}}if(chip)chip.dataset.state=w.state;if(word)word.textContent=w.label;
-  const now=performance.now(),n=JSON.stringify([this.store.stats.applied,this.store.stats.epochResets,this.link.state,this.link.paused,this.vs.selected,this.store.entities().map(s=>{const f=freshness(s,this.link,now);return [s.entityId,f.state,f.reason];})]);
-  if(n===this.painted&&!this.replay)return;this.painted=n;
+  // replay: its cursor is part of what is painted (nothing is repainted while it stands still)
+  const now=performance.now(),n=JSON.stringify([this.store.stats.applied,this.store.stats.epochResets,this.link.state,this.link.paused,this.vs.selected,this.store.entities().map(s=>{const f=freshness(s,this.link,now);return [s.entityId,f.state,f.reason];}),this.replay&&[this.replay.tick,this.replay.playing]]);
+  if(n===this.painted)return;this.painted=n;
   const f=this.frame();
   // in place (morph): a 2D entity under the pointer keeps its node (same data-action/data-value), so a click is not lost while samples arrive
   if(this.vs.view==='2d')morphInner(document.getElementById('twin-stage'),renderTwin(f,this.vs));else this.paint3d(f);
   morphInner(document.getElementById('twin-inspector'),engineeringInspection(inspect(f,this.vs.selected,f.seen??this.seen)));
   if(this.replay){
-   for(const [id,html] of [['twin-run-bar',this.bar(f)],['twin-objects',this.objects(f)],['twin-identity',this.identity(f)],['twin-next',this.strip(f)]] as const){const el=document.getElementById(id);if(el)el.outerHTML=html;}
-   const list=document.getElementById('twin-entity-list');if(list)list.innerHTML=this.entityList(f);
+   // in place (morph), as for the paced run: a press spanning an update, focus and an open box's scroll survive
+   for(const [id,html] of [['twin-run-bar',this.bar(f)],['twin-objects',this.objects(f)],['twin-identity',this.identity(f)],['twin-next',this.strip(f)]] as const)morphOuter(document.getElementById(id),html);
+   morphInner(document.getElementById('twin-entity-list'),this.entityList(f));
    const time=document.getElementById('twin-transport-time');if(time)time.textContent=transportTime(this.replay.tick*this.replay.rp.range.tickMs/1000,this.replay.tick,this.replay.rp.range.toTick);
-   const summary=document.getElementById('twin-report-summary');if(summary&&f.report)summary.outerHTML=reportSummary(f.report,this.business);
+   if(f.report)morphOuter(document.getElementById('twin-report-summary'),reportSummary(f.report,this.business));
   }
  }
  private animating(now:number){return this.vs.view==='3d'&&!!this.viewer&&this.playback.animating(now,{live:this.link.state==='live',replay:!!this.replay});}
@@ -602,8 +606,8 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   if(id==='twin-runtime-url'){this.addressDraft=value;this.radios(value);if(this.runtimeError==='INVALID_RUNTIME_URL'&&value!==this.failedAddress){this.runtimeError=null;document.getElementById('twin-runtime-url-error')?.remove();const f=document.getElementById(id);f?.removeAttribute('aria-invalid');f?.removeAttribute('aria-describedby');}return;}
   if(id!=='twin-replay-cursor'||!this.replay)return;this.replay.tick=Number(value);this.scrubbed();}
  private scrubbed(played=false){// played: moved by playback, so the scrubber follows even with focus (a drag is never overwritten)
-  const r=this.replay!;const body=document.getElementById('twin-replay-body');if(body)body.innerHTML=replayBody(r,this.vs.selected);
-  const verification=document.querySelector('[data-testid="controller-verification"]');if(verification&&this.report)verification.outerHTML=controllerVerificationHtml(this.report,r.tick);
+  const r=this.replay!;morphInner(document.getElementById('twin-replay-body'),replayBody(r,this.vs.selected));
+  const verification=document.querySelector('[data-testid="controller-verification"]');if(verification&&this.report)morphOuter(verification,controllerVerificationHtml(this.report,r.tick));
   const range=document.getElementById('twin-replay-cursor') as HTMLInputElement|null;if(range&&(played||document.activeElement!==range))range.value=String(r.tick);
   this.painted='';this.tick();
  }
