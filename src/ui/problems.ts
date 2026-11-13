@@ -25,8 +25,11 @@ export function collectProblems(i:{paired:boolean;health:TwinHealth|null;healthC
  if(!i.paired&&(!i.view||i.view.run.status==='ready'))p.push(i.healthChecked&&!i.health
   ?{id:'runtime',severity:'blocker',text:tr('Không thấy runtime /lab/v2 trên máy này. Khởi động runtime rồi ghép nối.','このマシンで/lab/v2ランタイムが見つかりません。起動してからペアリングしてください。','No /lab/v2 runtime found on this machine. Start the runtime, then pair.'),codes:['RUNTIME_UNREACHABLE'],action:runtimeBox()}
   :{id:'runtime',severity:'blocker',text:tr('Chưa ghép nối runtime: nhập mã một lần in trong terminal của runtime.','ランタイム未ペアリング:ターミナルのワンタイムコードを入力してください。','The runtime is not paired: enter the one-time code printed by its terminal.'),codes:['NOT_PAIRED'],action:runtimeBox()});
- // the pairing row stands for the items that need a paired runtime or its health answer; the rest are listed as they are
- const covered=(id:string)=>id==='paired'||!i.paired&&(id==='readiness'||!i.health&&id==='runtime')||!i.health&&['protocol','backend','scenario','readiness'].includes(id);
+ // paired (a session remembered) but not reached in this page load: not connected yet, which is not "cannot be reached"
+ const notTried=i.paired&&!i.health&&!i.healthChecked&&(!i.view||i.view.run.status==='ready');
+ if(notTried)p.push({id:'runtime',severity:'blocker',text:tr('Runtime chưa được kết nối trong lần mở trang này: bấm Kết nối trong hộp runtime.','このページではまだランタイムに接続していません。ランタイムの枠で「接続」を押してください。','The runtime is not connected yet in this page: press Connect in the runtime box.'),codes:['NOT_CONNECTED'],action:runtimeBox()});
+ // the pairing (or not-connected) row stands for the items that need a paired runtime or its health answer; the rest are listed as they are
+ const covered=(id:string)=>id==='paired'||(!i.paired||notTried)&&(id==='readiness'||!i.health&&id==='runtime')||!i.health&&['protocol','backend','scenario','readiness'].includes(id);
  for(const c of i.checks)if(!c.ok&&!covered(c.id))p.push({id:`check-${c.id}`,severity:'blocker',text:`${c.label}: ${c.detail}`,codes:c.codes??[],...c.entityId?{entityId:c.entityId,entityName:nameOf(i.preset,c.entityId)}:{}});
  if(['session_lost','run_lost','runtime_lost'].includes(i.linkState))p.push({id:'link',severity:'blocker',codes:[`LINK_${i.linkState.toUpperCase()}`],
   text:i.linkState==='session_lost'?tr('Runtime đã mất phiên; ghép nối lại.','ランタイムのセッションが失われました。再ペアリングしてください。','The runtime lost the session; pair again.'):i.linkState==='run_lost'?tr('Runtime không còn lần chạy này; báo cáo cuối vẫn xem được.','ランタイムにこの実行がありません。最後のレポートは閲覧できます。','The runtime no longer has this run; the last report stays viewable.'):tr('Mất kết nối tới runtime; không có mẫu mới.','ランタイムとの接続が失われました。新しいサンプルはありません。','The runtime connection is lost; no new samples arrive.'),

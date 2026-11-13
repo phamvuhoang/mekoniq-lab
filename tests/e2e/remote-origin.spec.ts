@@ -124,6 +124,12 @@ test('a Lab on another origin sends nothing to the runtime before the click, the
  await page.reload();
  await expect(page.getByTestId('runtime-address')).toHaveText(RUNTIME);await expect(page.locator('#twin-pair-token')).toHaveCount(0);
  await page.waitForTimeout(1500);expect(foreign).toEqual([]);
+ // I5: nothing was attempted in this page load: the chip says not connected (neutral), the problem names the Connect way, not "cannot reach"
+ await expect(chip).toHaveAttribute('data-state','idle');await expect(chip).toContainText('Chưa kết nối');
+ await expect(page.getByTestId('problems-count')).toBeVisible();await page.getByTestId('problems-count').click();
+ await expect(page.getByTestId('problems-panel')).toContainText('NOT_CONNECTED');await expect(page.getByTestId('problems-panel')).not.toContainText('RUNTIME_UNREACHABLE');
+ if(process.env.LAB_EVIDENCE_DIR)await page.screenshot({path:`${process.env.LAB_EVIDENCE_DIR}/final-I5-chip-not-connected.png`});
+ await chip.click();await expect(page.getByTestId('runtime-popover')).toBeVisible();
  await page.locator('[data-action="twin-connect"]').click();
  await expect(page.getByTestId('runtime-popover')).toBeHidden();
  await expect(chip).toContainText('Sẵn sàng');

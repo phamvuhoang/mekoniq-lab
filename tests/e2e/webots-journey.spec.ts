@@ -48,7 +48,7 @@ test('Serve on Webots 3D: compile, run WB-FD01 to completion, report and replay 
  await expect(page.getByTestId('preflight').locator('li',{hasText:'Compiled bundle for this exact draft'})).toHaveClass(/ok/);
  await expect(page.getByTestId('preflight').locator('li',{hasText:'Runtime readiness'})).toHaveClass(/ok/,{timeout:120000});
  await page.getByRole('button',{name:'Run Webots 3D'}).click();
- await expect(page.getByTestId('mode-badge')).toContainText('SIMULATION');
+ await expect(page.getByTestId('mode-badge')).toHaveText('Mô phỏng · chưa hiệu chuẩn');await expect(page.getByTestId('mode-badge')).toHaveAttribute('data-mode','simulation');
  await expect(page.getByTestId('run-identity')).toContainText('WB-FD01');
  await expect(page.locator('polygon[data-layer="footprint"]')).toHaveCount(1);
 

@@ -66,7 +66,7 @@ test('picker with a mock-only runtime: mock presets first, IR-SIM and Webots dis
 test('the simulation label: before a run, mock, uncalibrated and calibrated simulation; the caveat box names mode, notes and limitations',()=>{
  expect(simLabel(null,false)).toBe('Mô phỏng · chưa chạy');
  expect(simLabel('mock',false)).toBe('Mô phỏng · MOCK');
- expect(simLabel('simulation',false)).toBe('Mô phỏng · SIMULATION · chưa hiệu chuẩn');
+ expect(simLabel('simulation',false)).toBe('Mô phỏng · chưa hiệu chuẩn');
  expect(simLabel('simulation',true)).toBe('Mô phỏng · SIMULATION');
  const c=caveatPopover('SIMULATION · simulated',['no hardware <evidence>'],true);
  expect(c).toContain('data-testid="caveat-detail"');expect(c).toContain('SIMULATION · simulated');expect(c).toContain('no hardware &lt;evidence&gt;');
@@ -108,4 +108,15 @@ test('the preflight gate is the one of fa6fa35: a portable backend that is enabl
  expect(pickerItems([presetById('irsim-fd01')!],h)[0]!.reasons).toEqual(row.codes);
  // the old gate still refuses a disabled backend
  expect(preflight(presetById('irsim-fd01')!,irsimHealth,true).find(c=>c.id==='backend')!.ok).toBe(false);
+});
+test('I5: a remembered session not yet reached in this page load is "not connected yet" with the Connect way on, never "cannot reach"',async()=>{
+ const {collectProblems}=await import('../../src/ui/problems');
+ const {preflight}=await import('../../src/scenarios/preflight');
+ const {presetById}=await import('../../src/scenarios/catalog');
+ const preset=presetById('coffee')!,checks=preflight(preset,null,true);
+ const p=collectProblems({paired:true,health:null,healthChecked:false,checks,view:null,linkState:'closed',preset});
+ expect(p.map(x=>x.codes.join())).toEqual(['NOT_CONNECTED']);expect(p[0]!.action?.id).toBe('twin-runtime-toggle');
+ expect(JSON.stringify(p)).not.toMatch(/RUNTIME_UNREACHABLE|Không thấy runtime/);
+ // tried and failed: that is said
+ expect(collectProblems({paired:true,health:null,healthChecked:true,checks,view:null,linkState:'closed',preset}).some(x=>x.id==='check-runtime')).toBe(true);
 });

@@ -3,7 +3,7 @@ import {openInspector,openProblems,openScenarioPicker} from '../support/twin';
 // U07: what the screenshots showed wrong on the twin page. Against the mock launcher (scripts/test-mock-e2e.mjs twin-polish.spec.ts), preset coffee (BV01).
 const token=process.env.LAB_TEST_PAIRING_TOKEN,shots=process.env.LAB_EVIDENCE_DIR;
 const shot=async(page:Page,name:string)=>{if(shots)await page.screenshot({path:`${shots}/U07-${name}.png`});};
-const WORDS=['Chưa ghép nối','Đang kết nối','Trực tiếp','Chậm','Mất kết nối','Bản ghi','Sẵn sàng'];
+const WORDS=['Chưa ghép nối','Chưa kết nối','Đang kết nối','Không kết nối được','Khác phiên bản','Trực tiếp','Chậm','Mất kết nối','Bản ghi','Sẵn sàng'];
 const blur=(page:Page)=>page.evaluate(()=>(document.activeElement as HTMLElement|null)?.blur());
 /** The chip's visible text: one word, no transport name, reason code or seconds. */
 async function chipWord(page:Page){

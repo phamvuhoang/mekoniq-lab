@@ -19,7 +19,7 @@ import {selectEntity,selectedEntity,onSelection} from '../twin/selection';
 import {inspect,identityItems} from '../twin/inspector';
 import {currentCup,reconciliationSubject} from '../twin/coffee-cell';
 import {attentionChain,cycleQueue,nextAction,runControls,statusText,type OpsState} from './operations-panel';
-import {caveatPopover,pickerItems,runBar,runtimePopover,runtimeWord,scenarioPicker,simLabel,THIS_MACHINE,type RunBarState} from './run-bar';
+import {caveatPopover,loopbackBlockedText,pickerItems,runBar,runtimePopover,runtimeWord,scenarioPicker,simLabel,THIS_MACHINE,type RunBarState} from './run-bar';
 import {armMeshProblems,collectProblems,problemCounts,nextStrip,problemsPanel,type Problem} from './problems';
 import {transportBar,transportTime,type TransportState} from './transport';
 import {keyAction,shortcutsDialog} from './keys';
@@ -259,7 +259,10 @@ export class TwinWorkspace {
  private showChecks(){return !this.view||this.view.run.status==='ready';}
  private runtimeState():RunBarState['runtime']{/* one word for the run bar; `connecting` until the health check answers (no run) or the first heartbeat arrives (a run) */
   const l=this.link,link=this.archived?'closed':!this.view?this.healthChecked?'closed':'connecting':l.state==='live'&&l.lastHeartbeatMs===null?'connecting':l.state;
-  return {...runtimeWord(link,this.fresh().f.state,this.rt.paired,!!this.replay,this.playing),detail:this.health?`source ${this.health.sourceCommit.slice(0,7)}`:''};
+  // what this page load knows: nothing tried yet, a probe or Connect under way, the last one failed, or an answer (with or without the pin)
+  const pending=this.probing||this.busy&&!this.healthChecked||!this.healthChecked&&typeof location!=='undefined'&&mayAutoProbe(this.target(),location.hostname);
+  const attempt=this.health?'ok' as const:pending?'pending' as const:this.healthChecked?'failed' as const:'none' as const;
+  return {...runtimeWord(link,this.fresh().f.state,this.rt.paired,!!this.replay,this.playing,{attempt,pinMismatch:!!this.pinBlock()}),detail:this.health?`source ${this.health.sourceCommit.slice(0,7)}`:''};
  }
  private bar(f=this.frame()){
   const v=f.view,r=v?.run,ops=this.ops(f),n=nextAction(ops),c=runControls(ops);
@@ -268,7 +271,7 @@ export class TwinWorkspace {
   const p=this.problems(f);if(!p.length)this.ui.problemsOpen=false;const u=this.ui;// an emptied problems box closes: a later problem never opens it by itself
   const boxes=scenarioPicker(pickerItems(presets,this.health),this.preset.id,u.pickerOpen)+runtimePopover({open:u.runtimeOpen,target:this.target(),draftUrl:this.addressDraft,paired:this.rt.paired,busy:this.busy||this.playing,health:this.health,pin:{expected:this.pinExpected,actual:this.health?.sourceCommit??null},error:this.boxError(),where:this.whereChoice,pageOrigin:typeof location==='undefined'?'':location.origin,pageHasRuntime:onLoopbackPage()},v?this.linkText():null)
    +problemsPanel(p,u.problemsOpen,attentionChain(ops))+caveatPopover(r?`${r.mode.toUpperCase()} · ${r.access}`:'—',f.report?.limitations??[],u.caveatOpen);
-  return runBar({scenarioTitle:f.preset.title(),runtime:this.runtimeState(),mode:simLabel(r?.mode??null,f.report?.manifest.calibration?.status==='calibrated'),status:r?statusText(r.status):null,simTimeS:v?Number(v.simTimeNs)/1e9:null,served:v?v.served:null,...problemCounts(p),primary,inspectorOpen:u.inspectorOpen},
+  return runBar({scenarioTitle:f.preset.title(),runtime:this.runtimeState(),mode:simLabel(r?.mode??null,f.report?.manifest.calibration?.status==='calibrated'),modeToken:r?.mode??null,status:r?statusText(r.status):null,simTimeS:v?Number(v.simTimeNs)/1e9:null,served:v?v.served:null,...problemCounts(p),primary,inspectorOpen:u.inspectorOpen},
    {pickerOpen:u.pickerOpen,runtimeOpen:u.runtimeOpen,problemsOpen:u.problemsOpen,caveatOpen:u.caveatOpen,boxesHtml:boxes});
  }
  /** Engineering tab head: the run's locked identity and revision. */
@@ -384,7 +387,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
    if(e instanceof TwinRuntimeError&&e.code==='RUNTIME_PIN_MISMATCH')this.pinMismatch=e.reasonCodes;
    // LOOPBACK_BLOCKED: the browser gives the same TypeError for every cause, so the notice names them all and claims none
    const o=typeof location==='undefined'?'':location.origin;// this page's origin, for --allow-origin
-   this.notice=e instanceof TwinRuntimeError&&e.code==='LOOPBACK_BLOCKED'?`LOOPBACK_BLOCKED: ${tr(`Không tới được runtime trên máy này. Kiểm tra: runtime đang chạy; runtime cho phép origin của trang này (--allow-origin ${o}); trình duyệt cho phép truy cập mạng cục bộ; Safari không cho trang HTTPS gọi http://127.0.0.1.`,`このマシンのランタイムに届きません。確認:ランタイムが起動している、ランタイムがこのページのオリジンを許可している(--allow-origin ${o})、ブラウザがローカルネットワークへのアクセスを許可している、SafariはHTTPSページからhttp://127.0.0.1を呼べない。`,`The runtime on this machine could not be reached. Check that the runtime is running, that it allows this page's origin (--allow-origin ${o}), that the browser allows local network access, and note that Safari does not let an HTTPS page reach http://127.0.0.1.`)}`
+   this.notice=e instanceof TwinRuntimeError&&e.code==='LOOPBACK_BLOCKED'?`LOOPBACK_BLOCKED: ${loopbackBlockedText(o)}`
     :e instanceof TwinRuntimeError&&e.code==='REPORT_TIMEOUT'?`REPORT_TIMEOUT: ${tr('Runtime không gửi báo cáo của lần chạy trong 30 s; hành động này không thực hiện. Thử lại khi runtime trả lời.','ランタイムが30秒以内に実行のレポートを返しませんでした。この操作は行っていません。ランタイムが応答したら再試行してください。','The runtime did not send the run\'s report within 30 s; this action was not done. Try again once the runtime answers.')}`
     :e instanceof TwinRuntimeError&&e.code==='PACED_STEP_TIMEOUT'?`PACED_STEP_TIMEOUT: ${tr('Runtime không trả lời một bước trong 30 s (đã gửi lại một lần). Tự chạy đã dừng; lần chạy giữ nguyên trạng thái runtime báo.','ランタイムが30秒以内にステップへ応答しませんでした(1回再送済み)。自動実行を停止しました。実行はランタイムが報告する状態のままです。','The runtime did not answer a step within 30 s (resent once). Auto-run stopped; the run stays as the runtime reports it.')}`
     :e instanceof TwinRuntimeError?`${tr('Runtime từ chối','ランタイムが拒否','Runtime refused')}: ${e.message}`:e instanceof Error?e.message:String(e);

@@ -47,8 +47,9 @@ test('a pin mismatch disables every run button of the page; a matching runtime d
 });
 
 test('connection errors say what to do, in three languages',()=>{
- expect(box({error:'LOOPBACK_BLOCKED'})).toContain('Trình duyệt chặn kết nối tới 127.0.0.1 từ trang này. Dùng Chrome, Edge hoặc Firefox và cho phép khi được hỏi, hoặc chạy <code>pnpm lab:mujoco</code> rồi mở http://127.0.0.1:4175. Kiểm tra thêm');
- expect(box({error:'LOOPBACK_BLOCKED'})).toMatch(/\|[^|]*127\.0\.0\.1[^|]*\|The browser blocked the connection to 127\.0\.0\.1 from this page\./);
+ // I5: cause-neutral, the same words as the page notice; the launcher's page is suggested only to a page that is not it
+ expect(box({error:'LOOPBACK_BLOCKED'})).toContain('Không tới được runtime trên máy này. Kiểm tra: runtime đang chạy');expect(box({error:'LOOPBACK_BLOCKED'})).not.toContain('Trình duyệt chặn');
+ expect(box({error:'LOOPBACK_BLOCKED'})).toMatch(/\|[^|]*127\.0\.0\.1[^|]*\|The runtime on this machine could not be reached\./);
  expect(box({error:'PAIRING_RATE_LIMITED'})).toMatch(/PAIRING_RATE_LIMITED[^]*một phút[^|]*\|[^|]*1分[^|]*\|[^|]*a minute/);
  // a page with no runtime of its own (not on this machine's loopback): the help points to the address field, never to "start a runtime here"
  const none=box({error:'NO_RUNTIME_ON_THIS_PAGE'});

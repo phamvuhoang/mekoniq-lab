@@ -86,3 +86,18 @@ test('replay: the run speed is not on the transport',()=>{
  expect(transportBar(transport())).toContain('id="twin-run-speed"');
  expect(transportBar(transport({mode:'replay',replay:{fromTick:0,toTick:400,tick:100,playing:false,marks:[]}}))).not.toContain('twin-run-speed');
 });
+test('I5: the runtime word says what the page knows: not tried yet, trying, failed, another commit, ready',()=>{
+ const w=(attempt:'none'|'pending'|'failed'|'ok',o:{paired?:boolean;pin?:boolean;link?:LinkState}={})=>runtimeWord(o.link??'closed','unknown',o.paired??true,false,false,{attempt,pinMismatch:!!o.pin});
+ // a session remembered for the runtime, nothing attempted in this page load: neutral, never "connecting"
+ expect(w('none')).toEqual({state:'idle',label:'Chưa kết nối'});
+ expect(w('pending')).toEqual({state:'connecting',label:'Đang kết nối'});
+ // the attempt failed: an error word, never green, paired or not
+ expect(w('failed')).toEqual({state:'failed',label:'Không kết nối được'});
+ expect(w('failed',{paired:false})).toEqual({state:'failed',label:'Không kết nối được'});
+ // connected to a runtime of another source commit than the pin: a warning word (runs stay blocked)
+ expect(w('ok',{pin:true})).toEqual({state:'mismatch',label:'Khác phiên bản'});
+ expect(w('ok')).toEqual({state:'live',label:'Sẵn sàng'});
+ // a link that stopped answering stays an error
+ expect(w('ok',{link:'runtime_lost'})).toEqual({state:'lost',label:'Mất kết nối'});
+ for(const s of ['idle','failed','mismatch'])expect(runBar(bar({runtime:{state:s as never,label:'x',detail:''}}))).toContain(`data-state="${s}"`);
+});

@@ -47,7 +47,7 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  await expect(box).toBeVisible();await box.locator('[data-action="twin-disconnect"]').click();await expect(url).toHaveValue('https://rt.example');
  // 3. a loopback address the browser cannot reach: said once, in the box, with the whole checklist
  await url.fill('http://127.0.0.1:4179');await page.locator('#twin-pair-token').fill('not-used');await page.getByRole('button',{name:'Ghép nối runtime'}).click();
- await expect(box.getByTestId('runtime-error')).toContainText('LOOPBACK_BLOCKED');await expect(box.getByTestId('runtime-error')).toContainText('Trình duyệt chặn kết nối tới 127.0.0.1 từ trang này');
+ await expect(box.getByTestId('runtime-error')).toContainText('LOOPBACK_BLOCKED');await expect(box.getByTestId('runtime-error')).toContainText('Không tới được runtime trên máy này');
  await expect(box.getByTestId('runtime-error')).toContainText('--allow-origin http://127.0.0.1:4175');await expect(page.locator('.notice')).toHaveCount(0);
  await shot(page,'box-loopback-blocked');
  // back to this machine, then pair with the launcher's code
@@ -60,7 +60,7 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  const primary=page.getByTestId('primary-action');
  await expect(primary).toHaveText('Chạy MuJoCo (tay máy)',{timeout:180000});await expect(primary).toBeEnabled();
  await primary.click();
- await expect(page.getByTestId('mode-badge')).toContainText('SIMULATION');await expect(page.getByTestId('mode-badge')).toContainText('chưa hiệu chuẩn');
+ await expect(page.getByTestId('mode-badge')).toHaveText('Mô phỏng · chưa hiệu chuẩn');await expect(page.getByTestId('mode-badge')).toHaveAttribute('data-mode','simulation');
  // identity: each backend with its own model; the run tag only as the mock parts' tag
  await openInspector(page,'engineering');const identity=page.getByTestId('run-identity');
  await expect(identity).toContainText('MJ-BV01');await expect(identity).toContainText('mujoco_arm@');await expect(identity).toContainText('thẻ mô hình của phần mock');await expect(identity).not.toContainText('model mock_kinematic');

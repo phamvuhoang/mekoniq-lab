@@ -2271,7 +2271,8 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 .twin-runtime-chip i{flex:none;width:10px;height:10px;border-radius:50%;border:2px solid var(--muted)}
 .twin-runtime-chip[data-state="live"] i{background:var(--accent);border-color:var(--accent)}
 .twin-runtime-chip[data-state="slow"] i,.twin-runtime-chip[data-state="connecting"] i{border-color:var(--amber);border-style:dashed}
-.twin-runtime-chip[data-state="lost"] i{border-color:var(--danger);background:var(--danger)}
+.twin-runtime-chip[data-state="lost"] i,.twin-runtime-chip[data-state="failed"] i{border-color:var(--danger);background:var(--danger)}
+.twin-runtime-chip[data-state="mismatch"] i{border-color:var(--amber);background:var(--amber)}
 .twin-runtime-chip[data-state="recorded"] i{border-color:var(--blue);border-style:dotted}
 .twin-recorded{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;font:700 12px var(--mono);color:var(--blue);border:1px dashed var(--blue);border-radius:6px;white-space:nowrap}
 .twin-mode span{white-space:nowrap}
