@@ -66,7 +66,8 @@ test('the xArm is drawn from its meshes once loaded, swapped in place; the finge
  expect((await draw(page,{q:PICK,opening:null,cup:CUP})).gripperRad).toBe(open.gripperRad);
  const at=await draw(page,{q:PICK,opening:0.08,cup:CUP});
  (JSON.parse(at.cups!)['cup-1'] as number[]).forEach((v,k)=>expect(v).toBeCloseTo(CUP[k]!,4));
- expect(at.rebuilds).toBe(String(Number(first.rebuilds)+1));// the cup going to its plant pose changes its drawing once
+ // the cup going to its plant pose changes its drawing once: that object alone is redrawn, the scene is not rebuilt (U06)
+ expect(at.redraws).toBe(String(Number(first.redraws)+1));expect(at.rebuilds).toBe(first.rebuilds);
  await page.evaluate(()=>(window as unknown as {fit:(id:string)=>void}).fit('arm-1'));
  if(shots)await page.locator('#u05').screenshot({path:`${shots}/U05-mesh-pick-closed.png`});
  // a rebuild (another selection) draws the meshes again from the loaded geometry: no new request; every request went to this page's origin

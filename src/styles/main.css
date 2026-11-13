@@ -2528,6 +2528,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .button.danger { color: var(--danger); border-color: var(--danger); background: var(--panel); }
 input:not([type="range"]):not([type="checkbox"]), select { min-height: 44px; border-color: var(--mq-control-border); border-radius: var(--mq-radius-control); font-size: 14px; }
 input[type="checkbox"] { width: 24px; min-height: 24px; accent-color: var(--accent); }
+.twin-where input[type="radio"] { width: 18px; height: 18px; min-height: 18px; margin: 0; padding: 0; flex: none; accent-color: var(--accent); }
+.twin-where label { white-space: nowrap; min-height: 32px; }
 input[aria-invalid="true"] { border-color: var(--danger); }
 input::placeholder { color: var(--muted); }
 select option { background: var(--panel); color: var(--ink); }

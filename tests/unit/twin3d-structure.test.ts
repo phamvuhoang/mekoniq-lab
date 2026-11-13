@@ -1,8 +1,8 @@
-// D65: the 3D view keeps its scene; only a change of structure (project, navigation scene, layers, selection, the set of objects or the arm's display
-// source) rebuilds it. A new pose or joint angle never does.
+// D65: the 3D view keeps its scene; a change of the scene (project, navigation scene, layers, selection) rebuilds it, a change of one object's drawing (the set of
+// objects, a source, the arm's display source) redraws that object (sceneKey, objectKeys; structureKey covers both). A new pose or joint angle never does either.
 import {expect,test,vi} from 'vitest';
 vi.hoisted(()=>{(globalThis as Record<string,unknown>).localStorage={getItem:()=>'en',setItem:()=>{}};});
-import {anchoredOverlays,posesOf,structureKey} from '../../src/viewer/twin3d';
+import {anchoredOverlays,objectKeys,posesOf,sceneKey,structureKey} from '../../src/viewer/twin3d';
 import type {TwinFrame,ViewState} from '../../src/twin/scene';
 import {defaultLayers} from '../../src/twin/overlays';
 import {presets} from '../../src/scenarios/catalog';
@@ -35,4 +35,11 @@ test('a footprint is drawn in its body frame: the same outline whatever the pose
  const fp=(x:number)=>{const f=frame({x});f.view!.entities[0]!.pose.yawRad=x;return anchoredOverlays(f,vs).filter(s=>s.layer==='footprint');};
  const a=fp(1),b=fp(2.5);expect(a).toHaveLength(1);expect(a[0]!.anchored).toBe(true);
  a[0]!.points.forEach((p,i)=>p.forEach((v,k)=>expect(v).toBeCloseTo(b[0]!.points[i]![k]!,9)));
+});
+test('sceneKey: a layer or the selection rebuilds; a new object or a stale arm only changes objectKeys (that object is redrawn, the scene stays)',()=>{
+ const k=sceneKey(frame(),vs),o=objectKeys(frame());
+ expect(sceneKey(frame(),{...vs,layers:{...vs.layers,frames:true}})).not.toBe(k);expect(sceneKey(frame(),{...vs,selected:'amr-1'})).not.toBe(k);
+ expect(sceneKey(frame({cups:1}),vs)).toBe(k);expect(sceneKey(frame({joints:null}),vs)).toBe(k);expect(sceneKey(frame({x:3}),vs)).toBe(k);
+ expect(objectKeys(frame({cups:1})).has('cup-0')).toBe(true);expect(objectKeys(frame({joints:null})).get('arm-1')).not.toBe(o.get('arm-1'));
+ expect([...objectKeys(frame({x:3,joints:[0.3,-0.2,1,0.1,0.5,0.2]}))]).toEqual([...o]);
 });

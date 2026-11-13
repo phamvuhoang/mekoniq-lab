@@ -1,5 +1,6 @@
-// Optional WebGL view of the same TwinFrame/ViewState the 2D plan draws. Read-only. The scene is kept: update() rebuilds it only when its structure
-// (structureKey) changes and otherwise moves what is there; pose() only changes transforms. Renders on demand: the workspace drives pose() from an
+// Optional WebGL view of the same TwinFrame/ViewState the 2D plan draws. Read-only. The scene is kept: update() rebuilds it only when the scene itself
+// (sceneKey: project, world, navigation scene, layers, selection) changes; an object whose own drawing changes (objectKeys: it appears or goes, its source,
+// a cup entering or leaving the plant's report, the arm's display source) is redrawn alone (dataset.redraws); otherwise it moves what is there; pose() only changes transforms. Renders on demand: the workspace drives pose() from an
 // animation frame only while live samples arrive and reduced motion is not requested. Any WebGL failure returns null or calls onFail and the
 // workspace stays on the 2D plan with the same selection. An xArm 6 (MuJoCo plant) is drawn from its vendor meshes once they are loaded (D51), as its joint
 // chain until then or when they cannot be used; the swap happens in place, without a rebuild or a camera move.
@@ -80,13 +81,15 @@ export function armMeshIssues(f:TwinFrame):ArmMeshIssue[]{
  });
 }
 const heightOf=(e:SceneEntity)=>e.kind==='amr'?0.225:e.kind==='coffee_machine'?1.125:e.kind==='arm'?1.25:e.kind==='cup'?(e.status?.startsWith('robot')?0.52:e.status?.startsWith('customer')?0.8:1.0):1.05;
-/** Changes when the project, the navigation scene, a layer, the selection, the set of objects (and how each is drawn) or the arm's display source
- * changes; never when only a pose or a joint angle does. Pure. */
-export function structureKey(f:TwinFrame,vs:ViewState):string{
- const p=f.preset.project,chain=!!armBase(f);
- return JSON.stringify([p.id,p.revision,p.world.width,p.world.height,f.navigation?.sceneDigest??null,vs.layers,vs.selected,
-  drawn(f).map(({e,arm})=>[e.id,e.kind,e.source,!!e.pose3d,!!e.plant,arm&&[arm.source,arm.frozen,chain&&!!arm.jointsRad,arm.model,arm.mesh]])]);
+/** What rebuilds the whole scene: the project and its world, the navigation scene, a layer, the selection. Pure. */
+export const sceneKey=(f:TwinFrame,vs:ViewState):string=>{const p=f.preset.project;return JSON.stringify([p.id,p.revision,p.world.width,p.world.height,f.navigation?.sceneDigest??null,vs.layers,vs.selected]);};
+/** How each drawn object looks (never its pose or joint angles): a changed entry redraws that object alone. Pure. */
+export function objectKeys(f:TwinFrame):Map<string,string>{
+ const chain=!!armBase(f);
+ return new Map(drawn(f).map(({e,arm})=>[e.id,JSON.stringify([e.kind,e.source,!!e.pose3d,!!e.plant,arm&&[arm.source,arm.frozen,chain&&!!arm.jointsRad,arm.model,arm.mesh]])]));
 }
+/** Changes when the scene or any object's drawing changes; never when only a pose or a joint angle does. Pure. */
+export const structureKey=(f:TwinFrame,vs:ViewState):string=>JSON.stringify([sceneKey(f,vs),[...objectKeys(f)]]);
 /** The exact poses of a frame (no buffer): what update() shows, and the base the workspace's sample buffer overrides. Pure. */
 export function posesOf(f:TwinFrame):TwinPoses{
  const out:Required<TwinPoses>={arms:{},bodies:{},cups:{}},chain=!!armBase(f);
@@ -97,8 +100,9 @@ export function posesOf(f:TwinFrame):TwinPoses{
  }
  return out;
 }
-/** Remove and free every child: geometries and materials are not shared across rebuilds, except the arm meshes' parsed geometry (`userData.shared`), kept for the page. */
-const free=(g:THREE.Object3D)=>{for(const c of [...g.children]){g.remove(c);c.traverse(o=>{const m=o as THREE.Mesh,mt=m.material as THREE.Material|THREE.Material[]|undefined;if(!m.userData.shared)m.geometry?.dispose();for(const x of Array.isArray(mt)?mt:mt?[mt]:[])x.dispose();});}};
+/** Remove and free an object (or every child of a group): geometries and materials are not shared across rebuilds, except the arm meshes' parsed geometry (`userData.shared`), kept for the page. */
+const freeOne=(c:THREE.Object3D)=>{c.removeFromParent();c.traverse(o=>{const m=o as THREE.Mesh,mt=m.material as THREE.Material|THREE.Material[]|undefined;if(!m.userData.shared)m.geometry?.dispose();for(const x of Array.isArray(mt)?mt:mt?[mt]:[])x.dispose();});};
+const free=(g:THREE.Object3D)=>{for(const c of [...g.children])freeOne(c);};
 /** The overlays as drawn: footprint and safety outlines in their entity's own frame (`anchored`: they move with its body, never rebuilt for a pose),
  * the rest in the map. Pure. */
 export function anchoredOverlays(f:TwinFrame,vs:ViewState):(OverlayShape&{anchored:boolean})[]{
@@ -117,7 +121,7 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  let renderer:THREE.WebGLRenderer;
  try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});}catch{return null;}
  renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
- const canvas=renderer.domElement;canvas.setAttribute('aria-label','3D twin view. Use the entity list to select objects.');canvas.dataset.rebuilds='0';canvas.dataset.overlayBuilds='0';
+ const canvas=renderer.domElement;canvas.setAttribute('aria-label','3D twin view. Use the entity list to select objects.');canvas.dataset.rebuilds='0';canvas.dataset.redraws='0';canvas.dataset.overlayBuilds='0';
  canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();queueMicrotask(onFail);});
  host.replaceChildren(canvas);
  const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(40,1,0.1,200),controls=new OrbitControls(camera,canvas);
@@ -128,7 +132,7 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  const world=new THREE.Group(),overlays=new THREE.Group();scene.add(world,overlays);
  /** Per drawn entity: its object, the height of its centre above the base origin (AMR), and the arm chain to re-pose. */
  const objs=new Map<string,{obj:THREE.Object3D;c:number;arm?:ArmDraw}>();
- let key='',rebuilds=0,lf:TwinFrame|null=null,floor='',okey='',overlayBuilds=0,gone=false;
+ let key='',okeys=new Map<string,string>(),rebuilds=0,redraws=0,lf:TwinFrame|null=null,floor='',okey='',overlayBuilds=0,gone=false;
  /** Per entity: the overlay group that moves with its body, and its path line whose first point is the body. */
  const anchors=new Map<string,THREE.Group>(),heads=new Map<string,THREE.Line>();
  const mat=(color:number,o:{wire?:boolean;emissive?:boolean}={})=>new THREE.MeshStandardMaterial({color,wireframe:!!o.wire,emissive:o.emissive?LIME:0x000000,emissiveIntensity:o.emissive?0.6:0,roughness:0.7});
@@ -170,6 +174,28 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  const await_=(l:MeshLoad)=>{if(waiting.has(l))return;waiting.add(l);void l.done.then(()=>{waiting.delete(l);if(gone)return;
   for(const a of arms())if(l.set&&a.wantMesh&&!a.mesh)dressMeshes(a,l);
   fallback();status();render();onArmMesh();});};
+ /** One object as its frame describes it, added to the world (an arm: its chain or meshes; anything else: its schematic shape). */
+ const drawOne=({e,arm}:ReturnType<typeof drawn>[number],f:TwinFrame,vs:ViewState)=>{
+  const base=armBase(f);
+  const on=e.id===vs.selected;
+  // an arm with joint telemetry and a base pose is drawn as its joint chain (what the runtime last reported, never extrapolated); otherwise the single cylinder below
+  if(arm?.jointsRad&&base){
+   const a:ArmDraw={id:e.id,at:new THREE.Group(),joints:JOINTS[arm.model],look:{wire:arm.source!=='observed'||arm.frozen,emissive:on},wantMesh:arm.mesh,q:arm.jointsRad,opening:arm.gripperOpeningM};
+   const [px,py,pz]=base.position as [number,number,number],[qx,qy,qz,qw]=base.quaternionXyzw as [number,number,number,number];
+   a.at.quaternion.set(qx,qy,qz,qw);a.at.position.set(px,py,pz);
+   const holder=new THREE.Group();holder.rotation.x=-Math.PI/2;holder.add(a.at); // ROS (z up) -> scene (y up): (x, y, z) -> (x, z, -y); the arm sits at the base pose in the ROS map
+   world.add(holder);objs.set(e.id,{obj:holder,c:0,arm:a});
+   // the meshes when they are loaded (once per page); the joint chain until then, and for good when they cannot be used
+   const l=a.wantMesh?meshLoad():null;if(l?.set)dressMeshes(a,l);else dress(a,null);if(l&&!l.set&&!l.error)await_(l);
+   return;
+  }
+  // a cup the plant reports: its own size (cell layout, assumed) at the plant's pose, set by pose(); any other cup: the schematic cup at its custodian
+  const cup=xarmLayout.cup,geo=e.kind==='amr'?new THREE.CylinderGeometry(0.3,0.3,0.45,24):e.kind==='coffee_machine'?new THREE.BoxGeometry(0.4,0.45,0.3):e.kind==='arm'?new THREE.CylinderGeometry(0.09,0.12,0.7,16):e.kind==='cup'?e.plant?new THREE.CylinderGeometry(cup.radiusM,cup.radiusM,cup.heightM,20):new THREE.CylinderGeometry(0.05,0.04,0.12,16):new THREE.BoxGeometry(0.25,0.3,0.25);
+  const mesh=new THREE.Mesh(geo,mat(e.kind==='amr'?0xd3dcd3:e.kind==='cup'?0xf5f0e6:NAVY+0x101010,{wire:e.source==='unknown'||e.source==='derived',emissive:on}));
+  // a 3D plant: the body centre sits above the base origin by its height less the wheel radius (the base origin's height when it stands level)
+  const wheel=f.navigation?.robots.find(r=>r.robotId===e.id)?.model.kinematics.wheelRadiusM??0.09;
+  mesh.userData.entityId=e.id;mesh.userData.plant=!!e.plant;world.add(mesh);objs.set(e.id,{obj:mesh,c:heightOf(e)-(e.pose3d?wheel:0)});
+ };
  const build=(f:TwinFrame,vs:ViewState)=>{
   free(world);objs.clear();
   const w=f.preset.project.world,m=Math.max(w.width,w.height);
@@ -179,27 +205,7 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
   for(const o of f.navigation?.world.obstacles??[])world.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(o.verticesM.map(v=>at(v[0]!,v[1]!,0.04))),new THREE.LineBasicMaterial({color:0xf0b45a})));
   // Tables are schematic context, not collision geometry; runtime obstacles and footprint overlays remain the model.
   for(const p of w.points.filter(p=>p.kind==='table')){const table=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,0.08,20),mat(0x43585d));table.position.copy(at(p.x,p.y,0.72));world.add(table);}
-  const base=armBase(f);
-  for(const {e,arm} of drawn(f)){
-   const on=e.id===vs.selected;
-   // an arm with joint telemetry and a base pose is drawn as its joint chain (what the runtime last reported, never extrapolated); otherwise the single cylinder below
-   if(arm?.jointsRad&&base){
-    const a:ArmDraw={id:e.id,at:new THREE.Group(),joints:JOINTS[arm.model],look:{wire:arm.source!=='observed'||arm.frozen,emissive:on},wantMesh:arm.mesh,q:arm.jointsRad,opening:arm.gripperOpeningM};
-    const [px,py,pz]=base.position as [number,number,number],[qx,qy,qz,qw]=base.quaternionXyzw as [number,number,number,number];
-    a.at.quaternion.set(qx,qy,qz,qw);a.at.position.set(px,py,pz);
-    const holder=new THREE.Group();holder.rotation.x=-Math.PI/2;holder.add(a.at); // ROS (z up) -> scene (y up): (x, y, z) -> (x, z, -y); the arm sits at the base pose in the ROS map
-    world.add(holder);objs.set(e.id,{obj:holder,c:0,arm:a});
-    // the meshes when they are loaded (once per page); the joint chain until then, and for good when they cannot be used
-    const l=a.wantMesh?meshLoad():null;if(l?.set)dressMeshes(a,l);else dress(a,null);if(l&&!l.set&&!l.error)await_(l);
-    continue;
-   }
-   // a cup the plant reports: its own size (cell layout, assumed) at the plant's pose, set by pose(); any other cup: the schematic cup at its custodian
-   const cup=xarmLayout.cup,geo=e.kind==='amr'?new THREE.CylinderGeometry(0.3,0.3,0.45,24):e.kind==='coffee_machine'?new THREE.BoxGeometry(0.4,0.45,0.3):e.kind==='arm'?new THREE.CylinderGeometry(0.09,0.12,0.7,16):e.kind==='cup'?e.plant?new THREE.CylinderGeometry(cup.radiusM,cup.radiusM,cup.heightM,20):new THREE.CylinderGeometry(0.05,0.04,0.12,16):new THREE.BoxGeometry(0.25,0.3,0.25);
-   const mesh=new THREE.Mesh(geo,mat(e.kind==='amr'?0xd3dcd3:e.kind==='cup'?0xf5f0e6:NAVY+0x101010,{wire:e.source==='unknown'||e.source==='derived',emissive:on}));
-   // a 3D plant: the body centre sits above the base origin by its height less the wheel radius (the base origin's height when it stands level)
-   const wheel=f.navigation?.robots.find(r=>r.robotId===e.id)?.model.kinematics.wheelRadiusM??0.09;
-   mesh.userData.entityId=e.id;mesh.userData.plant=!!e.plant;world.add(mesh);objs.set(e.id,{obj:mesh,c:heightOf(e)-(e.pose3d?wheel:0)});
-  }
+  for(const d of drawn(f))drawOne(d,f,vs);
   if(vs.layers.frames)world.add(new THREE.AxesHelper(0.6));
   world.traverse(o=>{if((o as THREE.Mesh).isMesh){o.castShadow=o!==ground;o.receiveShadow=true;}});
   sun.position.set(w.width/2+3,8,-w.height/2+4);sun.target.position.set(w.width/2,0,-w.height/2);
@@ -245,7 +251,14 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
   attach(next){if(canvas.parentElement!==next)next.replaceChildren(canvas);ro.disconnect();ro.observe(next);resize();},
   update(f,vs){
    lf=f;put('plantCupsDropped',String(droppedPlantCups(f).length));
-   const k=structureKey(f,vs);if(k!==key){key=k;build(f,vs);}
+   const k=sceneKey(f,vs),o=objectKeys(f);
+   if(k!==key){key=k;okeys=o;build(f,vs);}
+   else{// the scene stands: only an object whose drawing changed is redrawn (a cup entering the plant's report, a source going stale)
+    const changed=[...new Set([...okeys.keys(),...o.keys()])].filter(id=>okeys.get(id)!==o.get(id));okeys=o;
+    if(changed.length){for(const id of changed){const x=objs.get(id);if(x){freeOne(x.obj);objs.delete(id);}}
+     for(const d of drawn(f))if(changed.includes(d.e.id)){drawOne(d,f,vs);objs.get(d.e.id)?.obj.traverse(m=>{if((m as THREE.Mesh).isMesh){m.castShadow=true;m.receiveShadow=true;}});}
+     canvas.dataset.redraws=String(redraws+=changed.length);fallback();status();}
+   }
    const w=f.preset.project.world,size=`${w.width}x${w.height}`;if(size!==floor){floor=size;home();}
    // objects without a pose of their own (cups, a cylinder arm, machines) move with the frame
    for(const {e} of drawn(f)){const o=objs.get(e.id);if(o&&e.kind!=='amr'&&!o.arm&&!e.plant)o.obj.position.copy(at(e.x,e.y,heightOf(e)));}
