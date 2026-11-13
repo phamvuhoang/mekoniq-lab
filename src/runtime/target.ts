@@ -3,15 +3,23 @@
 import {TwinRuntimeError} from '../scenarios/controls';
 export interface RuntimeTarget {base:string;kind:'same_origin'|'loopback'|'remote'}
 const LOOPBACK=['127.0.0.1','localhost','[::1]'],ADDRESS_KEY='mekoniq-lab-runtime',SAME:RuntimeTarget={base:'/lab/v2',kind:'same_origin'};
+/** By the parsed literal (the URL parser has already normalised IPv4 forms such as 127.1 or 0x7f.1 and compressed IPv6): IPv4 0.0.0.0 and 127.0.0.0/8,
+ * IPv6 :: and ::1, and their IPv4-mapped (::ffff:a.b.c.d) or IPv4-compatible (::a.b.c.d) forms; the names localhost and *.localhost. A DNS name that only starts with 127. is a host like any other. */
+function hostClass(host:string):'unspecified'|'loopback'|'other'{
+ const h=host.replace(/\.$/,''),v4=/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(h),ip4=(hi:number,lo:number)=>hi===0&&lo===0?'unspecified':hi>>8===127?'loopback':'other';
+ if(v4)return ip4(Number(v4[1])*256+Number(v4[2]),Number(v4[3])*256+Number(v4[4]));
+ if(h==='[::]')return 'unspecified';if(h==='[::1]')return 'loopback';
+ const mapped=/^\[::(?:ffff:)?([0-9a-f]{1,4}):([0-9a-f]{1,4})\]$/.exec(h);if(mapped)return ip4(parseInt(mapped[1]!,16),parseInt(mapped[2]!,16));
+ return h==='localhost'||h.endsWith('.localhost')?'loopback':'other';
+}
 /** null or empty: this page's runtime. http only for 127.0.0.1, localhost and [::1]; anything else must be https. Origin only (or its /lab/v2). */
 export function parseTarget(input:string|null,pageOrigin:string):RuntimeTarget{
  const s=input?.trim();if(!s)return {...SAME};
  const bad=()=>new TwinRuntimeError('INVALID_RUNTIME_URL',[],0);
  let u:URL;try{u=new URL(s);}catch{throw bad();}
- const loopback=LOOPBACK.includes(u.hostname),h=u.hostname.replace(/\.$/,'');
+ const loopback=LOOPBACK.includes(u.hostname),c=hostClass(u.hostname);
  // never the unspecified address; a local runtime only by http://127.0.0.1, http://localhost or http://[::1] (an https "remote" that is this machine is refused)
- const local=/^127\./.test(h)||h==='[::1]'||/^\[::ffff:(7f[0-9a-f]{2}:[0-9a-f]{1,4}|127\.[\d.]+)\]$/.test(h)||h==='localhost'||h.endsWith('.localhost');
- if(h==='0.0.0.0'||h==='[::]'||u.protocol==='https:'&&local)throw bad();
+ if(c==='unspecified'||u.protocol==='https:'&&c==='loopback')throw bad();
  if(!(u.protocol==='https:'||u.protocol==='http:'&&loopback)||u.username||u.password||u.search||u.hash||!['/','/lab/v2','/lab/v2/'].includes(u.pathname))throw bad();
  return u.origin===pageOrigin?{...SAME}:{base:`${u.origin}/lab/v2`,kind:loopback?'loopback':'remote'};
 }

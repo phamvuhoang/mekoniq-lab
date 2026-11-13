@@ -65,3 +65,10 @@ test('an unparsed buffer beyond 1 MiB fails once and aborts the request',async()
  expect(es.readyState).toBe(2);expect(errors).toHaveBeenCalledTimes(1);expect(s.calls[0]!.init.signal!.aborted).toBe(true);expect(got).not.toHaveBeenCalled();
  await flush();expect(errors).toHaveBeenCalledTimes(1);
 });
+
+test('one network chunk over 1 MiB made of complete records is parsed, not refused (the bound applies to what stays unparsed)',async()=>{
+ const s=server(),es=new FetchEventSource('/x',{fetch:s.fetch}),errors=vi.fn(),got:string[]=[];es.onerror=errors;es.addEventListener('message',e=>got.push(e.data));
+ await flush();
+ const big='y'.repeat(500*1024);s.send(`data: ${big}\n\ndata: ${big}\n\ndata: ${big}\n\n`);await flush();
+ expect(errors).not.toHaveBeenCalled();expect(got).toHaveLength(3);expect(es.readyState).toBe(1);es.close();
+});

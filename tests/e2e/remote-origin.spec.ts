@@ -52,20 +52,43 @@ test('a Lab on another origin sends nothing to the runtime before the click, the
  await expect(chip).toHaveAttribute('data-state','live',{timeout:15000});await expect(chip).toContainText('Trực tiếp');
  await shot(page,'connected-run-bar');
 
- // one press of Pause during a paced run at 1×: the step in flight finishes, then the run is paused
- await page.locator('#twin-run-speed').selectOption('1');await page.getByRole('button',{name:'Tự chạy'}).click();
- await expect(page.locator('#twin-transport [data-action="twin-pause"]')).toBeEnabled();await page.waitForTimeout(900);
- // the transport is re-rendered after every step: dispatch on the element present now (the same delegated handler a click reaches)
- await page.locator('#twin-transport [data-action="twin-pause"]').dispatchEvent('click');
- await shot(page,'pausing');
- await expect(page.getByTestId('run-status')).toContainText('Tạm dừng');
- await expect(page.locator('#twin-transport [data-action="twin-play"]')).toBeVisible();
- const pauses=toRuntime.filter(r=>r.url().endsWith('/actions')&&r.method()==='POST').map(r=>r.postDataJSON()).filter(b=>b.kind==='pause');
- expect(pauses).toHaveLength(1);
- await page.locator('#twin-transport [data-action="twin-resume"]').click();await expect(page.getByTestId('run-status')).toContainText('Đang chạy');
- await page.locator('#twin-run-speed').selectOption('16');
- await page.getByRole('button',{name:'Tự chạy'}).click();
+ // during a paced run every control works with a real pointer at 1× and 16×: the controls keep their elements while steps land
+ const T=page.locator('#twin-transport'),btn=(a:string)=>T.locator(`[data-action="${a}"]`),status=page.getByTestId('run-status'),tick=page.getByTestId('run-tick');
+ const pauseCount=()=>toRuntime.filter(r=>r.url().endsWith('/actions')&&r.method()==='POST').map(r=>r.postDataJSON()).filter(b=>b.kind==='pause').length;
+ const remember=()=>page.evaluate(()=>{(window as unknown as {kept:Element[]}).kept=[...document.querySelectorAll('#twin-transport button,#twin-transport select,#twin-run-speed option,[data-testid="primary-action"],#twin-details [role="tab"]')];return (window as unknown as {kept:Element[]}).kept.length;});
+ const allKept=()=>page.evaluate(()=>(window as unknown as {kept:Element[]}).kept.every(n=>n.isConnected));
+ await page.locator('[data-action="twin-inspector-toggle"]').click();await expect(page.getByTestId('inspector-tab-objects')).toBeVisible();
+ for(const speed of ['1','16']){
+  await page.locator('#twin-run-speed').selectOption(speed);await btn('twin-play').click();await expect(btn('twin-stop')).toBeVisible();
+  // node identity: the same transport buttons, select and options, primary action and tabs after several steps
+  expect(await remember()).toBeGreaterThan(10);const t0=await tick.textContent();
+  await page.waitForTimeout(1300);
+  await expect(tick).not.toHaveText(t0!);expect(await allKept(),`controls kept their elements at ${speed}×`).toBe(true);
+  if(speed==='1')await shot(page,'paced-1x');
+  // an inspector tab, then Stop, then Pause: each with a real pointer click, each on the first attempt
+  const tab=speed==='1'?'engineering':'report';
+  await page.getByTestId(`inspector-tab-${tab}`).click();await expect(page.getByTestId(`inspector-tab-${tab}`)).toHaveAttribute('aria-selected','true');
+  await expect(btn('twin-stop')).toBeVisible();
+  await btn('twin-stop').click();await expect(btn('twin-play')).toBeVisible();await expect(status).toContainText('Đang chạy');
+  await btn('twin-play').click();await expect(btn('twin-stop')).toBeVisible();await page.waitForTimeout(700);
+  const before=pauseCount();
+  await btn('twin-pause').click();
+  if(speed==='1')await shot(page,'pausing');
+  await expect(status).toContainText('Tạm dừng');expect(pauseCount()).toBe(before+1);
+  await expect(btn('twin-resume')).toBeFocused();// focus follows the pressed control
+  if(speed==='1')await shot(page,'paused');
+  await btn('twin-resume').click();await expect(status).toContainText('Đang chạy');
+ }
+ // the speed changes through the select while a run is going, and the next steps take it
+ await page.locator('#twin-run-speed').selectOption('1');await btn('twin-play').click();await expect(btn('twin-stop')).toBeVisible();
+ await page.waitForTimeout(600);await remember();
+ const n16=toRuntime.length;await page.locator('#twin-run-speed').selectOption('16');
+ await expect.poll(()=>toRuntime.slice(n16).filter(r=>r.url().endsWith('/actions')).map(r=>r.postDataJSON()).some(b=>b.kind==='step'&&b.payload.pace?.factor===16)).toBe(true);
+ expect(await page.evaluate(()=>(window as unknown as {kept:Element[]}).kept.filter(n=>n.matches('#twin-run-speed')).every(n=>n.isConnected))).toBe(true);
  await expect(page.getByTestId('run-status')).toContainText('Hoàn thành',{timeout:150000});
+ // right after completion the final report may still be on its way: the page says so, then it lands
+ if(await page.getByTestId('report-pending').isVisible())await shot(page,'final-report-loading');
+ await expect(page.getByTestId('report-pending')).toHaveCount(0);
  await expect(page.getByTestId('run-served')).toContainText('2');
  await shot(page,'completed');
 

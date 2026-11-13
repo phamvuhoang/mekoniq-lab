@@ -142,7 +142,9 @@ export function httpTwinRuntime(target:RuntimeTarget={base:'/lab/v2',kind:'same_
  };
  const request=async<T>(path:string,body?:unknown,signal?:AbortSignal):Promise<T>=>{
   const t=target,post=body!==undefined,a=auth(),response=await send(t.base+path,{method:post?'POST':'GET',...a,cache:'no-store',headers:{...a.headers as Record<string,string>,...post?{'Content-Type':'application/json',...csrf&&!remote()?{'X-CSRF-Token':csrf}:{}}:{}},...post?{body:JSON.stringify(body)}:{},...signal?{signal}:{}},t);
-  const data=await response.json().catch(()=>({error:'INVALID_RUNTIME_RESPONSE'}));
+  // a body that does not parse (not JSON, cut off, or aborted while read) is never data, whatever the status
+  const data=await response.json().then(d=>d!==null&&typeof d==='object'?d as Record<string,unknown>:null,()=>null);
+  if(!data)throw new TwinRuntimeError('INVALID_RUNTIME_RESPONSE',[],response.status);
   if(!response.ok)throw new TwinRuntimeError(String(data.error??'RUNTIME_REQUEST_FAILED'),Array.isArray(data.reasonCodes)?data.reasonCodes.map(String):[],response.status);
   return data as T;
  };

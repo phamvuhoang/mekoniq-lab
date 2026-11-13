@@ -31,6 +31,7 @@ import {icon,esc} from './icons';
 import {TwinStore} from '../twin/store';
 import {freshness,type Link} from '../twin/freshness';
 import {openRunStreams,type LinkState} from '../runtime/stream';
+import {morph} from './morph';
 import {mayAutoProbe,parseTarget,saveTarget,targetAddress,type RuntimeTarget} from '../runtime/target';
 import {openReplayV2} from '../reports/replay';
 import {reportCsv,reportHtml,reportJson} from '../reports/metrics';
@@ -95,6 +96,12 @@ export class TwinWorkspace {
  private failedAddress='';
  /** Report refresh off the paced loop's critical path: at most one request in flight, at most once a second, `reportAgain` = one more when it lands. */
  private reportBusy=false;private reportDue=0;private reportAgain=false;
+ /** Every report request gets a number; an answer is shown only if no later-asked one is shown already (the runtime makes a report when asked). */
+ private reportSeq=0;private reportShown=0;
+ /** An action waits for the report that matches the view (save, export, replay, a new run): the page says it is loading meanwhile. */
+ private reportLoading=false;
+ /** The paced loop is running: re-renders keep the elements the user can act on (paint()). */
+ private pacedLoop=false;
  private tokenDraft='';private busy=false;private playing=false;private notice='';private fault='cup-removed';private confirming:string|null=null;private confirmationKind:'reconcile'|'restoreCup'='reconcile';private reconcileTargets:string[]=[];
  /** `engineeringProjectDigest` is the digest of the engineering design the Assembly page holds now; saved engineering evidence is current only while it matches. */
  /** `engineeringInput` is the Assembly page's current design and receipt; an engineering preset runs from it only when its profile matches (re-checked against the receipt). */
@@ -171,7 +178,38 @@ export class TwinWorkspace {
  }
  /** Durable events arrived that this view does not reflect yet (e.g. another tab acted): re-read the snapshot. */
  private async refresh(){this.refreshing=true;try{if(this.view)await this.apply(await this.rt.get(this.view.run.id));this.rerender();}catch{/* keep the last snapshot */}finally{this.refreshing=false;}}
- private async saveEvidence(){if(!this.report||!this.runPreset||typeof indexedDB==='undefined')return;await this.evidenceStore.save(captureEvidence(this.report,this.runPreset.project));this.saved=await this.evidenceStore.list();}
+ /** Evidence is the report of the run as shown, never an older one (finalReport). */
+ private async saveEvidence(){if(!this.runPreset||typeof indexedDB==='undefined'||!this.report&&!this.view)return;const report=await this.finalReport();await this.evidenceStore.save(captureEvidence(report,this.runPreset.project));this.saved=await this.evidenceStore.list();}
+ /** Does this report describe the run exactly as the view shows it (same run, tick and status)? */
+ /** A finished or paused run whose report does not describe it yet (or an action is fetching that report). */
+ private reportPending(){const v=this.view;return this.reportLoading||!!v&&!this.replay&&!this.archived&&['completed','failed','cancelled','paused'].includes(v.run.status)&&!this.reportFits();}
+ private reportFits(r=this.report){const v=this.view;return !!r&&!!v&&r.manifest.runId===v.run.id&&r.outcome.tick===v.tick&&r.outcome.status===v.run.status;}
+ /** The report as a record of the run as shown: the one held if it matches the view, otherwise fetched now; one that still does not match,
+  * or a failed fetch, is a visible error (call() shows it), never a fallback to an older report. */
+ private async finalReport():Promise<RunReport>{
+  const v=this.view;if(!v)return this.report!;
+  if(this.reportFits())return this.report!;
+  const seq=++this.reportSeq;this.reportLoading=true;this.paint();
+  try{
+   const r=await this.rt.report(v.run.id);this.takeReport(v.run.id,seq,r,false);
+   if(!this.reportFits(r))throw new TwinRuntimeError('REPORT_NOT_CURRENT',[`report tick ${r.outcome.tick} ${r.outcome.status}`,`run tick ${v.tick} ${v.run.status}`],409);
+   return r;
+  }finally{this.reportLoading=false;}
+ }
+ /** Show report `r` (asked as number `seq`) unless the run changed or a later-asked report is already shown. */
+ private takeReport(id:string,seq:number,r:RunReport|null,paint=true){
+  if(this.view?.run.id!==id||seq<=this.reportShown)return;
+  this.reportShown=seq;this.report=r;if(r&&this.replay)this.replay={...this.replay,rp:openReplayV2(r)};if(paint)this.paint();
+ }
+ /** A re-render during the paced loop keeps every element whose markup did not change (morph): buttons under the pointer, an open select and
+  * focus survive; readouts change in place. Outside the paced loop the app re-renders as it always did. */
+ private paint(){if(this.pacedLoop)this.liveRender();else this.rerender();}
+ private liveRender(){
+  const shell=typeof document.querySelector==='function'?document.querySelector('.twin-shell'):null;if(!shell)return this.rerender();
+  const t=document.createElement('template');t.innerHTML=this.html();const next=t.content.querySelector('.twin-shell');if(!next)return this.rerender();
+  // the 3D viewer owns the stage's canvas; the 2D plan is plain markup and is updated like the rest
+  morph(shell,next,el=>el.id==='twin-stage'&&this.vs.view==='3d'&&!!this.viewer);
+ }
  private evidenceHtml(){
   return `<section class="panel" data-testid="saved-evidence"><h3>${tr('Báo cáo đã lưu','保存済みレポート','Saved reports')}</h3><p class="field-help">${tr('Báo cáo được giữ nguyên. Phạm vi cũ cần chạy lại khi đầu vào đổi.','レポートは不変。入力変更時は該当範囲を再実行。','Reports stay unchanged. Changed inputs require new evidence for the affected scope.')}</p><label for="twin-import-evidence">${tr('Nhập thư mục bằng chứng (chỉ đọc)','検証フォルダを読み込む(読み取り専用)','Import evidence folder (read-only)')}</label><input id="twin-import-evidence" type="file" multiple webkitdirectory ${this.busy||this.playing?'disabled':''}>${this.saved.map(s=>{const state=evidenceStatus(s,this.resolve(this.preset).project,this.report?.manifest.scenario.id===s.report.manifest.scenario.id?this.report:null,{engineeringProjectDigest:this.engineeringProjectDigest()});return `<p><button class="text-button" data-action="twin-open-evidence" data-value="${esc(s.id)}">${s.origin==='imported'?tr('Đã nhập','インポート済み','Imported')+' · ':''}${esc(s.report.manifest.scenario.id)} · ${esc(s.report.manifest.runId.slice(0,8))} · tick ${esc(s.report.outcome.tick)}</button> <span data-testid="evidence-status">${state.stale?`${tr('bằng chứng cũ','古い検証記録','stale evidence')}: ${state.scopes.join(', ')}`:tr('khớp đầu vào','入力一致','inputs match')}${!state.runtimeChecked?` · ${tr('chưa so runtime','ランタイム未比較','runtime not compared')}`:''}</span></p>`;}).join('')||'<p>—</p>'}</section>`;
  }
@@ -199,7 +237,7 @@ export class TwinWorkspace {
  private bar(f=this.frame()){
   const v=f.view,r=v?.run,ops=this.ops(f),n=nextAction(ops),c=runControls(ops);
   // the primary action is the recommended step; while a run is live with none, auto-run (or stopping it)
-  const primary=this.replay?null:n.action?{action:n.action.id,label:n.action.label,disabled:ops.busy}:c.live?this.playing?{action:'twin-stop',label:tr('Dừng','停止','Stop'),disabled:false}:{action:'twin-play',label:tr('Chạy tiếp','続行','Keep running'),disabled:!c.canPlay}:null;
+  const primary=this.replay?null:n.action?{action:n.action.id,label:n.action.label,disabled:ops.busy}:c.live?this.pausing?{action:'twin-pause',label:tr('Đang tạm dừng…','一時停止中…','Pausing…'),disabled:true}:this.playing?{action:'twin-stop',label:tr('Dừng','停止','Stop'),disabled:false}:{action:'twin-play',label:tr('Chạy tiếp','続行','Keep running'),disabled:!c.canPlay}:null;
   const p=this.problems(f);if(!p.length)this.ui.problemsOpen=false;const u=this.ui;// an emptied problems box closes: a later problem never opens it by itself
   const boxes=scenarioPicker(pickerItems(presets,this.health),this.preset.id,u.pickerOpen)+runtimePopover({open:u.runtimeOpen,pairFormHtml:this.pairForm(),sourceCommit:this.rt.paired?this.health?.sourceCommit??null:null,telemetry:v?this.linkText():null})
    +problemsPanel(p,u.problemsOpen,attentionChain(ops))+caveatPopover(r?`${r.mode.toUpperCase()} · ${r.access}`:'—',f.report?.limitations??[],u.caveatOpen);
@@ -265,7 +303,7 @@ ${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớ
   const viewport=`<section class="twin-viewport" aria-label="${tr('Khung nhìn','ビューポート','Viewport')}"><div class="twin-stage" id="twin-stage" data-testid="twin-scene">${renderTwin(f,this.vs)}</div>
 <div class="twin-viewport-tools"><div class="twin-tool-row">${this.vs.view==='3d'&&!this.webglFailed?tool('twin-camera-home','home',tr('Về góc nhìn gốc','初期視点に戻す','Reset the camera'))+tool('twin-camera-fit','fit',tr('Vừa khung đối tượng chọn (không chọn: cả cảnh)','選択対象に合わせる(未選択なら全体)','Fit the selected object (none: the whole scene)')):''}${tool('twin-watch','eye',tr('Chế độ xem','視聴モード','Watch mode'),` aria-pressed="${this.ui.watch}"`)}${tool('twin-help','keyboard',tr('Phím tắt','キーボードショートカット','Keyboard shortcuts'),` aria-expanded="${this.helpOpen}" aria-controls="twin-shortcuts"`)}<button class="button quiet" data-action="twin-display-toggle" aria-expanded="${this.ui.displayOpen}" aria-controls="twin-display-menu">${icon('design',16)}${tr('Hiển thị','表示','Display')}</button></div>${display}</div>
 ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(this.notice)}</span><button aria-label="${tr('Đóng','閉じる','Dismiss')}" data-action="twin-dismiss">${icon('cross',16)}</button></div>`:''}
-<div class="twin-overlay">${this.webglFailed?`<p class="source-note" data-testid="twin-fallback-note" role="status">${icon('info',15)}${tr('WebGL không khả dụng · đang hiển thị mặt bằng 2D với cùng dữ liệu và lựa chọn.','WebGLを利用できません · 同じデータと選択で2D平面図を表示中。','WebGL unavailable · showing the 2D plan with the same data and selection.')}</p>`:''}${this.strip(f)}</div></section>`;
+<div class="twin-overlay">${this.reportPending()?`<p class="source-note" data-testid="report-pending" role="status">${icon('info',15)}${tr('Đang tải báo cáo cuối của lần chạy; lưu, xuất và xem lại chờ báo cáo này.','実行の最終レポートを読み込み中です。保存・書き出し・再生はこのレポートを待ちます。','Loading the run\'s final report; saving, export and replay wait for it.')}</p>`:''}${this.webglFailed?`<p class="source-note" data-testid="twin-fallback-note" role="status">${icon('info',15)}${tr('WebGL không khả dụng · đang hiển thị mặt bằng 2D với cùng dữ liệu và lựa chọn.','WebGLを利用できません · 同じデータと選択で2D平面図を表示中。','WebGL unavailable · showing the 2D plan with the same data and selection.')}</p>`:''}${this.strip(f)}</div></section>`;
   const list=`<ul class="entity-list" id="twin-entity-list" data-testid="entity-list" aria-label="${tr('Đối tượng trong twin','ツイン内の対象','Twin objects')}">${this.entityList(f)}</ul>`;
   const panels={
    objects:`${this.objects(f)}<div class="panel-heading"><h3 id="ent-title">${tr('Đối tượng trong twin','ツイン内の対象','Twin objects')}</h3><span class="pill">${ents.length}</span></div>${list}`,
@@ -323,7 +361,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
    if(this.view)try{await this.apply(await this.rt.get(this.view.run.id));}catch{/* keep the last snapshot */}
   }finally{this.busy=false;this.rerender();}
  }
- private async apply(v:RunView){this.applyView(v);try{this.report=await this.rt.report(v.run.id);}catch{this.report=null;}if(this.report&&this.replay)this.replay={...this.replay,rp:openReplayV2(this.report)};}
+ private async apply(v:RunView){this.applyView(v);const seq=++this.reportSeq;let r:RunReport|null=null;try{r=await this.rt.report(v.run.id);}catch{/* shown as no report */}this.takeReport(v.run.id,seq,r,false);}
  /** The run snapshot only (the action receipt is the pause acknowledgement; heartbeats only refresh it between receipts, e.g. another tab). */
  private applyView(v:RunView){this.view=v;this.track(v);this.link={...this.link,paused:v.run.status==='paused'};}
  /** The report (trail, summary, caveats) may lag the live picture, which comes from the streams. Never on the paced loop's path:
@@ -332,9 +370,11 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   const v=this.view;if(!v)return;
   if(this.reportBusy){this.reportAgain||=final;return;}
   if(!final&&performance.now()<this.reportDue)return;
-  this.reportBusy=true;this.reportDue=performance.now()+1000;const id=v.run.id;
-  void this.rt.report(id).then(r=>{if(this.view?.run.id===id){this.report=r;if(this.replay)this.replay={...this.replay,rp:openReplayV2(r)};this.rerender();}},()=>{/* keep the last report */})
-   .finally(()=>{this.reportBusy=false;if(this.reportAgain){this.reportAgain=false;this.refreshReport(true);}});
+  this.reportBusy=true;this.reportDue=performance.now()+1000;const id=v.run.id,seq=++this.reportSeq;let done=false;
+  // a request that never settles is abandoned after STEP_TIMEOUT_MS (its late answer is ignored) so the next one, and the final one, can run
+  const finish=()=>{if(done)return;done=true;clearTimeout(timer);this.reportBusy=false;if(this.reportAgain){this.reportAgain=false;this.refreshReport(true);}};
+  const timer=setTimeout(finish,STEP_TIMEOUT_MS);
+  void this.rt.report(id).then(r=>{if(!done)this.takeReport(id,seq,r);},()=>{/* keep the last report */}).finally(finish);
  }
  private act(kind:Parameters<TwinRuntime['action']>[1],payload?:Record<string,unknown>){return this.rt.action(this.view!,kind,payload).then(v=>this.apply(v));}
  /** Recover display metadata from the recorded input; catalog entries provide labels/assets only. */
@@ -365,13 +405,15 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   await this.saveEvidence();
   await this.retire();
   this.archived=false;
-  this.previous=this.report;this.view=null;this.report=null;this.seen={};this.runPreset={...p,project:structuredClone(p.project)};this.stopReplay();this.replay=null;this.navigation=null;const token=++this.sceneLoad;
+  // the run kept for comparison is recorded by its matching report too, never an older one
+  this.previous=this.view?await this.finalReport():this.report;this.view=null;this.report=null;this.seen={};this.runPreset={...p,project:structuredClone(p.project)};this.stopReplay();this.replay=null;this.navigation=null;const token=++this.sceneLoad;
   const ref=this.refOf(p);if(ref){const s=await loadNavigationScene(this.rt,ref.bundleDigest).catch(()=>null);if(token===this.sceneLoad)this.navigation=s;}
   const v=await this.rt.create(requestForPreset(p),{sourceCommit:this.health.sourceCommit,schemaHash:this.health.schemaHash});this.pinMismatch=null;
   await this.apply(v);this.openStreams(v);if(start){await this.act('start');if(this.clock()?.step)await this.act('step',{ticks:STEP_TICKS});}
  }
  private async play(){
-  if(!this.view||!clockControls(this.view,this.health).play)return;
+  // nothing starts while another action holds the run or a pause is pending (Space, the button, a visible tab alike)
+  if(this.busy||this.pausing||!this.view||!clockControls(this.view,this.health).play)return;
   this.playing=true;this.hiddenStop=false;
   const live=()=>this.playing&&!!this.view&&['running','awaiting_confirmation'].includes(this.view.run.status);
   await this.call(async()=>{
@@ -379,10 +421,15 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
     // one paced step in flight; the next goes when it returns, with its revision. The runtime holds each step at real time × factor:
     // no client timer paces anything, and a run nobody steps stands still (a hidden tab sends nothing after the step in flight)
     this.speedLog=[];this.measuredSpeed=undefined;
-    try{while(live()){if(document.visibilityState==='hidden'){this.hiddenStop=true;document.addEventListener('visibilitychange',this.onVisible);break;}await this.pacedStep();this.rerender();}}
-    finally{this.refreshReport(true);}// the loop ended for any reason: one report for where the run stands
+    this.pacedLoop=true;
+    try{while(live()){if(document.visibilityState==='hidden'){this.hiddenStop=true;document.addEventListener('visibilitychange',this.onVisible);break;}await this.pacedStep();this.paint();}}
+    finally{this.pacedLoop=false;this.refreshReport(true);}// the loop ended for any reason: one report for where the run stands
     // one press of Pause: the in-flight step has returned (this.view is its receipt), so pause carries the revision it returned
-    if(this.pausing&&this.view&&['running','awaiting_confirmation'].includes(this.view.run.status))await this.act('pause');
+    if(this.pausing&&this.view&&['running','awaiting_confirmation'].includes(this.view.run.status)){
+     await this.act('pause');this.pausing=false;// landed: the next render shows Resume
+     // the pause control the user pressed becomes Resume: focus goes there, not to the page
+     const a=typeof document.querySelector==='function'?document.activeElement as HTMLElement|null:null;if(!a||a===document.body||a.dataset?.action==='twin-pause')this.focusTo='#twin-transport [data-action="twin-resume"]';
+    }
    }else while(live()){const started=performance.now();await this.act('step',{ticks:PLAY_TICKS});this.rerender();const delay=PLAY_TICKS*(this.report?.manifest.clock.tickMs??20)/this.runSpeed-(performance.now()-started);if(delay>0)await new Promise(resolve=>setTimeout(resolve,delay));}
   });
   this.playing=false;this.pausing=false;this.rerender();
@@ -448,8 +495,13 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   }
   if(action==='twin-save-evidence')return void this.call(()=>this.saveEvidence());
   if(action==='twin-open-evidence'&&value){const saved=this.saved.find(s=>s.id===value);if(!saved)return;this.playing=false;this.streams?.close();this.streams=null;clearInterval(this.ticker);this.stopReplay();this.archived=true;this.report=structuredClone(saved.report);const preset=presets.find(p=>p.scenarioId===saved.report.manifest.scenario.id)??this.preset;this.runPreset={...preset,project:structuredClone(saved.project)};const m=saved.report.manifest;this.loadScene(m.engineering?.bundleDigest);this.view={run:{schemaVersion:2,id:m.runId,mode:m.mode==='simulation'?'simulation':'mock',access:m.access,backendSetId:m.backendSetId,backends:m.backends.map(b=>b.id),status:saved.report.outcome.status as RunView['run']['status'],runRevision:0,eventCursor:null,telemetryCursor:null,fidelity:'modeled',ageMs:0,sourceCommit:m.sourceCommit,scenarioId:m.scenario.id,scenarioRevision:m.scenario.revision,seed:m.seed},tick:saved.report.outcome.tick,simTimeNs:saved.report.outcome.simTimeNs,model:m.backends[0]?.model??'unknown',entities:saved.project.entities.filter(e=>e.kind==='amr').map(e=>({id:e.id,kind:'amr',pose:{x:NaN,y:NaN,yawRad:NaN},quality:'stale',moving:false,hold:null,goal:null,path:[],distanceM:NaN})),workload:[],awaiting:[],attention:[],served:saved.report.outcome.served,coffee:null};this.replay={rp:openReplayV2(this.report),tick:saved.report.outcome.tick,playing:false};return this.rerender();}
-  if(action==='twin-export'&&this.report)return this.download(value??'json');
-  if(action==='twin-replay'&&this.report){this.playing=false;this.replay={rp:openReplayV2(this.report),tick:0,playing:false};return this.rerender();}
+  // export and replay are records of the run as shown: they wait for its matching report (finalReport)
+  const current=!this.view||this.reportFits();// a matching report acts at once, as before; otherwise the action waits for the fetch
+  if(action==='twin-export'&&this.report)return current?this.download(value??'json'):void this.call(async()=>{await this.finalReport();this.download(value??'json');});
+  if(action==='twin-replay'&&this.report){
+   if(current){this.playing=false;this.replay={rp:openReplayV2(this.report),tick:0,playing:false};return this.rerender();}
+   return void this.call(async()=>{const r=await this.finalReport();this.playing=false;this.replay={rp:openReplayV2(r),tick:0,playing:false};});
+  }
   if(action==='twin-replay-exit'){this.stopReplay();this.replay=null;if(this.archived){this.archived=false;this.view=null;this.report=null;this.runPreset=null;}this.painted='';return this.rerender();}
   if(action==='twin-replay-play'&&this.replay){
    if(this.replay.playing){this.stopReplay();return this.rerender();}
@@ -469,7 +521,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   if(action==='twin-play')return void this.play();
   if(action==='twin-stop'){this.playing=false;this.hiddenStop=false;return this.rerender();}
   if(action==='twin-cancel')return void this.call(()=>this.act('cancel'));
-  if(action==='twin-pause'&&this.playing){if(this.health?.features?.pacedStep&&!this.pausing){this.pausing=true;this.playing=false;this.hiddenStop=false;this.rerender();}return;}
+  if(action==='twin-pause'&&(this.playing||this.pausing)){if(this.playing&&this.health?.features?.pacedStep&&!this.pausing){this.pausing=true;this.playing=false;this.hiddenStop=false;this.paint();}return;}
   if(action==='twin-pause')return void this.call(()=>this.act('pause'));
   if(action==='twin-resume')return void this.call(()=>this.act('resume'));
   if(action==='twin-fault')return void this.call(()=>this.act('injectFault',{faultId:this.fault}));
@@ -485,7 +537,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   this.health=null;this.healthChecked=false;this.readiness=null;this.pinMismatch=null;
  }
  private knownReconciliationTargets(){return this.view?[...new Set(this.view.attention.map(a=>reconciliationSubject(a,this.view!)).filter((id):id is string=>id!==null))]:[];}
- change(id:string,value:string){if(id==='twin-backend-set'&&!this.busy&&!this.playing&&!this.replay&&!this.archived){const set=backendSetOptions(this.health).find(s=>s.id===value&&s.selectable)?this.health!.backendSets.find(s=>s.id===value):undefined;if(set){const compatible=set.id===WEBOTS_ARM_SET?presetById('webots-coffee'):this.preset.id==='webots-coffee'?presetById(set.mode==='mock'?'coffee':'native-bv01'):set.mode==='simulation'&&this.preset.scenarioId==='BV01'?presetById('native-bv01'):set.mode==='mock'&&this.preset.id==='native-bv01'?presetById('coffee'):this.preset;this.preset={...(compatible??this.preset),mode:set.mode as 'mock'|'simulation',backendSetId:set.id};if(set.mode==='simulation')this.scheduleDraft={...this.scheduleDraft,faultId:'cup-removed',targetId:''};this.readiness=null;void this.checkReadiness(this.preset).then(()=>this.rerender());}return this.rerender();}if(id.startsWith('twin-schedule-')){const d=this.scheduleDraft;if(id==='twin-schedule-fault'){d.faultId=value;d.targetId='';}if(id==='twin-schedule-target')d.targetId=value;if(id==='twin-schedule-trigger'&&(value==='phase'||value==='elapsed_sim_ms')){d.trigger=value;d.value=value==='phase'?'grasp':'1000';}if(id==='twin-schedule-value')d.value=value;if(id==='twin-schedule-duration')d.durationMs=value;return this.rerender();}if(id==='twin-reconcile-target'&&this.confirmationKind==='reconcile'){this.confirming=this.reconcileTargets.includes(value)&&this.knownReconciliationTargets().includes(value)?value:null;return this.rerender();}if(id==='twin-run-speed'&&[1,4,16,64].includes(Number(value))){this.runSpeed=Number(value);this.rerender();}if(id==='twin-speed-limit'){const n=Number(value);if(Number.isFinite(n)&&n>0&&n<=0.5){this.preset={...this.preset,project:{...this.preset.project,revision:this.preset.project.revision+1,entities:this.preset.project.entities.map(e=>e.kind==='amr'?{...e,speedLimitMps:n}:e)}};this.rerender();}}if(id==='twin-fault')this.fault=value;if(id==='twin-replay-cursor')this.input(id,value);}
+ change(id:string,value:string){if(id==='twin-backend-set'&&!this.busy&&!this.playing&&!this.replay&&!this.archived){const set=backendSetOptions(this.health).find(s=>s.id===value&&s.selectable)?this.health!.backendSets.find(s=>s.id===value):undefined;if(set){const compatible=set.id===WEBOTS_ARM_SET?presetById('webots-coffee'):this.preset.id==='webots-coffee'?presetById(set.mode==='mock'?'coffee':'native-bv01'):set.mode==='simulation'&&this.preset.scenarioId==='BV01'?presetById('native-bv01'):set.mode==='mock'&&this.preset.id==='native-bv01'?presetById('coffee'):this.preset;this.preset={...(compatible??this.preset),mode:set.mode as 'mock'|'simulation',backendSetId:set.id};if(set.mode==='simulation')this.scheduleDraft={...this.scheduleDraft,faultId:'cup-removed',targetId:''};this.readiness=null;void this.checkReadiness(this.preset).then(()=>this.rerender());}return this.rerender();}if(id.startsWith('twin-schedule-')){const d=this.scheduleDraft;if(id==='twin-schedule-fault'){d.faultId=value;d.targetId='';}if(id==='twin-schedule-target')d.targetId=value;if(id==='twin-schedule-trigger'&&(value==='phase'||value==='elapsed_sim_ms')){d.trigger=value;d.value=value==='phase'?'grasp':'1000';}if(id==='twin-schedule-value')d.value=value;if(id==='twin-schedule-duration')d.durationMs=value;return this.rerender();}if(id==='twin-reconcile-target'&&this.confirmationKind==='reconcile'){this.confirming=this.reconcileTargets.includes(value)&&this.knownReconciliationTargets().includes(value)?value:null;return this.rerender();}if(id==='twin-run-speed'&&[1,4,16,64].includes(Number(value))){this.runSpeed=Number(value);this.paint();}if(id==='twin-speed-limit'){const n=Number(value);if(Number.isFinite(n)&&n>0&&n<=0.5){this.preset={...this.preset,project:{...this.preset.project,revision:this.preset.project.revision+1,entities:this.preset.project.entities.map(e=>e.kind==='amr'?{...e,speedLimitMps:n}:e)}};this.rerender();}}if(id==='twin-fault')this.fault=value;if(id==='twin-replay-cursor')this.input(id,value);}
  /** Scrub: update the replay body and the scene in place so the range input keeps focus and drag state. */
  input(id:string,value:string){
   // the address error goes as soon as the field no longer holds the value that failed; no re-render, so focus and caret stay

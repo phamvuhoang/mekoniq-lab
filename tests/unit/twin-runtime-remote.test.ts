@@ -3,6 +3,10 @@ import {createServer,type IncomingMessage,type ServerResponse} from 'node:http';
 import type {AddressInfo} from 'node:net';
 import {httpTwinRuntime,TwinRuntimeError,type RunView,type TwinRuntime} from '../../src/scenarios/controls';
 import {openRunStreams,type LinkState} from '../../src/runtime/stream';
+import type {RunReport} from '../../src/scenarios/controls';
+import {coffeeReplay} from '../support/coffee-replay';
+/** A report made from a view: the same run, tick and status. */
+const reportOf=(v:RunView):RunReport=>{const {report}=coffeeReplay();return {...report,manifest:{...report.manifest,runId:v.run.id},outcome:{...report.outcome,tick:v.tick,status:v.run.status,simTimeNs:v.simTimeNs}};};
 afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
 const flush=()=>new Promise(r=>setTimeout(r,5));
 /** A stand-in gateway on an ephemeral loopback port: bearer only (401 without it), pairing, health, a run and its two SSE streams. */
@@ -113,17 +117,21 @@ test('a loopback fetch the browser refuses becomes LOOPBACK_BLOCKED; a remote on
 // The play loop of the workspace against a runtime that paces steps (features.pacedStep).
 const docStub={getElementById:()=>null,activeElement:null,visibilityState:'visible' as 'visible'|'hidden',listeners:[] as (()=>void)[],
  addEventListener(t:string,f:()=>void){if(t==='visibilitychange')this.listeners.push(f);},removeEventListener(t:string,f:()=>void){this.listeners=this.listeners.filter(x=>x!==f);}};
-async function loop(o:{conflictAt?:number;lostAt?:number;completeAt?:number;onSend?:(n:number)=>void;stepMs?:number;reportMs?:number;hangAt?:number[];onPause?:()=>void}={}){
+async function loop(o:{conflictAt?:number;lostAt?:number;completeAt?:number;onSend?:(n:number)=>void;stepMs?:number;reportMs?:number|((n:number)=>number);reportHang?:boolean;hangAt?:number[];onPause?:()=>void}={}){
  vi.stubGlobal('localStorage',{getItem:()=>null,setItem:()=>{}});vi.stubGlobal('innerWidth',600);
  docStub.visibilityState='visible';docStub.listeners=[];vi.stubGlobal('document',docStub);
- const {TwinWorkspace}=await import('../../src/ui/workspace');
+ const {TwinWorkspace}=await import('../../src/ui/workspace');const {presetById}=await import('../../src/scenarios/catalog');
  let rev=3,inflight=0,maxInflight=0,gets=0,paused=false,reportsInFlight=0,maxReports=0;let tick=0;const receipts=new Map<string,RunView>();
  const sent:{expected:number;payload:Record<string,unknown>;actionId:string;at:number;answeredAt?:number}[]=[],pauses:number[]=[],reports:{at:number;done?:number}[]=[];
  const viewAt=():RunView=>({run:{schemaVersion:2,id:'r1',mode:'mock',access:'simulated',backendSetId:'mock-default',backends:[],status:paused?'paused':o.completeAt!==undefined&&tick>=o.completeAt*20?'completed':'running',runRevision:rev,eventCursor:null,telemetryCursor:null,fidelity:'modeled',ageMs:0,sourceCommit:'d',scenarioId:'BV01',scenarioRevision:1,seed:42},
   tick,simTimeNs:String(tick*20_000_000),model:'m',entities:[],workload:[],awaiting:[],attention:[],served:'0',coffee:null});
  const rt={paired:true,target:{base:'http://127.0.0.1:4176/lab/v2',kind:'loopback'},forget(){},health:async()=>({}),
-  report:async()=>{if(o.reportMs===undefined)throw new Error('none');const r={at:performance.now()} as {at:number;done?:number};reports.push(r);reportsInFlight++;maxReports=Math.max(maxReports,reportsInFlight);
-   await new Promise(res=>setTimeout(res,o.reportMs));reportsInFlight--;r.done=performance.now();return {manifest:{clock:{tickMs:20}},limitations:[]};},
+  report:async()=>{if(o.reportMs===undefined&&!o.reportHang)throw new Error('none');const r={at:performance.now()} as {at:number;done?:number};reports.push(r);reportsInFlight++;maxReports=Math.max(maxReports,reportsInFlight);
+   // the report is made when it is asked for (the runtime's state then), and arrives after its delay
+   const made=reportOf(viewAt());
+   if(o.reportHang)await new Promise(()=>{});
+   await new Promise(res=>setTimeout(res,typeof o.reportMs==='function'?o.reportMs(reports.length):o.reportMs));reportsInFlight--;r.done=performance.now();return made;},
+  create:async()=>({...viewAt(),run:{...viewAt().run,id:'r2',status:'ready',runRevision:1}}),
   get:async()=>{gets++;return viewAt();},
   action:async(v:RunView,kind:string,payload:Record<string,unknown>={},actionId='',signal?:AbortSignal)=>{
    if(kind==='pause'){if(v.run.runRevision!==rev)throw new TwinRuntimeError('REVISION_CONFLICT',[],409);pauses.push(v.run.runRevision);o.onPause?.();rev++;paused=true;return viewAt();}
@@ -143,9 +151,11 @@ async function loop(o:{conflictAt?:number;lostAt?:number;completeAt?:number;onSe
    entry.answeredAt=performance.now();return r;
   }} as unknown as TwinRuntime;
  const w=new TwinWorkspace(()=>{},rt);
- Object.assign(w,{health:{sourceCommit:'d',schemaHash:'s',protocolMajors:[2],scenarioIds:[],backends:[],backendSets:[],features:{pacedStep:true}},view:viewAt(),openStreams:()=>{}});
- const h=w as unknown as {playing:boolean;busy:boolean;notice:string;view:RunView;measuredSpeed:number|undefined;html():string};
- return {w,h,sent,pauses,reports,stats:()=>({maxInflight,gets,rev,maxReports,reportsInFlight})};
+ const saved:{report:RunReport}[]=[];
+ Object.assign(w,{health:{sourceCommit:'d',schemaHash:'s',protocolMajors:[2],scenarioIds:[],backends:[],backendSets:[],features:{pacedStep:true}},view:viewAt(),openStreams:()=>{},
+  runPreset:presetById('coffee'),evidenceStore:{save:async(e:{report:RunReport})=>{saved.push(e);},list:async()=>[]}});
+ const h=w as unknown as {playing:boolean;busy:boolean;notice:string;view:RunView;report:RunReport|null;previous:RunReport|null;measuredSpeed:number|undefined;html():string;saveEvidence():Promise<void>};
+ return {w,h,sent,pauses,reports,saved,stats:()=>({maxInflight,gets,rev,maxReports,reportsInFlight})};
 }
 
 test('Review Focus: paced steps one at a time; a REVISION_CONFLICT re-reads the run and stops the loop',async()=>{
@@ -294,4 +304,83 @@ test('Assembly sends nothing to a runtime it may not probe by itself; the compil
   await a.restore();expect(calls,`${kind} on ${host}`).toEqual(probes?['health']:[]);
   if(!probes){a.click('asm-compile');await vi.waitFor(()=>expect(calls).toEqual(['health']));expect(a.canCompile).toBe(false);}
  }
+});
+
+test('evidence waits for the final report: a run completed inside the loop, then saved and replaced at once, keeps its final report',async()=>{
+ vi.stubGlobal('indexedDB',{});
+ const {w,h,saved}=await loop({completeAt:3,reportMs:250});
+ w.click('twin-play');await vi.waitFor(()=>expect(h.view.run.status).toBe('completed'),{timeout:3000});
+ await vi.waitFor(()=>expect(h.busy).toBe(false));
+ expect(h.report?.outcome.status).not.toBe('completed');// the final report has not landed yet
+ expect(h.html()).toContain('data-testid="report-pending"');
+ w.click('twin-save-evidence');await vi.waitFor(()=>expect(saved).toHaveLength(1),{timeout:3000});
+ expect(saved[0]!.report.outcome).toMatchObject({tick:60,status:'completed'});
+ await vi.waitFor(()=>expect(h.busy).toBe(false));
+ w.click('twin-reset');await vi.waitFor(()=>expect(h.view.run.id).toBe('r2'),{timeout:3000});
+ expect(saved.every(e=>e.report.outcome.tick===60&&e.report.outcome.status==='completed')).toBe(true);
+ expect(h.previous?.outcome).toMatchObject({tick:60,status:'completed'});
+ w.leave();
+});
+
+test('an action that needs the final report fails visibly when it cannot be fetched, instead of using an older one',async()=>{
+ vi.stubGlobal('indexedDB',{});
+ const {w,h,saved}=await loop({completeAt:2,reportMs:5});
+ w.click('twin-play');await vi.waitFor(()=>expect(h.busy).toBe(false),{timeout:3000});
+ await new Promise(r=>setTimeout(r,30));
+ Object.assign(h,{report:reportOf({...h.view,tick:20,run:{...h.view.run,status:'running'}})});// an older report is all the page holds
+ (w as unknown as {rt:{report():Promise<never>}}).rt.report=async()=>{throw new TypeError('Failed to fetch');};
+ w.click('twin-save-evidence');await vi.waitFor(()=>expect(h.busy).toBe(false));await new Promise(r=>setTimeout(r,10));
+ expect(saved).toEqual([]);expect(h.notice).not.toBe('');
+ w.leave();
+});
+
+test('Space while a pause is pending does not cancel it: exactly one pause, no further step',async()=>{
+ const {w,h,sent,pauses}=await loop({stepMs:40});
+ w.click('twin-play');await vi.waitFor(()=>expect(sent.length).toBeGreaterThanOrEqual(1));
+ w.click('twin-pause');const n=sent.length;
+ w.click('twin-toggle-play');w.click('twin-play');// Space, then the button
+ await vi.waitFor(()=>expect(h.view.run.status).toBe('paused'),{timeout:3000});await vi.waitFor(()=>expect(h.busy).toBe(false));
+ await new Promise(r=>setTimeout(r,100));
+ expect(pauses).toHaveLength(1);expect(sent).toHaveLength(n);expect(h.playing).toBe(false);
+ w.leave();
+});
+
+test('while pausing, the run bar says so too',async()=>{
+ const {w,h,sent}=await loop({stepMs:40});
+ w.click('twin-play');await vi.waitFor(()=>expect(sent.length).toBeGreaterThanOrEqual(1));
+ w.click('twin-pause');
+ expect(h.html()).toMatch(/data-testid="primary-action"[^>]*>[^<]*(<[^>]*>)*[^<]*Đang tạm dừng/);
+ await vi.waitFor(()=>expect(h.busy).toBe(false),{timeout:3000});w.leave();
+});
+
+test('an older report never replaces a newer one (the pre-pause report lands after the post-pause one)',async()=>{
+ // the pause's own report (the second request) is fast; the one asked during the run and the final one are slow
+ const {w,h,sent}=await loop({stepMs:40,reportMs:n=>n===2?5:400});
+ w.click('twin-play');await vi.waitFor(()=>expect(sent.length).toBeGreaterThanOrEqual(1));
+ w.click('twin-pause');
+ await vi.waitFor(()=>expect(h.report?.outcome.status).toBe('paused'),{timeout:3000});
+ // the run-time report lands now: it must not replace the newer one
+ const seen=new Set<string>();const until=Date.now()+1000;while(Date.now()<until){seen.add(String(h.report?.outcome.status));await new Promise(r=>setTimeout(r,10));}
+ expect([...seen]).toEqual(['paused']);
+ w.leave();
+});
+
+test('a report request that never settles is abandoned after 30 s and the final report is still fetched',async()=>{
+ vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});
+ try{
+  const {w,h,reports}=await loop({reportHang:true,completeAt:2,stepMs:0});
+  w.click('twin-play');await vi.advanceTimersByTimeAsync(50);
+  expect(h.view.run.status).toBe('completed');expect(reports).toHaveLength(1);// the final one is queued behind the hung one
+  await vi.advanceTimersByTimeAsync(30_100);
+  expect(reports).toHaveLength(2);
+  w.leave();
+ }finally{vi.useRealTimers();}
+});
+
+test('a 2xx whose body is not JSON (or is cut off) is INVALID_RUNTIME_RESPONSE, never data',async()=>{
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response('<html>proxy</html>',{status:200})));
+ await expect(httpTwinRuntime().get('r1')).rejects.toMatchObject({code:'INVALID_RUNTIME_RESPONSE'});
+ const body=new ReadableStream({start:c=>c.error(new DOMException('aborted','AbortError'))});
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(body,{status:200})));
+ await expect(httpTwinRuntime({base:'https://a.example/lab/v2',kind:'remote'}).action({run:{id:'r1',runRevision:1}} as RunView,'step',{ticks:20})).rejects.toMatchObject({code:'INVALID_RUNTIME_RESPONSE'});
 });

@@ -24,7 +24,6 @@ export class FetchEventSource {
    for(;;){
     const {done,value}=await reader.read();if(done||this.abort.signal.aborted)break;
     buffer+=value;
-    if(buffer.length+pending>MAX_PENDING)return this.fail();
     for(let i;(i=buffer.search(/[\r\n]/))>=0;){
      if(buffer[i]==='\r'&&i===buffer.length-1)break;// a CR at the end of a chunk may be half of a CRLF: wait for the next chunk
      const line=buffer.slice(0,i);buffer=buffer.slice(i+(buffer[i]==='\r'&&buffer[i+1]==='\n'?2:1));
@@ -36,6 +35,8 @@ export class FetchEventSource {
      const c=line.indexOf(':'),field=c<0?line:line.slice(0,c),v=c<0?'':line.slice(c+1).replace(/^ /,'');
      if(field==='data'){data.push(v);pending+=v.length;}else if(field==='event')event=v;else if(field==='id'&&!v.includes('\0'))id=v;// retry: ignored (no reconnect here)
     }
+    // bounded after the complete records of this chunk were consumed: only what is still unparsed, plus the unfinished record's data, counts
+    if(buffer.length+pending>MAX_PENDING)return this.fail();
    }
   }catch{/* aborted or a network error */}
   this.fail();

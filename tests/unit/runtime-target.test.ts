@@ -25,6 +25,13 @@ test('the unspecified address is refused in every scheme; https to a loopback ho
  expect(parseTarget('https://notlocalhost.example','https://lab.example').kind).toBe('remote');
 });
 
+test('hosts are classified by their parsed IP literal: mapped forms of the unspecified and loopback addresses are refused; a DNS name starting with 127. is an ordinary remote host',()=>{
+ for(const bad of ['https://[::ffff:0:0]','http://[::ffff:0.0.0.0]:4176','https://[::ffff:0.0.0.0]','https://0x7f.1','https://[::7f00:1]','https://2130706433'])
+  expect(()=>parseTarget(bad,'https://lab.example'),bad).toThrow('INVALID_RUNTIME_URL');
+ for(const ok of ['https://127.example.com','https://127.0.0.1.example.com','https://0.example.com','https://localhost.example.com'])
+  expect(parseTarget(ok,'https://lab.example'),ok).toMatchObject({kind:'remote'});
+});
+
 test('requestInit: same origin keeps the cookie; other targets send the bearer, no cookie, and loopback names its address space',()=>{
  expect(requestInit({base:'/lab/v2',kind:'same_origin'},'tok')).toEqual({credentials:'same-origin'});
  expect(requestInit({base:'http://127.0.0.1:4176/lab/v2',kind:'loopback'},'tok')).toEqual({credentials:'omit',headers:{Authorization:'Bearer tok'},targetAddressSpace:'loopback'});
