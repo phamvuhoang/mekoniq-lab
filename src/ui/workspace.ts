@@ -46,6 +46,8 @@ const STEP_TICKS=250,PLAY_TICKS=25,PACED_TICKS=20,PACE_FACTORS=[1,4,16,64],SAME_
 const lostResponse=(e:unknown)=>e instanceof TypeError||e instanceof TwinRuntimeError&&['LOOPBACK_BLOCKED','PACED_STEP_TIMEOUT'].includes(e.code);
 /** A paced step holds at most 50 ticks (≤ 1 s at 1×): no answer after this is a lost response. */
 const STEP_TIMEOUT_MS=30_000;
+/** Only the network request's own failure (fetch rejects with a TypeError) means the runtime was not reached; a TypeError thrown by code is not hidden behind it. */
+const net=<T,>(p:Promise<T>)=>p.catch((e:unknown)=>{throw e instanceof TypeError?new TwinRuntimeError('RUNTIME_UNREACHABLE',[],0):e;});
 /** A page served from this machine has a runtime of its own origin; a page from the web has none (no location: the unit tests, a loopback page). */
 const onLoopbackPage=()=>typeof location==='undefined'||loopbackPage(location.hostname);
 /** Replace an element's content with `html` in place: kept nodes stay (morph). */
@@ -248,7 +250,7 @@ export class TwinWorkspace {
   // the primary action is the recommended step; while a run is live with none, auto-run (or stopping it)
   const primary=this.replay?null:n.action?{action:n.action.id,label:n.action.label,disabled:ops.busy||!!this.pinBlock()&&['twin-run','twin-rerun','twin-reset'].includes(n.action.id)}:c.live?this.pausing?{action:'twin-pause',label:tr('Đang tạm dừng…','一時停止中…','Pausing…'),disabled:true}:this.playing?{action:'twin-stop',label:tr('Dừng','停止','Stop'),disabled:false}:{action:'twin-play',label:tr('Chạy tiếp','続行','Keep running'),disabled:!c.canPlay}:null;
   const p=this.problems(f);if(!p.length)this.ui.problemsOpen=false;const u=this.ui;// an emptied problems box closes: a later problem never opens it by itself
-  const boxes=scenarioPicker(pickerItems(presets,this.health),this.preset.id,u.pickerOpen)+runtimePopover({open:u.runtimeOpen,target:this.target(),draftUrl:this.addressDraft,paired:this.rt.paired,busy:this.busy||this.playing,health:this.health,pin:{expected:this.pinExpected,actual:this.health?.sourceCommit??null},error:this.boxError(),where:this.whereChoice,pageOrigin:typeof location==='undefined'?'':location.origin},v?this.linkText():null)
+  const boxes=scenarioPicker(pickerItems(presets,this.health),this.preset.id,u.pickerOpen)+runtimePopover({open:u.runtimeOpen,target:this.target(),draftUrl:this.addressDraft,paired:this.rt.paired,busy:this.busy||this.playing,health:this.health,pin:{expected:this.pinExpected,actual:this.health?.sourceCommit??null},error:this.boxError(),where:this.whereChoice,pageOrigin:typeof location==='undefined'?'':location.origin,pageHasRuntime:onLoopbackPage()},v?this.linkText():null)
    +problemsPanel(p,u.problemsOpen,attentionChain(ops))+caveatPopover(r?`${r.mode.toUpperCase()} · ${r.access}`:'—',f.report?.limitations??[],u.caveatOpen);
   return runBar({scenarioTitle:f.preset.title(),runtime:this.runtimeState(),mode:simLabel(r?.mode??null,f.report?.manifest.calibration?.status==='calibrated'),status:r?statusText(r.status):null,simTimeS:v?Number(v.simTimeNs)/1e9:null,served:v?v.served:null,...problemCounts(p),primary,inspectorOpen:u.inspectorOpen},
    {pickerOpen:u.pickerOpen,runtimeOpen:u.runtimeOpen,problemsOpen:u.problemsOpen,caveatOpen:u.caveatOpen,boxesHtml:boxes});
@@ -306,7 +308,7 @@ export class TwinWorkspace {
   const viewSwitch=`<div class="viewer-switch" role="group" aria-label="${tr('Kiểu xem','表示形式','View')}"><button data-action="twin-view" data-value="3d" aria-pressed="${this.vs.view==='3d'}" ${this.webglFailed?'disabled':''}>3D</button><button data-action="twin-view" data-value="2d" aria-pressed="${this.vs.view==='2d'}">2D</button></div>`;
   const legendHtml=`<ul class="twin-legend" data-testid="twin-legend" aria-label="${tr('Chú giải','凡例','Legend')}">${legend().map(x=>`<li><i class="mark ${x.mark}" aria-hidden="true"></i><b>${x.label}</b><small>${x.note}</small></li>`).join('')}</ul>`;
   const display=`<div class="twin-popover twin-display-menu" id="twin-display-menu" data-testid="display-menu" role="group" aria-labelledby="twin-scene-title"${this.ui.displayOpen?'':' hidden'}><h2 id="twin-scene-title" class="small-code">${esc(p.project.name)} · ${p.project.world.width} × ${p.project.world.height} m</h2>${viewSwitch}${layers}
-${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớp vùng chiếm chỗ thể hiện hình học mô hình.','3D形状は模式図です。占有領域レイヤーがモデル形状を示します。','3D shapes are schematic. The footprint layer shows model geometry.')}</p>`:''}${legendHtml}<p class="source-note">${icon('info',15)}${tr('Cảnh chỉ đọc: vị trí lấy từ runtime, canvas không quyết định đến đích hay hoàn thành.','表示は読み取り専用。位置はランタイムから取得し、描画は到着や完了を判定しません。','Read-only scene: positions come from the runtime; the canvas never decides arrival or completion.')}</p><p class="source-note" data-testid="honesty-notes">${icon('info',15)}${esc(illustrativeNote())} · ${esc(businessSimulationNote())}</p></div>`;
+${this.vs.view==='3d'&&this.v3d?.armCellDrawn(f)?`<p class="source-note" data-testid="arm-cell-note">${icon('info',15)}${tr('Giá đỡ vòi và khay: hình học giả định của trạm mô phỏng (bố trí trạm, giả định), không phải số đo. Chân đế dưới tay máy (khung dây): hình minh họa, không có trong mô phỏng.','ノズル台とトレイ:シミュレーションのセルの仮定形状(セル配置、仮定)で、実測ではありません。アーム下の台座(ワイヤーフレーム):説明用の図で、シミュレーションには含まれません。','Nozzle stand and tray: assumed geometry of the simulated cell (the cell layout, assumed), not measured. The mount under the arm (wireframe): an illustration, not part of the simulation.')}</p>`:''}${this.vs.view==='3d'?`<p class="source-note">${tr('Hình 3D là sơ đồ. Lớp vùng chiếm chỗ thể hiện hình học mô hình.','3D形状は模式図です。占有領域レイヤーがモデル形状を示します。','3D shapes are schematic. The footprint layer shows model geometry.')}</p>`:''}${legendHtml}<p class="source-note">${icon('info',15)}${tr('Cảnh chỉ đọc: vị trí lấy từ runtime, canvas không quyết định đến đích hay hoàn thành.','表示は読み取り専用。位置はランタイムから取得し、描画は到着や完了を判定しません。','Read-only scene: positions come from the runtime; the canvas never decides arrival or completion.')}</p><p class="source-note" data-testid="honesty-notes">${icon('info',15)}${esc(illustrativeNote())} · ${esc(businessSimulationNote())}</p></div>`;
   const tool=(a:string,ic:string,label:string,attrs='')=>`<button class="icon-button twin-tool" data-action="${a}" aria-label="${label}" title="${label}"${attrs}>${icon(ic,18)}</button>`;
   const viewport=`<section class="twin-viewport" aria-label="${tr('Khung nhìn','ビューポート','Viewport')}"><div class="twin-stage" id="twin-stage" data-testid="twin-scene">${renderTwin(f,this.vs)}</div>
 <div class="twin-viewport-tools"><div class="twin-tool-row">${this.vs.view==='3d'&&!this.webglFailed?tool('twin-camera-home','home',tr('Về góc nhìn gốc (kịch bản tay máy: trạm tay máy)','初期視点に戻す(アームのシナリオ:アームセル)','Reset the camera (arm scenarios: the arm cell)'))+tool('twin-camera-fit','fit',tr('Vừa khung đối tượng chọn (không chọn: cả mặt bằng)','選択対象に合わせる(未選択なら床全体)','Fit the selected object (none: the whole floor)')):''}${tool('twin-watch','eye',tr('Chế độ xem','視聴モード','Watch mode'),` aria-pressed="${this.ui.watch}"`)}${tool('twin-help','keyboard',tr('Phím tắt','キーボードショートカット','Keyboard shortcuts'),` aria-expanded="${this.helpOpen}" aria-controls="twin-shortcuts"`)}<button class="button quiet" data-action="twin-display-toggle" aria-expanded="${this.ui.displayOpen}" aria-controls="twin-display-menu">${icon('design',16)}${tr('Hiển thị','表示','Display')}</button></div>${display}</div>
@@ -622,15 +624,15 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   this.addressDraft=targetAddress(t);
   void this.call(async()=>{
    try{
-    if(!this.health)try{this.health=await this.rt.health();}finally{this.healthChecked=true;}
+    if(!this.health)try{this.health=await net(this.rt.health());}finally{this.healthChecked=true;}
     if(t.kind!=='same_origin')this.pinExpected=await pinnedCommit().catch(()=>this.pinExpected);
     // a commit that is not the pin blocks creating runs (pinBlock), never pairing, viewing, reclaiming or reading reports: the box stays open and shows both commits
-    if(!this.rt.paired){if(!token)throw new TwinRuntimeError('NO_PAIRING_CODE',[],0);await this.rt.pair(token);this.notice=tr('Runtime v2 đã ghép nối.','ランタイムv2とペアリングしました。','Runtime v2 paired.');}
+    if(!this.rt.paired){if(!token)throw new TwinRuntimeError('NO_PAIRING_CODE',[],0);await net(this.rt.pair(token));this.notice=tr('Runtime v2 đã ghép nối.','ランタイムv2とペアリングしました。','Runtime v2 paired.');}
     this.ui={...this.ui,runtimeOpen:!!this.pinBlock()};await this.checkReadiness();
    }catch(e){
     // said once, in the box (a runtime that was not there at all is said by boxError()); anything else is the page's notice
-    if(!(e instanceof TwinRuntimeError||e instanceof TypeError))throw e;
-    this.runtimeError=e instanceof TwinRuntimeError?(!this.health&&t.kind==='same_origin'?null:e.code):'RUNTIME_UNREACHABLE';this.ui={...this.ui,runtimeOpen:true};
+    if(!(e instanceof TwinRuntimeError))throw e;
+    this.runtimeError=!this.health&&t.kind==='same_origin'?null:e.code;this.ui={...this.ui,runtimeOpen:true};
    }
   });
  }

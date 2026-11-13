@@ -19,6 +19,8 @@ test('MJ-BV01 with the arm meshes unavailable: joint chain, one ARM_MESH_UNAVAIL
  const canvas=page.locator('#twin-stage canvas'),ds=(k:string)=>canvas.evaluate((c,key)=>(c as HTMLCanvasElement).dataset[key]??'',k);
  await expect.poll(()=>ds('armFallback'),{timeout:60000}).toContain('ARM_MESH_UNAVAILABLE');
  expect(blocked).toBeGreaterThan(0);expect(await ds('armModel')).toBe('chain');expect(await ds('armMeshLinks')).toBe('0');
+ // the cell's supports and the mount are drawn with the xArm's joint-chain fallback too
+ expect(await ds('armSupports')).toBe('2');
  await page.locator('#twin-run-speed').selectOption('64');await page.locator('#twin-transport [data-action="twin-play"]').click();
  await expect(page.getByTestId('run-status')).toContainText('Hoàn thành',{timeout:420000});
  // listed as a note, not counted as a problem

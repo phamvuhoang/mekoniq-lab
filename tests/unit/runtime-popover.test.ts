@@ -142,3 +142,28 @@ test('the box\'s connect control carries twin-connect in every state that can co
  // the radio follows the state the page keeps, not the field
  expect(radio(box({where:'other',draftUrl:''}),'other')).toContain('checked');expect(radio(box({where:'here',draftUrl:THIS_MACHINE}),'here')).toContain('checked');
 });
+
+// Fix round 2
+test('the address field\'s label: "empty: this page\'s runtime" only on a page that has a runtime of its own',()=>{
+ const label=(html:string)=>/<label for="twin-runtime-url">([^<]*)<\/label>/.exec(html)?.[1]??'';
+ expect(label(box())).toContain('để trống: runtime của trang này');
+ const web=label(box({pageHasRuntime:false}));
+ expect(web).not.toMatch(/để trống|空欄|empty/);expect(web).toContain('http://127.0.0.1:4176');expect(web.split('|')).toHaveLength(3);
+});
+test('create() refuses a run on a runtime that is not the pin even when the control is bypassed; nothing is sent',async()=>{
+ const created:unknown[]=[];
+ const rt={paired:true,target:{base:'/lab/v2',kind:'same_origin'},health:async()=>health({sourceCommit:OTHER}),pair:async()=>{},forget(){},create:async(r:unknown)=>{created.push(r);throw new Error('sent');}} as unknown as TwinRuntime;
+ const w=new TwinWorkspace(()=>{},rt);Object.assign(w,{health:health({sourceCommit:OTHER,features:{readiness:false}}),pinExpected:PIN});
+ await expect((w as unknown as {create:(p:unknown)=>Promise<void>}).create(presetById('mujoco-coffee'))).rejects.toMatchObject({code:'RUNTIME_PIN_MISMATCH'});
+ expect(created).toEqual([]);w.leave();
+});
+test('only the network request\'s failure becomes RUNTIME_UNREACHABLE; a TypeError from code is not hidden behind it',async()=>{
+ const net=page('mekoniq-lab.vercel.app',{health:async()=>{throw new TypeError('Failed to fetch');},target:{base:'https://rt.example/lab/v2',kind:'remote'}});net.h.tokenDraft='c';
+ (net.w as unknown as {addressDraft:string;whereChoice:string}).addressDraft='https://rt.example';(net.w as unknown as {whereChoice:string}).whereChoice='other';
+ net.w.click('twin-connect');await settle();expect(net.h.runtimeError).toBe('RUNTIME_UNREACHABLE');net.w.leave();
+ // a health answer whose reading throws (a bug, not the network): the page's notice says it, the box does not claim the runtime is unreachable
+ const bug=new Proxy({},{get:(_t,k)=>{if(k==='then')return undefined;throw new TypeError('bug in reading health');}});
+ const b=page('mekoniq-lab.vercel.app',{health:async()=>bug,target:{base:'https://rt.example/lab/v2',kind:'remote'}});b.h.tokenDraft='c';
+ (b.w as unknown as {addressDraft:string}).addressDraft='https://rt.example';(b.w as unknown as {whereChoice:string}).whereChoice='other';
+ b.w.click('twin-connect');await settle();expect(b.h.runtimeError).not.toBe('RUNTIME_UNREACHABLE');expect(b.h.notice).toContain('bug in reading health');b.w.leave();
+});

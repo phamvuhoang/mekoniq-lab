@@ -7,6 +7,7 @@ import type {TwinFrame,ViewState} from '../../src/twin/scene';
 import {defaultLayers} from '../../src/twin/overlays';
 import {presets} from '../../src/scenarios/catalog';
 import type {Held} from '../../src/twin/store';
+import layout from '../../fixtures/engineering/xarm6-g2-v1/cell-layout.json' with {type:'json'};
 
 const arm=(joints:number[]|null,seq=1):Held=>({schemaVersion:2,runId:'r',entityId:'arm-1',providerId:'mock_arm',bootId:'b',seq:String(seq),simTimeNs:String(seq*1e8),observedAt:null,receivedMonotonicNs:'0',frameId:'map',origin:'mock',quality:'valid',reasonCodes:[],
  commanded:null,observed:joints?{jointsRad:joints}:{},estimated:null,causationId:null,receivedAtMs:1000,epochResetAtMs:null});
@@ -46,11 +47,13 @@ test('sceneKey: a layer or the selection rebuilds; a new object or a stale arm o
 test('U06 fix 1: the arm-cell preset opens on the cell: boxes derived from the scene (the arm over its base; the docked robot at each coffee pickup); other presets frame the floor',()=>{
  const mj=presets.find(p=>p.id==='mujoco-coffee')!,base=mj.project.armCollisionProfile!.baseInMap.position,pick=mj.project.world.points.find(p=>p.kind==='coffee_pickup')!;
  const boxes=homeRegion({preset:mj,report:null,view:null} as unknown as TwinFrame)!;
- expect(boxes).toHaveLength(2);
- const has=(x:number,y:number,z:number)=>boxes.some(b=>x>=b.min[0]&&x<=b.max[0]&&y>=b.min[1]&&y<=b.max[1]&&z>=b.min[2]&&z<=b.max[2]);
+ expect(boxes).toHaveLength(4);// the arm, the nozzle stand, the tray, the docked robot
+ const E=1e-9,has=(x:number,y:number,z:number)=>boxes.some(b=>x>=b.min[0]-E&&x<=b.max[0]+E&&y>=b.min[1]-E&&y<=b.max[1]+E&&z>=b.min[2]-E&&z<=b.max[2]+E);// a corner on a box's face, to rounding
  expect(has(base[0]!,base[1]!,base[2]!+0.7),'the arm standing up over its base').toBe(true);
  for(const [dx,dy] of [[-0.4,-0.4],[0.4,0.4],[-0.4,0.4],[0.4,-0.4]])expect(has(pick.x+dx,pick.y+dy,0),'the docked robot on the floor').toBe(true);
  expect(has(pick.x,pick.y,0.45)).toBe(true);
+ // the supports of the cell layout, placed through baseInMap: every corner of the stand and the tray is inside the region
+ for(const sp of [layout.nozzleStand,layout.tray])for(let i=0;i<8;i++)expect(has(...[0,1,2].map(k=>base[k]!+sp.centerM[k]!+(i>>k&1?1:-1)*sp.sizeM[k]!/2) as [number,number,number]),`support corner ${i}`).toBe(true);
  for(const b of boxes)expect(b.max[0]-b.min[0]).toBeLessThan(mj.project.world.width/2);// a cell, not the floor
  expect(homeRegion({preset:presets.find(p=>p.id==='coffee')!,report:null,view:null} as unknown as TwinFrame)).toBeNull();
 });

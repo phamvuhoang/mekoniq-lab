@@ -4,7 +4,7 @@
 // the plant block. Ignored by the default Playwright config; without the launcher's pairing code it FAILS (never skipped). Screenshots are candidate evidence only.
 import {test,expect,type Page} from '@playwright/test';
 import {mkdirSync} from 'node:fs';
-import {openInspector,openScenarioPicker} from '../support/twin';
+import {openDisplayMenu,openInspector,openScenarioPicker} from '../support/twin';
 const token=process.env.LAB_TEST_PAIRING_TOKEN,dir=process.env.LAB_EVIDENCE_DIR??process.env.LAB_IRSIM_SCREENSHOTS;
 const shot=async(page:Page,name:string)=>{if(dir)await page.screenshot({path:`${dir}/U06-${name}.png`});};
 const simS=async(page:Page)=>Number(((await page.getByTestId('run-tick').locator('b').textContent())??'').replace(',','.').replace(/[^\d.]/g,''));
@@ -20,6 +20,8 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  await web.route('http://lab.example.test/**',async r=>{const u=new URL(r.request().url());if(u.pathname.startsWith('/lab/'))return r.fulfill({status:404,contentType:'application/json',body:'{"error":"NO_RUNTIME_ON_THIS_ORIGIN"}'});return r.fulfill({response:await r.fetch({url:`http://127.0.0.1:4175${u.pathname}${u.search}`})});});
  await web.goto('http://lab.example.test/#twin');
  await expect(web.getByTestId('runtime-popover')).toBeVisible();await expect(web.locator('#twin-runtime-here')).toBeChecked();await expect(web.locator('#twin-runtime-url')).toHaveValue('http://127.0.0.1:4176');
+ // its address field names what an address looks like, never "empty: this page's runtime" (this page has none)
+ await expect(web.locator('label[for="twin-runtime-url"]')).toContainText('http://127.0.0.1:4176');await expect(web.locator('label[for="twin-runtime-url"]')).not.toContainText('để trống');
  await shot(web,'box-web-page-initial');await web.close();
  const page=await context.newPage();
  const box=page.getByTestId('runtime-popover'),url=page.locator('#twin-runtime-url');
@@ -68,12 +70,26 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  // the arm is drawn from its meshes once its first sample arrives; the preset opens on the arm cell
  const canvas=page.locator('#twin-stage canvas'),ds=(k:string)=>canvas.evaluate((c,key)=>(c as HTMLCanvasElement).dataset[key]??'',k);
  await expect.poll(()=>ds('armModel'),{timeout:60000}).toBe('mesh');expect(await ds('armMeshLinks')).toBe('14');expect(await ds('armFallback')).toBe('');
- await expect.poll(async()=>Number(await ds('armFrac')),{message:'the arm takes at least a third of the viewport height'}).toBeGreaterThanOrEqual(1/3);
- expect(await ds('floorInView')).toBe('false');
- const cell=await ds('camera'),armFrac0=await ds('armFrac');
+ // the view's framing, asked on demand (the canvas's twinFraming()); the canvas is looked up anew because a fresh mount replaces it
+ type F={armFrac:number;floorInView:boolean;camera:string};
+ const fr=()=>page.locator('#twin-stage canvas').evaluate(c=>(c as unknown as {twinFraming:()=>F}).twinFraming());
+ await expect.poll(async()=>(await fr()).armFrac,{message:'the arm takes at least a third of the viewport height'}).toBeGreaterThanOrEqual(1/3);
+ expect((await fr()).floorInView).toBe(false);
+ const cell=(await fr()).camera,armFrac0=(await fr()).armFrac;
  const fit=page.locator('[data-action="twin-camera-fit"]'),home=page.locator('[data-action="twin-camera-home"]');
- await fit.click();await expect.poll(()=>ds('floorInView'),{message:'one press of fit shows the whole floor'}).toBe('true');
- await home.click();await expect.poll(()=>ds('camera')).toBe(cell);
+ await fit.click();await expect.poll(async()=>(await fr()).floorInView,{message:'one press of fit shows the whole floor'}).toBe(true);
+ await home.click();await expect.poll(async()=>(await fr()).camera).toBe(cell);
+ // the cell's supports are drawn with the arm, and the Display menu says what they are
+ expect(await ds('armSupports')).toBe('2');
+ await openDisplayMenu(page);await expect(page.getByTestId('arm-cell-note')).toContainText('giả định');await expect(page.getByTestId('arm-cell-note')).toContainText('không có trong mô phỏng');
+ await page.locator('[data-action="twin-display-toggle"]').click();
+ await expect.poll(()=>ds('cups'),{timeout:20000}).not.toBe('{}');await shot(page,'cell-start');
+ // a fresh mount (2D, then 3D again): the same framing at the real viewport
+ await openDisplayMenu(page);await page.getByRole('button',{name:'2D',exact:true}).click();await page.getByRole('button',{name:'3D',exact:true}).click();await page.locator('[data-action="twin-display-toggle"]').click();
+ await expect.poll(()=>ds('armModel'),{timeout:20000}).toBe('mesh');
+ await expect.poll(async()=>(await fr()).camera,{message:'a fresh mount frames the cell as home does'}).toBe(cell);
+ const armFracFresh=(await fr()).armFrac;expect(armFracFresh).toBeGreaterThanOrEqual(1/3);expect(await ds('armSupports')).toBe('2');
+ await shot(page,'cell-fresh-mount');
 
  // paced steps as the browser sees them: how long each took against its due time (20 ticks x 20 ms / factor)
  const steps:{factor:number;ms:number}[]=[];
@@ -94,7 +110,14 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  const s1=await simS(page),w1=Date.now(),measured=(s1-s0)/((w1-w0)/1000);
  expect(await allKept(),'controls kept their elements at 1×, the runtime box opened and closed').toBe(true);
  expect(measured,'1× runs at about real time').toBeGreaterThan(0.5);expect(measured).toBeLessThan(1.25);
- expect(await ds('plantCupsDropped')).toBe('0');
+ expect(await ds('plantCupsDropped')).toBe('0');expect(await ds('armSupports')).toBe('2');
+ // the user orbits during the run: the steps that land and the report refreshes keep the user's camera; home brings back the cell
+ const cb=(await page.locator('#twin-stage canvas').boundingBox())!,[cx,cy]=[cb.x+cb.width/2,cb.y+cb.height/2];
+ await page.mouse.move(cx,cy);await page.mouse.down();await page.mouse.move(cx+160,cy+40,{steps:6});await page.mouse.up();
+ const orbit=(await fr()).camera;expect(orbit).not.toBe(cell);const t0=await simS(page);
+ await page.waitForTimeout(2500);expect(await simS(page)).toBeGreaterThan(t0);
+ expect((await fr()).camera,'steps and report refreshes never reset a camera the user moved').toBe(orbit);
+ await home.click();await expect.poll(async()=>(await fr()).camera).toBe(cell);
  // Pause with one real pointer click, then Resume
  await btn('twin-pause').click();await expect(status).toContainText('Tạm dừng');
  await btn('twin-resume').click();await expect(status).toContainText('Đang chạy');
@@ -104,7 +127,10 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  const holding=JSON.parse(await ds('cups')||'{}') as Record<string,number[]>;
  await shot(page,'mujoco-1x-holding');
  // the same moment with the whole floor (fit, nothing selected), then back to the cell
- await fit.click();await expect.poll(()=>ds('floorInView')).toBe('true');await shot(page,'mujoco-1x-holding-fit');await home.click();await expect.poll(()=>ds('camera')).toBe(cell);
+ await fit.click();await expect.poll(async()=>(await fr()).floorInView).toBe(true);await shot(page,'mujoco-1x-holding-fit');await home.click();await expect.poll(async()=>(await fr()).camera).toBe(cell);
+ // still at 1×: released, the cup rests on the tray (its centre 5 cm over the tray's top face at 0.76 m)
+ await expect.poll(async()=>Object.values(JSON.parse(await ds('cups')||'{}') as Record<string,number[]>).some(p=>Math.abs(p[2]!-0.81)<0.01&&Math.hypot(p[0]!-3.016,p[1]!-1.016)<0.05),{timeout:120000,intervals:[200]}).toBe(true);
+ await shot(page,'cup-on-tray');
  const rebuildsBeforeSelect=await ds('rebuilds');
  expect(rebuildsBeforeSelect,'the scene was not rebuilt while the run went on').toBe(rebuilds0);
  // both joint columns, labelled (selecting the arm is the user's change of the scene: one rebuild, counted apart)
@@ -146,6 +172,6 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  expect(r.coverage.armSceneCollision,'the docked robot was in the arm\'s collision check').toBe(true);
  const late=steps.filter(s=>s.ms>20*20/s.factor+250);
  console.log(`MJ-BV01 ${JSON.stringify({measured1x:Number(measured.toFixed(3)),simS:[s0,s1],wallS:(w1-w0)/1000,totalWallS:Number(total.toFixed(1)),finalTick:r.outcome.tick,
-  steps:steps.length,maxStepMs:{1:Math.max(0,...steps.filter(s=>s.factor===1).map(s=>Math.round(s.ms))),16:Math.max(0,...steps.filter(s=>s.factor===16).map(s=>Math.round(s.ms)))},late:late.length,rebuilds:[rebuilds0,rebuildsBeforeSelect,rebuildsSelected,rebuilds1],armFrac:armFrac0,redraws:[redraws0,redraws1],cupsWhileHolding:holding})}`);
+  steps:steps.length,maxStepMs:{1:Math.max(0,...steps.filter(s=>s.factor===1).map(s=>Math.round(s.ms))),16:Math.max(0,...steps.filter(s=>s.factor===16).map(s=>Math.round(s.ms)))},late:late.length,rebuilds:[rebuilds0,rebuildsBeforeSelect,rebuildsSelected,rebuilds1],armFrac:armFrac0,armFracFresh,redraws:[redraws0,redraws1],cupsWhileHolding:holding})}`);
  await context.close();
 });
