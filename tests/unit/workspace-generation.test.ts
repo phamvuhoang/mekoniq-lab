@@ -78,3 +78,21 @@ test('(4) a completion that lands after the page was left renders nothing',async
  void h.checkHealth();await settle();await settle();
  expect(renders()).toBe(n);
 });
+test('item 2: while the run is paused, the primary action resumes it (the transport\'s Resume)',async()=>{
+ const {w,h,calls}=setup();h.view!.run.status='paused';
+ expect(w.html()).toMatch(/<button class="button primary" data-testid="primary-action" data-action="twin-resume">/);
+ w.click('twin-resume');await vi.waitFor(()=>expect(calls).toContain('resume run'));
+});
+test('item 3: an action that gets no answer says so in one translated sentence naming the runtime address, never the browser\'s "Failed to fetch"',async()=>{
+ const {w,h}=setup();Object.assign((h as unknown as {rt:Record<string,unknown>}).rt,{action:async()=>{throw new TypeError('Failed to fetch');}});
+ w.click('twin-step');await vi.waitFor(()=>expect(h.busy).toBe(false));
+ const notice=(h as unknown as {notice:string}).notice;
+ expect(notice).not.toContain('Failed to fetch');expect(notice).toContain('RUNTIME_UNREACHABLE');expect(notice).toContain('http://127.0.0.1:4175/lab/v2');
+});
+test('item 4: a finished run whose report fetch failed: the Report tab says so and offers Reload report, which asks again',async()=>{
+ const {w,h,calls}=setup();h.view!.run.status='completed';h.report=null;
+ const rt=(h as unknown as {rt:Record<string,unknown>}).rt,report=rt.report as (id:string)=>Promise<RunReport>;
+ expect(w.html()).toContain('data-testid="report-missing"');expect(w.html()).toContain('data-action="twin-report-reload"');
+ w.click('twin-report-reload');await vi.waitFor(()=>expect(h.busy).toBe(false));
+ expect(calls.filter(c=>c==='report run').length).toBeGreaterThan(0);void report;
+});

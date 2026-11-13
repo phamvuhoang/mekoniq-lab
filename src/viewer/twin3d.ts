@@ -13,7 +13,7 @@ import {placeBody,rosQuat,yawOf} from '../twin/pose3d';
 import {armFrames,type ArmJointDef} from '../twin/arm/arm-frames';
 import {armJointsView,armModelFor,displayJoints} from '../twin/arm/arm-telemetry';
 import {armChain,poseArmChain} from './arm-chain';
-import {armJoints,cloneArmMeshes,loadArmMeshes,poseArmMeshes,type ArmMeshSet} from './arm-mesh';
+import {armJoints,cloneArmMeshes,loadArmMeshes,poseArmMeshes,type ArmMeshSet,type MeshFailure} from './arm-mesh';
 import armComponent from '../../fixtures/engineering/arm-ref-3d-v1/component.json' with {type:'json'};
 import xarmComponent from '../../fixtures/engineering/xarm6-g2-v1/component.json' with {type:'json'};
 import xarmPhysics from '../../fixtures/engineering/xarm6-g2-v1/physics.json' with {type:'json'};
@@ -79,27 +79,28 @@ export function homeRegion(f:TwinFrame):MapBox[]|null{
  const M=0.45,around=(x:number,y:number,z0:number,z1:number):MapBox=>({min:[x-M,y-M,z0],max:[x+M,y+M,z1]});
  return [around(b[0]!,b[1]!,Math.max(0,b[2]!-0.1),b[2]!+0.8),...SUPPORTS.map(([,s])=>baseBoxInMap(base,s.centerM,s.sizeM)),...f.preset.project.world.points.filter(p=>p.kind==='coffee_pickup').map(p=>around(p.x,p.y,0,0.6))];
 }
-/** One mesh load per model per page: the parsed geometry is kept and shared by every drawing of it. */
-interface MeshLoad {set:ArmMeshSet|null;error:string|null;ms:number|null;done:Promise<void>}
-const loads=new Map<string,MeshLoad>();
-function meshLoad():MeshLoad{
- let l=loads.get(XARM);if(l)return l;
- const t0=performance.now(),x:MeshLoad={set:null,error:null,ms:null,done:Promise.resolve()};
+/** One mesh load per model per page: the parsed geometry is kept and shared by every drawing of it. A load whose fetch failed is tried again by the next
+ * mount of a view (`mount`: the view that asked); a blob whose sha256 differs, or that does not parse, stays unusable for the page. */
+interface MeshLoad {set:ArmMeshSet|null;error:string|null;reason:MeshFailure|'render'|null;ms:number|null;mount:number;done:Promise<void>}
+const loads=new Map<string,MeshLoad>();let mounts=0;
+function meshLoad(mount:number):MeshLoad{
+ let l=loads.get(XARM);if(l&&!(l.reason==='fetch'&&l.mount!==mount))return l;
+ const t0=performance.now(),x:MeshLoad={set:null,error:null,reason:null,ms:null,mount,done:Promise.resolve()};
  x.done=loadArmMeshes(xarmComponent,xarmPhysics,async sha=>{const r=await fetch(`${XARM_BLOBS}${sha}.stl`);if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.arrayBuffer();},new THREE.MeshStandardMaterial())
-  .then(s=>{x.set=s;},(e:unknown)=>{x.error=e instanceof Error?e.message:String(e);}).finally(()=>{x.ms=performance.now()-t0;});
+  .then(s=>{x.set=s;},(e:unknown)=>{x.error=e instanceof Error?e.message:String(e);x.reason=(e as {reason?:MeshFailure}).reason??'fetch';}).finally(()=>{x.ms=performance.now()-t0;});
  loads.set(XARM,l=x);return l;
 }
 /** The page's loaded mesh set (the parsed geometry every drawing shares), or null: read by the browser test that checks nothing accumulates on it. */
 export const cachedArmMeshes=():ArmMeshSet|null=>loads.get(XARM)?.set??null;
-export interface ArmMeshIssue {entityId:string;code:'ARM_MODEL_REVISION_MISMATCH'|'ARM_MESH_UNAVAILABLE';lab?:string;run?:string;detail?:string}
+export interface ArmMeshIssue {entityId:string;code:'ARM_MODEL_REVISION_MISMATCH'|'ARM_MESH_UNAVAILABLE';lab?:string;run?:string;detail?:string;/** why the meshes cannot be used */reason?:MeshFailure|'render'}
 /** Why an arm that has meshes is drawn as its joint chain instead (D51): the run reports another model revision than the Lab's fixture, or a mesh could not
  * be used. Both are notices: the run goes on. */
 export function armMeshIssues(f:TwinFrame):ArmMeshIssue[]{
  if(!armBase(f))return [];
  return drawn(f).flatMap(({e,arm}):ArmMeshIssue[]=>{
   if(!arm?.jointsRad||arm.model!==XARM)return [];
-  const run=runRevision(f),err=loads.get(XARM)?.error;
-  return !arm.mesh?[{entityId:e.id,code:'ARM_MODEL_REVISION_MISMATCH',lab:xarmManifest.modelRevision,run:run!}]:err?[{entityId:e.id,code:'ARM_MESH_UNAVAILABLE',detail:err}]:[];
+  const run=runRevision(f),l=loads.get(XARM),err=l?.error;
+  return !arm.mesh?[{entityId:e.id,code:'ARM_MODEL_REVISION_MISMATCH',lab:xarmManifest.modelRevision,run:run!}]:err?[{entityId:e.id,code:'ARM_MESH_UNAVAILABLE',detail:err,reason:l!.reason??'fetch'}]:[];
  });
 }
 const heightOf=(e:SceneEntity)=>e.kind==='amr'?0.225:e.kind==='coffee_machine'?1.125:e.kind==='arm'?1.25:e.kind==='cup'?(e.status?.startsWith('robot')?0.52:e.status?.startsWith('customer')?0.8:1.0):1.05;
@@ -140,7 +141,7 @@ const r6=(_k:string,v:unknown)=>typeof v==='number'?Math.round(v*1e6)/1e6:v;
 interface ArmDraw {id:string;at:THREE.Group;joints:ArmJointDef[];look:{wire:boolean;emissive:boolean};wantMesh:boolean;chain?:THREE.Group;mesh?:ArmMeshSet;q:number[];opening:number|null}
 /** `onArmMesh`: the arm's drawing changed by itself (meshes ready or failed), so the page can update its problems list. */
 export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:()=>void,onArmMesh:()=>void=()=>{}):Twin3d|null {
- let renderer:THREE.WebGLRenderer;
+ let renderer:THREE.WebGLRenderer;const mount=++mounts;
  try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});}catch{return null;}
  renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
  const canvas=renderer.domElement;canvas.setAttribute('aria-label','3D twin view. Use the entity list to select objects.');canvas.dataset.rebuilds='0';canvas.dataset.redraws='0';canvas.dataset.overlayBuilds='0';
@@ -213,7 +214,7 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  };
  /** The meshes, or on any throw while dressing them the joint chain for good: the load is marked unusable (ARM_MESH_UNAVAILABLE), never an arm with no drawing. */
  const dressMeshes=(a:ArmDraw,l:MeshLoad)=>{
-  try{dress(a,l.set);}catch(e){l.error=`ARM_MESH_UNAVAILABLE:render (${e instanceof Error?e.message:String(e)})`;l.set=null;dress(a,null);}
+  try{dress(a,l.set);}catch(e){l.error=`ARM_MESH_UNAVAILABLE:render (${e instanceof Error?e.message:String(e)})`;l.reason='render';l.set=null;dress(a,null);}
  };
  /** Swap every arm waiting for these meshes in place once they are loaded (or report the failure): no rebuild, the camera stays. */
  const waiting=new Set<MeshLoad>();
@@ -244,7 +245,7 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
     for(const g of [cell,props])g.traverse(o=>{o.raycast=()=>{};});holder.userData.supports=SUPPORTS.length;holder.userData.illustrative=props.children.length;
    }
    // the meshes when they are loaded (once per page); the joint chain until then, and for good when they cannot be used
-   const l=a.wantMesh?meshLoad():null;if(l?.set)dressMeshes(a,l);else dress(a,null);if(l&&!l.set&&!l.error)await_(l);
+   const l=a.wantMesh?meshLoad(mount):null;if(l?.set)dressMeshes(a,l);else dress(a,null);if(l&&!l.set&&!l.error)await_(l);
    return;
   }
   // a cup the plant reports: its own size (cell layout, assumed) at the plant's pose, set by pose(); any other cup: the schematic cup at its custodian

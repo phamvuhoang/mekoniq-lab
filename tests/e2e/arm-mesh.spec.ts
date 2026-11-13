@@ -96,6 +96,12 @@ for(const how of ['blocked','altered'] as const)test(`meshes ${how}: the joint c
  if(how==='altered')await expect(page.locator('#u05 [data-testid="problem-row"]')).toContainText(`ARM_MESH_UNAVAILABLE:${bad.split('/').pop()!.slice(0,12)}`);// the blob named, by the first 12 hex digits of its sha256
  await page.evaluate(()=>(window as unknown as {fit:(id:string)=>void}).fit('arm-1'));
  if(shots&&how==='blocked')await page.locator('#u05').screenshot({path:`${shots}/U05-fallback-problems.png`});
+ // item 5: the note says which case it is; a failed fetch is tried again by the next mount, a sha256 that differs stays final for the page
+ await expect(page.locator('#u05 [data-testid="problem-row"]').first()).toContainText(how==='blocked'?'không tải được file':'sha256 của file khác tên của nó');
+ await page.unroute('**/fixtures/xarm6-g2-v1/blobs/*.stl');
+ await page.evaluate(()=>(window as unknown as {remount:()=>void}).remount());await draw(page,{q:HOME,opening:null,cup:CUP});
+ if(how==='blocked')await page.waitForFunction(()=>(document.querySelector('#u05 canvas') as HTMLCanvasElement).dataset.armModel==='mesh',null,{timeout:20000});
+ else{await page.waitForTimeout(1500);expect((await data(page)).armModel).toBe('chain');}
 });
 
 const ev=<T,>(page:Page,f:string,...a:unknown[])=>page.evaluate(([f,a])=>(window as unknown as Record<string,(...x:unknown[])=>unknown>)[f as string]!(...(a as unknown[])),[f,a] as const) as Promise<T>;

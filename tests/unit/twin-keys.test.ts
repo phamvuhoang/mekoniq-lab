@@ -45,3 +45,8 @@ test('replay marks: one per business-event tick, at most 200 evenly spaced, firs
  expect(replayMarks(report(ticks),10)).toHaveLength(10);
  expect(replayMarks(report(ticks),1)).toEqual([marks[0]]);
 });
+test('item 1: on an inspector tab, Left and Right move between the tabs and never step the run',()=>{
+ const tab=(k:string)=>({...key(k,{tagName:'BUTTON'}),target:{tagName:'BUTTON',role:'tab'}});
+ expect(keyAction(tab('ArrowRight'),false)).toBe('twin-tab-next');expect(keyAction(tab('ArrowLeft'),false)).toBe('twin-tab-previous');
+ expect(keyAction(key('ArrowRight',{tagName:'BUTTON'}),false)).toBe('twin-step');
+});

@@ -110,10 +110,16 @@ test('live playback: the measured opening and a cup pose are interpolated betwee
 import {cloneArmMeshes} from '../../src/viewer/arm-mesh';
 import {droppedPlantCups} from '../../src/twin/scene';
 test('blobs are hashed with crypto.subtle; without it the pure-JS hash still refuses an altered blob',async()=>{
- const spy=vi.spyOn(crypto.subtle,'digest');await load();expect(spy.mock.calls.length).toBeGreaterThanOrEqual(14);// one per blob (Node's digest may re-enter itself)spy.mockRestore();
+ const spy=vi.spyOn(crypto.subtle,'digest');await load();expect(spy.mock.calls.length).toBeGreaterThanOrEqual(14);// one per blob (Node's digest may re-enter itself)
+ spy.mockRestore();
  vi.stubGlobal('crypto',undefined);
  try{const bad=component.links[0]!.visual[0]!.geometry.blobSha256;await expect(load(async sha=>{const b=await fromDisk(sha);if(sha===bad)new Uint8Array(b)[90]^=1;return b;})).rejects.toThrow(`ARM_MESH_UNAVAILABLE:${bad}`);}
  finally{vi.unstubAllGlobals();}
+});
+test('item 5: a failure says why: the fetch (worth another try), the sha256, or the parse',async()=>{
+ const bad=component.links[0]!.visual[0]!.geometry.blobSha256;
+ await expect(load(async sha=>{if(sha===bad)throw new TypeError('Failed to fetch');return fromDisk(sha);})).rejects.toMatchObject({reason:'fetch'});
+ await expect(load(async sha=>{const b=await fromDisk(sha);if(sha===bad)new Uint8Array(b)[90]^=1;return b;})).rejects.toMatchObject({reason:'hash'});
 });
 test('a clone\'s finger pivots follow the opening by their own multipliers (a synthetic gripper with multipliers other than 1); the original is untouched',async()=>{
  const g=physics.gripper,synthetic={...physics,gripper:{...g,mimic:g.mimic.map((m,i)=>({...m,multiplier:[1,-0.5,2,0.25,-1][i]!}))}};

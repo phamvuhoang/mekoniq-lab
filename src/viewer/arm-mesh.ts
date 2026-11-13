@@ -24,13 +24,17 @@ export function gripperDriveRad(physics:unknown,openingM:number|null):number{
 /** SHA-256 by crypto.subtle (native, off the main thread's long tasks); the synchronous pure-JS hash only where subtle is missing (an insecure context). */
 const hex=async(b:ArrayBuffer)=>globalThis.crypto?.subtle?Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',b)),x=>x.toString(16).padStart(2,'0')).join(''):sha256Hex(new Uint8Array(b));
 const q=(p:number[])=>new THREE.Quaternion(p[0],p[1],p[2],p[3]);
-/** Fetches every visual blob once, checks that its content's sha256 is its name and parses it. Throws `ARM_MESH_UNAVAILABLE:<sha256>` for a blob that cannot be
- * fetched, differs from its name or does not parse. */
+/** Why a blob could not be used: it could not be fetched (`fetch`: worth another try), its content's sha256 is not its name (`hash`), or it does not parse (`parse`). */
+export type MeshFailure='fetch'|'hash'|'parse';
+/** Fetches every visual blob once, checks that its content's sha256 is its name and parses it. Throws `ARM_MESH_UNAVAILABLE:<sha256>` (its `reason` a MeshFailure)
+ * for a blob that cannot be fetched, differs from its name or does not parse. */
 export async function loadArmMeshes(component:unknown,physics:unknown,blob:(sha256:string)=>Promise<ArrayBuffer>,material:THREE.Material):Promise<ArmMeshSet>{
  const c=component as Component,p=physics as Physics,stl=new STLLoader(),shas=[...new Set(c.links.flatMap(l=>(l.visual??[]).map(v=>v.geometry.blobSha256!).filter(Boolean)))];
  const geo=new Map(await Promise.all(shas.map(async sha=>{
-  try{const b=await blob(sha);if(await hex(b)!==sha)throw 0;const g=stl.parse(b);g.computeVertexNormals();return [sha,g] as const;}
-  catch{throw new Error(`ARM_MESH_UNAVAILABLE:${sha}`);}
+  const fail=(reason:MeshFailure)=>Object.assign(new Error(`ARM_MESH_UNAVAILABLE:${sha}`),{reason});
+  let b:ArrayBuffer;try{b=await blob(sha);}catch{throw fail('fetch');}
+  if(await hex(b)!==sha)throw fail('hash');
+  try{const g=stl.parse(b);g.computeVertexNormals();return [sha,g] as const;}catch{throw fail('parse');}
  })));
  const obj=new Map(c.links.map(l=>{const o=new THREE.Object3D();o.name=`link:${l.id}`;
   for(const v of l.visual??[])if(v.geometry.kind==='mesh'&&v.geometry.blobSha256){const m=new THREE.Mesh(geo.get(v.geometry.blobSha256)!,material);m.position.fromArray(v.pose.xyzM);m.quaternion.copy(q(v.pose.quaternionXyzw));m.scale.fromArray(v.geometry.scale??[1,1,1]);m.userData.shared=true;o.add(m);}

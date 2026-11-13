@@ -4,7 +4,9 @@ export const KEYMAP:Readonly<Record<string,string>>={' ':'twin-toggle-play',Arro
 const FIELDS=['INPUT','SELECT','TEXTAREA'];
 /** null while typing in a field (a range input is not one, but its arrows keep moving it), with Ctrl/Meta/Alt held, or with a dialog open
  * (Escape still acts). Letters ignore Shift/Caps Lock. A held Space (auto-repeat) toggles play once. */
-export function keyAction(e:{key:string;ctrlKey:boolean;metaKey:boolean;altKey:boolean;repeat?:boolean;target:{tagName?:string;type?:string;isContentEditable?:boolean}|null},dialogOpen:boolean):string|null{
+export function keyAction(e:{key:string;ctrlKey:boolean;metaKey:boolean;altKey:boolean;repeat?:boolean;target:{tagName?:string;type?:string;isContentEditable?:boolean;role?:string|null}|null},dialogOpen:boolean):string|null{
+ // on a tab, the arrows move between the tabs (the tablist's own keys), never the run
+ if(e.target?.role==='tab'&&(e.key==='ArrowRight'||e.key==='ArrowLeft')&&!e.ctrlKey&&!e.metaKey&&!e.altKey)return e.key==='ArrowRight'?'twin-tab-next':'twin-tab-previous';
  const range=e.target?.tagName?.toUpperCase()==='INPUT'&&e.target.type==='range';
  if(e.ctrlKey||e.metaKey||e.altKey||e.target?.isContentEditable||!range&&FIELDS.includes(e.target?.tagName?.toUpperCase()??'')||range&&e.key==='ArrowRight')return null;
  const action=KEYMAP[e.key]??KEYMAP[e.key.toLowerCase()]??null;
