@@ -237,10 +237,11 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
    if(arm.model===XARM){
     const cell=new THREE.Group();cell.quaternion.copy(a.at.quaternion);cell.position.copy(a.at.position);holder.add(cell);
     for(const [id,b] of SUPPORTS){const m=new THREE.Mesh(new THREE.BoxGeometry(...b.sizeM as [number,number,number]),mat(0x7d8b8f));m.position.set(...b.centerM as [number,number,number]);m.userData.support=id;cell.add(m);}
-    // illustrative, not simulated: the mount under the base and a leg under each support, standing vertically in the map from the floor to the point under them
+    // illustrative, not simulated: the mount under the base and a leg under the nozzle stand, standing vertically in the map from the floor to the point under
+    // them; the tray stands for the docked robot's tray (the receiver), so it gets no leg (one would pass through the robot)
     const props=new THREE.Group(),leg=(id:string,top:THREE.Vector3,r:number)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,top.z,12,1,true),mat(0x9fb3b8,{wire:true}));m.rotation.x=Math.PI/2;m.position.set(top.x,top.y,top.z/2);m.userData[id==='mount'?'mount':'leg']=id;props.add(m);};
     leg('mount',new THREE.Vector3(px,py,pz),0.08);
-    for(const [id,b] of SUPPORTS)leg(id,new THREE.Vector3(b.centerM[0],b.centerM[1],b.centerM[2]-b.sizeM[2]/2).applyQuaternion(a.at.quaternion).add(a.at.position),0.03);
+    for(const [id,b] of SUPPORTS)if(id!=='tray')leg(id,new THREE.Vector3(b.centerM[0],b.centerM[1],b.centerM[2]-b.sizeM[2]/2).applyQuaternion(a.at.quaternion).add(a.at.position),0.03);
     holder.add(props);
     for(const g of [cell,props])g.traverse(o=>{o.raycast=()=>{};});holder.userData.supports=SUPPORTS.length;holder.userData.illustrative=props.children.length;
    }

@@ -14,7 +14,7 @@ import { robotSvg } from "./viewer/fallback";
 import { TwinWorkspace } from "./ui/workspace";
 import { AssemblyWorkspace } from "./ui/assembly-page";
 import { httpTwinRuntime } from "./scenarios/controls";
-import { loadTarget } from "./runtime/target";
+import { loadTarget, loopbackPage } from "./runtime/target";
 import { businessSimulationNote, illustrativeNote } from "./ui/labels";
 
 type Page = "design" | "assembly" | "restaurant" | "scenarios" | "twin" | "results" | "deployment";
@@ -118,7 +118,7 @@ export class LabApp {
       );
     }
     this.render();
-    if (["localhost", "127.0.0.1", "[::1]"].includes(location.hostname))
+    if (loopbackPage(location.hostname))
       void this.checkHealth();
   }
   private async checkHealth() {

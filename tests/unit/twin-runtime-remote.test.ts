@@ -450,3 +450,17 @@ test('U06: only a not-found answer for the run from the report step means the pr
  const c=await settle({report:new TwinRuntimeError('RUN_NOT_FOUND',[],404)});
  expect(c.h.view.run.id).toBe('r2');expect(c.saved).toEqual([]);expect(c.h.previous).toBeNull();expect(c.h.notice).toContain('không còn trên runtime');
 });
+
+test('item 6: Assembly asks again on a new connection and on Compile; not reached says "not connected", never that the runtime lacks the capability',async()=>{
+ vi.stubGlobal('localStorage',{getItem:()=>null,setItem:()=>{}});vi.stubGlobal('indexedDB',undefined);vi.stubGlobal('location',{hostname:'127.0.0.1',origin:'http://127.0.0.1:4175'});
+ const {AssemblyWorkspace}=await import('../../src/ui/assembly-page');
+ let up=false,paired=true;const calls:string[]=[];
+ const rt={get paired(){return paired;},target:{base:'/lab/v2',kind:'same_origin'},health:async()=>{calls.push('health');if(!up)throw new TypeError('Failed to fetch');return {capabilities:['engineering_bundle_v1']};},compileEngineering:async()=>{calls.push('compile');throw new Error('x');}} as unknown as TwinRuntime;
+ const a=new AssemblyWorkspace(()=>{},rt) as unknown as {restore():Promise<void>;click(a:string):void;html():string;canCompile:boolean|null;busy:boolean};
+ await a.restore();expect(a.canCompile).toBe(false);
+ expect(a.html()).toContain('data-reason="not-connected"');expect(a.html()).not.toContain('has no engineering_bundle_v1');expect(a.html()).not.toMatch(/data-action="asm-compile"[^>]*disabled/);
+ // the runtime comes up; the next press asks again and compiles
+ up=true;calls.length=0;a.click('asm-compile');await vi.waitFor(()=>expect(calls).toEqual(['health','compile']));
+ // another connection: the last answer no longer applies
+ await vi.waitFor(()=>expect(a.busy).toBe(false));paired=false;a.html();expect(a.canCompile).toBeNull();
+});

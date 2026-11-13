@@ -47,7 +47,10 @@ const sha=(b)=>createHash('sha256').update(b).digest('hex');
 const xarmFiles=await Promise.all([...XARM_FILES,'NOTICE'].map(async(n)=>{const b=await readFile(`${xarmSource}${n}`);if(n!=='manifest.json'&&xarmManifest.files.find(f=>f.path===n)?.sha256!==sha(b))throw new Error(`XARM_FIXTURE_HASH:${n}`);return [n,b];}));
 const xarmBlobs=await Promise.all(xarmManifest.blobs.map(async({sha256})=>{const b=await readFile(`${xarmSource}blobs/${sha256}.stl`);if(sha(b)!==sha256)throw new Error(`XARM_BLOB_HASH:${sha256}`);return [`blobs/${sha256}.stl`,b];}));
 if(xarmBlobs.reduce((n,[,b])=>n+b.length,0)>XARM_MESH_LIMIT)throw new Error('XARM_MESHES_TOO_LARGE: D51 allows 8 MB of visual meshes');
-const xarmOut=[...xarmFiles.map(([n,b])=>[n==='NOTICE'?`${xarmPublic}NOTICE`:`${xarmTarget}${n}`,b]),...xarmBlobs.map(([n,b])=>[`${xarmPublic}${n}`,b])];
+// the NOTICE cites vendor-manifest.json and manifest.json: each goes beside it when it is under 100 KB (the manifest is the fixture's own; the vendor manifest is checked by it)
+const XARM_CITED=['vendor-manifest.json','manifest.json'],XARM_CITED_LIMIT=100*1024;
+const xarmCited=(await Promise.all(XARM_CITED.map(async(n)=>{const b=n==='manifest.json'?xarmFiles.find(([f])=>f===n)[1]:await readFile(`${xarmSource}${n}`);if(n!=='manifest.json'&&xarmManifest.files.find(f=>f.path===n)?.sha256!==sha(b))throw new Error(`XARM_FIXTURE_HASH:${n}`);return [n,b];}))).filter(([,b])=>b.length<XARM_CITED_LIMIT);
+const xarmOut=[...xarmFiles.map(([n,b])=>[n==='NOTICE'?`${xarmPublic}NOTICE`:`${xarmTarget}${n}`,b]),...xarmCited.map(([n,b])=>[`${xarmPublic}${n}`,b]),...xarmBlobs.map(([n,b])=>[`${xarmPublic}${n}`,b])];
 /** Files under the two xArm target folders that the fixture does not list (a blob the manifest dropped, a stray file). */
 const xarmExtra=async()=>{const want=new Set(xarmOut.map(([path])=>path)),found=[];for(const dir of [xarmTarget,xarmPublic])for(const e of await readdir(dir,{recursive:true,withFileTypes:true}).catch(()=>[]))if(e.isFile())found.push(`${e.parentPath.replace(/\/?$/,'/')}${e.name}`);return found.filter(f=>!want.has(f));};
 const schemaDir=here('../src/shared/engineering-schemas/');

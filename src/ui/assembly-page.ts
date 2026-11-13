@@ -25,6 +25,8 @@ export class AssemblyWorkspace {
   private bom:Bom|null=null;
   private scene:CompiledScene|null=null;
   private canCompile:boolean|null=null;
+  /** What the last probe found (`unreachable`: no answer, so nothing is known of its capabilities) and for which connection (`probed`): another connection asks again. */
+  private reach:'ok'|'missing'|'unreachable'|null=null;private probed='';private probing=false;
   private saveState:SaveState='idle';
   private message='';
   private busy=false;
@@ -75,7 +77,13 @@ export class AssemblyWorkspace {
   }
   /** Outside a browser (Node tests) there is no page origin to protect: treated as a loopback page. */
   private autoProbe():boolean {return mayAutoProbe(this.rt.target??{base:'/lab/v2',kind:'same_origin'},typeof location==='undefined'?'localhost':location.hostname);}
-  private async probe():Promise<void> {try {this.canCompile=!!(await this.rt.health()).capabilities?.includes('engineering_bundle_v1');} catch {this.canCompile=false;}}
+  private connection():string {return `${this.rt.target?.base??'/lab/v2'}|${this.rt.paired}`;}
+  private async probe():Promise<void> {
+    this.probed=this.connection();this.probing=true;
+    try {this.canCompile=!!(await this.rt.health()).capabilities?.includes('engineering_bundle_v1');this.reach=this.canCompile?'ok':'missing';}
+    catch {this.canCompile=false;this.reach='unreachable';}
+    finally {this.probing=false;}
+  }
   /** Takes everything the archive holds into the catalog (nothing is dropped) and opens its project with the identity it was saved with. */
   private open(archive:ReturnType<typeof archiveFor>,how:'load'|'reset'):void {
     mergeCatalog(this.catalog,catalogFromArchive(archive));
@@ -84,6 +92,8 @@ export class AssemblyWorkspace {
     this.receipt=null;this.bom=null;this.scene=null;
   }
   html():string {
+    // the runtime connection changed since the last answer: that answer says nothing about this runtime (asked again on mount or on Compile)
+    if (this.probed&&this.probed!==this.connection()) {this.canCompile=null;this.reach=null;this.probed='';}
     const p=this.design(),problems=previewProblems(p,this.catalog),archive=this.archive();
     const owner=(id:string)=>p.entityBindings.find(b=>b.instanceIds.includes(id))?.entityId??'—';
     const ports=p.assembly.instances.flatMap(i=>(this.catalog.components[i.componentDigest]?.ports??[]).map(x=>({value:`${i.id}/${x.id}`,label:`${i.id}/${x.id} · ${x.kind} · ${x.mate}`,kind:x.kind})));
@@ -96,7 +106,8 @@ export class AssemblyWorkspace {
     const receiptProblems=shown?.problems??[];
     const list=(items:{code:string;path:string;detail:string;blocking?:boolean}[])=>items.length?`<ul class="asm-problems">${items.map(x=>`<li data-code="${esc(x.code)}"><b>${esc(x.code)}</b> <code>${esc(x.path)}</code> ${esc(x.detail)}</li>`).join('')}</ul>`:`<p>${tr('Không có vấn đề cấu trúc trong bản xem trước. Điều này chưa có nghĩa là hợp lệ: chỉ compile trên runtime mới xác nhận.','構造上の問題はありません(プレビュー)。有効の意味ではありません: ランタイムでのコンパイルのみが確認します。','No structural problems in the preview. That does not mean valid: only a compile on the runtime confirms it.')}</p>`;
     const bom=this.bom?`<table class="asm-bom"><thead><tr><th>${tr('Linh kiện','部品','Part')}</th><th>${tr('SL','数量','Qty')}</th><th>kg</th><th>${tr('Giá','価格','Price')}</th></tr></thead><tbody>${this.bom.lines.map(l=>`<tr><td>${esc(l.componentId)} ${l.candidate?chip(tr('ứng viên','候補','candidate')):''}</td><td>${esc(l.qty)}</td><td>${l.massKg===null?'—':(l.massKg*l.qty).toFixed(2)}</td><td>${l.price?`${esc(l.price.amount)} ${esc(l.price.currency)}`:tr('chưa có báo giá','見積なし','no quote')}</td></tr>`).join('')}</tbody><tfoot><tr><td>${tr('Tổng khối lượng','総質量','Total mass')}</td><td></td><td>${this.bom.lines.reduce((n,l)=>n+(l.massKg??0)*l.qty,0).toFixed(2)}</td><td>${this.bom.incompleteTotal?tr('tổng giá chưa đầy đủ','合計は不完全','price total incomplete'):''}</td></tr></tfoot></table>`:'';
-    const compile=this.canCompile===false?`<p class="notice-inline" data-testid="asm-no-runtime">${tr('Runtime không có engineering_bundle_v1: vẫn thiết kế, lưu và xuất được, nhưng chưa compile.','ランタイムにengineering_bundle_v1がありません。設計・保存・書き出しは可能ですが、コンパイルはできません。','This runtime has no engineering_bundle_v1: you can still design, save and export, but not compile.')}</p>`:'';
+    const compile=this.reach==='unreachable'?`<p class="notice-inline" data-testid="asm-no-runtime" data-reason="not-connected">${tr('Chưa kết nối được runtime: vẫn thiết kế, lưu và xuất được. Kết nối runtime (Digital twin, hộp runtime) rồi bấm Compile để hỏi lại.','ランタイムに接続できていません。設計・保存・書き出しは可能です。ランタイムに接続(デジタルツインのランタイム枠)してから「コンパイル」を押すと再確認します。','The runtime is not connected: you can still design, save and export. Connect the runtime (Digital twin, runtime box), then press Compile to ask again.')}</p>`
+      :this.canCompile===false?`<p class="notice-inline" data-testid="asm-no-runtime">${tr('Runtime không có engineering_bundle_v1: vẫn thiết kế, lưu và xuất được, nhưng chưa compile.','ランタイムにengineering_bundle_v1がありません。設計・保存・書き出しは可能ですが、コンパイルはできません。','This runtime has no engineering_bundle_v1: you can still design, save and export, but not compile.')}</p>`:'';
     const receiptView=this.receipt?`<div data-testid="asm-receipt" data-state="${esc(this.receipt.state)}">${chip(this.stale()?tr('đã cũ: thiết kế đã đổi','古い: 設計変更済み','stale: design changed'):this.receipt.state,this.stale()?'warn':'')} ${this.receipt.state==='compiled'?`<small>bundle ${short(this.receipt.bundleDigest)} · scene ${short(this.receipt.sceneDigest)} · ${this.receipt.runnable?tr('chạy được','実行可','runnable'):tr('không chạy được: chưa có môi trường native được qualify','実行不可: ネイティブ未認定','not runnable: no qualified native environment')}</small>`:''}${list(receiptProblems)}</div>`:'';
     const summary=estimateSummary(p,archive),num=(v:number|null,unit:string)=>v===null?`<span class="unknown-text">${tr('chưa rõ','不明','unknown')}</span>`:`<b>${+v.toFixed(2)}</b> ${unit}`;
     const ref=this.currentRef(),validation=modelValidationPanel({v:this.validation,view:validationView(this.validation,{projectDigest:hashJson(p),ref},p),robots:p.runtimeProject.entities.filter(e=>e.kind==='amr').map(e=>e.id),canValidate:!!ref&&!!this.rt.validateEngineeringModel&&!!this.canCompile,busy:this.validating||this.busy,error:this.validationError});
@@ -116,7 +127,7 @@ export class AssemblyWorkspace {
 <button class="button quiet" data-action="asm-export">${tr('Xuất dự án kỹ thuật','エンジニアリング書き出し','Export engineering project')}</button>
 <label class="button quiet">${tr('Nhập tệp','ファイルを読み込む','Import file')}<input id="asm-import" type="file" accept="application/json,.json" hidden></label>
 <button class="button quiet" data-action="asm-candidate">${tr('Tải bản nháp ứng viên','候補ドラフト','Download candidate draft')}</button>
-<button class="button primary" data-action="asm-compile" ${this.canCompile||this.canCompile===null&&!this.autoProbe()?'':'disabled'}>${tr('Compile trên runtime','ランタイムでコンパイル','Compile on runtime')}</button>
+<button class="button primary" data-action="asm-compile" ${this.busy||this.probing?'disabled':''}>${tr('Compile trên runtime','ランタイムでコンパイル','Compile on runtime')}</button>
 <span class="asm-status" data-testid="asm-save-state" data-state="${this.saveState}">${{idle:'',saving:tr('đang lưu…','保存中…','saving…'),saved:tr('đã lưu','保存済み','saved'),error:tr('chưa lưu: ','未保存: ','not saved: ')+esc(this.message)}[this.saveState]}</span></div>
 ${this.message&&this.saveState!=='error'?`<p role="status" data-testid="asm-message">${esc(this.message)}</p>`:''}
 ${compile}
@@ -134,6 +145,8 @@ ${validation}
   }
   mounted():void {
     void this.restore();
+    // a new connection since the last answer: a page that may ask its own runtime by itself asks again
+    if (this.restored&&this.canCompile===null&&!this.probing&&this.autoProbe()) void this.probe().then(()=>this.rerender());
     const importer=document.getElementById('asm-import') as HTMLInputElement|null;
     importer?.addEventListener('change',()=>{const file=importer.files?.[0];if (file) void this.importFile(file);});
     const holder=document.getElementById('asm-scene');
@@ -214,8 +227,8 @@ ${validation}
     if (!this.rt.compileEngineering||this.busy) return;
     this.busy=true;this.message='';this.rerender();
     try {
-      // not asked yet (a runtime this page may not probe by itself): this click asks first
-      if (this.canCompile===null) {await this.probe();if (!this.canCompile) return;}
+      // not asked yet, or the last answer was no (not reached, or no engineering_bundle_v1): this click asks again
+      if (this.canCompile!==true) {await this.probe();if (!this.canCompile) return;}
       const project=this.design(),receipt=await this.rt.compileEngineering(project);
       this.receipt=receipt;this.bom=null;this.scene=null;
       if (receipt.state==='compiled') {

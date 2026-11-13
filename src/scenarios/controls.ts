@@ -206,10 +206,12 @@ export function httpTwinRuntime(target:RuntimeTarget={base:'/lab/v2',kind:'same_
 /** What the run controls may offer, from the set's execution metadata in health. Mock: Lab step/auto-run. Simulation with a source fixed-step clock:
  * step and pacing at the set's multipliers (no step while paused unless manualStep). Native or unknown simulation: the engine owns time, no Lab step. */
 export interface ClockControls {clock:'mock'|'source_fixed_step'|'native';step:boolean;play:boolean;speeds:number[]}
+/** The run speeds a runtime accepts (×): the paced step's factors and the mock clock's speeds. */
+export const SPEED_FACTORS=[1,4,16,64] as const;
 export function clockControls(view:RunView,health:TwinHealth|null):ClockControls{
  const live=['running','awaiting_confirmation'].includes(view.run.status),paused=view.run.status==='paused';
- if(view.run.mode==='mock')return {clock:'mock',step:live,play:live,speeds:[1,4,16,64]};
+ if(view.run.mode==='mock')return {clock:'mock',step:live,play:live,speeds:[...SPEED_FACTORS]};
  const e=health?.backendSets.find(s=>s.id===view.run.backendSetId)?.execution;
  if(view.run.mode!=='simulation'||e?.clock!=='source_fixed_step')return {clock:'native',step:false,play:false,speeds:[]};
- return {clock:'source_fixed_step',step:live||paused&&e.manualStep,play:live,speeds:e.speedMultipliers.filter(n=>[1,4,16,64].includes(n))};
+ return {clock:'source_fixed_step',step:live||paused&&e.manualStep,play:live,speeds:e.speedMultipliers.filter(n=>(SPEED_FACTORS as readonly number[]).includes(n))};
 }

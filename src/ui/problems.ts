@@ -57,9 +57,10 @@ export function problemsPanel(p:readonly Problem[],open:boolean,chains:Readonly<
  const n=problemCounts(p),head=n.problems&&n.notes?tr('Vấn đề và lưu ý','問題と注意','Problems and notes'):n.notes?tr('Lưu ý','注意','Notes'):tr('Vấn đề','問題','Problems');
  return `<div class="twin-popover twin-problems-box" id="twin-problems" data-testid="problems-panel" role="group" aria-label="${head}"${open&&p.length?'':' hidden'}><h3>${head}</h3><ol class="problem-list">${p.map(x=>`<li class="problem" data-testid="problem-row" data-severity="${x.severity}"><span class="problem-severity">${icon('cross',14)}${sevLabel(x.severity)}</span><span class="problem-text">${esc(x.text)}</span>${x.codes.length?`<span class="problem-codes">${x.codes.map(c=>`<code>${esc(c)}</code>`).join(' ')}</span>`:''}${chains[x.id]??''}<span class="problem-actions">${x.entityId&&!chains[x.id]?entityButton(x.entityId,x.entityName??x.entityId):''}${x.action?`<button class="text-button" data-action="${esc(x.action.id)}">${esc(x.action.label)}</button>`:''}</span></li>`).join('')}</ol></div>`;
 }
-/** The viewport strip: the recommended step when it needs a person, with the codes of the first problem behind it. No button: its action is the run bar's primary action. */
+/** The viewport strip: the recommended step when it needs a person, with the codes of the problem that step answers (the one whose action it is; none
+ * otherwise, never another problem's). No button: its action is the run bar's primary action. */
 export function nextStrip(p:readonly Problem[],next:NextAction):string{
  if(!next.action)return '';
- const codes=p.find(x=>x.severity!=='notice')?.codes??[];
+ const codes=p.find(x=>x.severity!=='notice'&&x.action?.id===next.action!.id)?.codes??[];
  return `<div class="next-action" data-testid="next-action" role="status"><span class="eyebrow">${tr('BƯỚC TIẾP THEO','次の操作','NEXT ACTION')}</span><b>${esc(next.title)}</b>${codes.map(c=>`<code>${esc(c)}</code>`).join(' ')}<span>${esc(next.detail)}</span></div>`;
 }

@@ -29,6 +29,12 @@ test('run bar layout in every state at three widths; the transport at phone widt
  await page.locator('#twin-pair-token').fill(token!);await page.getByRole('button',{name:'Ghép nối runtime'}).click();
  await expect(page.getByTestId('runtime-popover')).toBeHidden();
  await expect(chip(page)).toHaveAttribute('data-state','live');await expect(chip(page)).toContainText('Sẵn sàng');await shot(page,'I5-chip-ready');
+ // item 11: a press outside an open box closes it; a press inside it, or on the button that opened it, is not outside
+ await openScenarioPicker(page);await page.locator('#twin-picker h3, #twin-picker ul').first().click({position:{x:4,y:4}});await expect(page.locator('#twin-picker')).toBeVisible();
+ await page.locator('#twin-stage').click({position:{x:20,y:20}});await expect(page.locator('#twin-picker')).toBeHidden();
+ await page.getByTestId('mode-badge').click();await expect(page.getByTestId('caveat-detail')).toBeVisible();
+ await page.getByTestId('scenario-picker').click();await expect(page.getByTestId('caveat-detail')).toBeHidden();await expect(page.locator('#twin-picker')).toBeVisible();// another box's button: this one opens, that one closes
+ await page.getByTestId('scenario-picker').click();await expect(page.locator('#twin-picker')).toBeHidden();
  await openScenarioPicker(page);await page.getByRole('button',{name:'Cà phê sữa đá'}).click();
  await eachWidth(page,'before-run');
  await page.getByTestId('primary-action').click();

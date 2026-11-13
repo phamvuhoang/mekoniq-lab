@@ -10,8 +10,9 @@ const rows=(page:Page)=>page.getByTestId('asm-instances').locator('tr');
 test('a fresh draft shows its blockers, and without a runtime says it cannot compile',async({page})=>{
   await open(page);
   await expect(page.getByTestId('asm-problems')).toContainText('UNBOUND_ENTITY');
-  await expect(page.getByTestId('asm-no-runtime')).toBeVisible();
-  await expect(page.getByRole('button',{name:'Compile on runtime'})).toBeDisabled();
+  // item 6: no runtime answered, so nothing is known of its capabilities: "not connected", and Compile stays pressable (it asks again)
+  await expect(page.getByTestId('asm-no-runtime')).toHaveAttribute('data-reason','not-connected');await expect(page.getByTestId('asm-no-runtime')).not.toContainText('engineering_bundle_v1');
+  await expect(page.getByRole('button',{name:'Compile on runtime'})).toBeEnabled();
   await expect(page.getByTestId('asm-receipt')).toHaveCount(0);        // no receipt, so nothing looks compiled
 });
 test('the reference AMR opens clean; editing changes the design id and undo/redo restore it',async({page})=>{
@@ -83,7 +84,7 @@ test('switching language never loses the design',async({page})=>{
   const id=await digest(page);
   for (const code of ['JA','VI','EN']) {await page.getByRole('button',{name:code,exact:true}).click();await expect(rows(page)).toHaveCount(7);expect(await digest(page)).toBe(id);}
   await page.getByRole('button',{name:'JA',exact:true}).click();
-  await expect(page.getByTestId('asm-no-runtime')).toContainText('engineering_bundle_v1');
+  await expect(page.getByTestId('asm-no-runtime')).toContainText('デジタルツイン');
 });
 test('a candidate draft downloads with null digests and the blocker when nothing was compiled',async({page})=>{
   await open(page);

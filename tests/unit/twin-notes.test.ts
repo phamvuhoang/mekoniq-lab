@@ -28,9 +28,10 @@ test('problems and notes: the problem count is shown; the notes count is there f
  expect(b).toContain('data-testid="problems-count"');expect(b).not.toContain('notes-only');expect(b).toContain('>2 <');
  expect(/<span class="visually-hidden" data-testid="notes-count">([^<]*)</.exec(b)?.[1]).toBe(', 1 lưu ý|1 件の注意|1 note');
 });
-test('the next-step strip takes its codes from the first problem, never from a note',()=>{
- const next={title:'t',detail:'d',action:{id:'a',label:'l'}};
- expect(nextStrip([note,problem],next)).toContain('CUP_MISSING');expect(nextStrip([note,problem],next)).not.toContain('ARM_MESH_UNAVAILABLE');
+test('the next-step strip takes its codes from the problem its step answers (item 8), never from a note',()=>{
+ const next={title:'t',detail:'d',action:{id:'a',label:'l'}},problem_={...problem,action:{id:'a',label:'l'}};
+ expect(nextStrip([note,problem_],next)).toContain('CUP_MISSING');expect(nextStrip([note,problem],next)).not.toContain('<code>');
+ expect(nextStrip([note,problem_],next)).toContain('CUP_MISSING');expect(nextStrip([note,problem],next)).not.toContain('ARM_MESH_UNAVAILABLE');
  expect(nextStrip([note],next)).not.toContain('<code>');
 });
 test('the two arm-mesh notes: the unusable blob named; a revision mismatch naming both revisions, in three languages',()=>{

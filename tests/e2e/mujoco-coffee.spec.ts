@@ -80,7 +80,7 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  await fit.click();await expect.poll(async()=>(await fr()).floorInView,{message:'one press of fit shows the whole floor'}).toBe(true);
  await home.click();await expect.poll(async()=>(await fr()).camera).toBe(cell);
  // the cell's supports are drawn with the arm, and the Display menu says what they are
- expect(await ds('armSupports')).toBe('2');expect(await ds('armIllustrative')).toBe('3');// the mount and a leg under each support
+ expect(await ds('armSupports')).toBe('2');expect(await ds('armIllustrative')).toBe('2');// the mount and a leg under the nozzle stand (the tray stands for the robot's: none)
  await openDisplayMenu(page);await expect(page.getByTestId('arm-cell-note')).toContainText('giả định');await expect(page.getByTestId('arm-cell-note')).toContainText('không có trong mô phỏng');await expect(page.getByTestId('arm-cell-note')).toContainText('khay ở nguyên chỗ khi robot rời đi');
  await page.locator('[data-action="twin-display-toggle"]').click();
  await expect.poll(()=>ds('cups'),{timeout:20000}).not.toBe('{}');await shot(page,'cell-start');
@@ -110,7 +110,7 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  const s1=await simS(page),w1=Date.now(),measured=(s1-s0)/((w1-w0)/1000);
  expect(await allKept(),'controls kept their elements at 1×, the runtime box opened and closed').toBe(true);
  expect(measured,'1× runs at about real time').toBeGreaterThan(0.5);expect(measured).toBeLessThan(1.25);
- expect(await ds('plantCupsDropped')).toBe('0');expect(await ds('armSupports')).toBe('2');expect(await ds('armIllustrative')).toBe('3');
+ expect(await ds('plantCupsDropped')).toBe('0');expect(await ds('armSupports')).toBe('2');expect(await ds('armIllustrative')).toBe('2');
  // the user orbits during the run: the steps that land and the report refreshes keep the user's camera; home brings back the cell
  const cb=(await page.locator('#twin-stage canvas').boundingBox())!,[cx,cy]=[cb.x+cb.width/2,cb.y+cb.height/2];
  await page.mouse.move(cx,cy);await page.mouse.down();await page.mouse.move(cx+160,cy+40,{steps:6});await page.mouse.up();

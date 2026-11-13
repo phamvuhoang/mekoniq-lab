@@ -120,3 +120,10 @@ test('I5: a remembered session not yet reached in this page load is "not connect
  // tried and failed: that is said
  expect(collectProblems({paired:true,health:null,healthChecked:true,checks,view:null,linkState:'closed',preset}).some(x=>x.id==='check-runtime')).toBe(true);
 });
+test('item 8: the strip\'s codes come from the problem its step answers, never from another one',async()=>{
+ const {nextStrip}=await import('../../src/ui/problems');
+ const p=[{id:'runtime-pin',severity:'blocker' as const,text:'pin',codes:['RUNTIME_PIN_MISMATCH'],action:{id:'twin-runtime-toggle',label:'Open'}},{id:'attention-0',severity:'attention' as const,text:'cup',codes:['CUP_REMOVED'],action:{id:'twin-reconcile',label:'Reconcile'}}];
+ const html=nextStrip(p,{title:'Reconcile needed',detail:'d',action:{id:'twin-reconcile',label:'Reconcile'}});
+ expect(html).toContain('<code>CUP_REMOVED</code>');expect(html).not.toContain('RUNTIME_PIN_MISMATCH');
+ expect(nextStrip(p,{title:'Run again',detail:'d',action:{id:'twin-rerun',label:'Run again'}})).not.toContain('<code>');
+});

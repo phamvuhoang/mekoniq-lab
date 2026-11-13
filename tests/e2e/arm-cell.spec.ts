@@ -58,15 +58,16 @@ test('the MuJoCo cell shows its two supports and a mount; a cup at the pick stan
  expect(d.mount!.min[2]).toBeCloseTo(0,3);expect(d.mount!.max[2]).toBeCloseTo(BASE[2]!,3);centre(d.mount!).slice(0,2).forEach((v,i)=>expect(v).toBeCloseTo(BASE[i]!,3));
 });
 
-/** Each support stands on an illustrative leg: from the floor straight up to the support's underside, under its centre. */
+/** The nozzle stand stands on an illustrative leg: from the floor straight up to its underside, under its centre. The tray stands for the docked robot's
+ * tray (the receiver) and has none (item 10: a leg would pass through the robot). */
 const legsHold=(d:Drawn)=>{
- expect(d.legs.map(l=>l.id).sort()).toEqual(['nozzle-stand','tray']);
+ expect(d.legs.map(l=>l.id).sort()).toEqual(['nozzle-stand']);
  for(const l of d.legs){const s=d.supports.find(x=>x.id===l.id)!;
   expect(Math.abs(l.min[2]),`${l.id} leg on the floor`).toBeLessThan(0.001);expect(Math.abs(l.max[2]-s.min[2]),`${l.id} leg up to its underside`).toBeLessThan(0.001);
   centre(l).slice(0,2).forEach((v,i)=>expect(Math.abs(v-centre(s)[i]!),`${l.id} leg under its centre`).toBeLessThan(0.001));}
 };
 test('the supports stand on illustrative legs from the floor; the mount and the legs are counted as illustrative parts',async({page})=>{
- await mount(page);expect((await draw(page)).armIllustrative).toBe('3');legsHold(await ev<Drawn>(page,'drawn'));
+ await mount(page);expect((await draw(page)).armIllustrative).toBe('2');legsHold(await ev<Drawn>(page,'drawn'));
 });
 test('the supports turn with a turned baseInMap; their legs and the mount stay vertical under them',async({page})=>{
  await mount(page);await draw(page,{yawRad:Math.PI/2});
