@@ -12,11 +12,21 @@ import type {Held} from './store';
 import type {NavigationSceneV1} from '../shared/navigation2d';
 import {footprintInMap,scanLayer,type ScanSample} from './lidar';
 import {layerProvenance} from './overlays';
+import {plantCupPose} from './arm/arm-telemetry';
 export interface TwinFrame {preset:TwinPreset;view:RunView|null;report:RunReport|null;seen?:Record<string,number>;/** latest telemetry per entity from the browser store (plan 03: arm joints) */samples?:Record<string,Held>;nowMs?:number;
  /** IR-SIM 2D runs: the run bundle's compiled navigation scene (footprints, sensors, obstacles) and, for imported evidence only, scans with their own-tick poses. */
  navigation?:NavigationSceneV1|null;scans?:{scans:ScanSample[]}}
 export interface ViewState {view:'2d'|'3d';layers:Layers;selected:string|null}
-export interface SceneEntity {id:string;kind:string;name:string;x:number;y:number;/** AMR only, from a 3D plant: base height, roll and pitch */pose3d?:{z:number;rollRad:number;pitchRad:number};yawRad?:number;source:'observed'|'modeled'|'derived'|'unknown';status?:string}
+export interface SceneEntity {id:string;kind:string;name:string;x:number;y:number;/** AMR only, from a 3D plant: base height, roll and pitch */pose3d?:{z:number;rollRad:number;pitchRad:number};yawRad?:number;source:'observed'|'modeled'|'derived'|'unknown';status?:string;
+ /** Cup only: its pose in the map as the MuJoCo plant reports it (drawn there instead of at its custodian) */plant?:{positionM:[number,number,number];quaternionXyzw:[number,number,number,number]}}
+/** Plant cup samples older than the plant's newest sample by more than this (sim time) have stopped: the cup left the cell and is drawn by custody again. */
+const PLANT_CUP_STOPPED_NS=1e9;
+/** The cup's plant pose while the plant still reports it. */
+function plantCup(f:TwinFrame,cupId:string){
+ const s=f.samples?.[cupId],p=plantCupPose(s);if(!p||s!.simTimeNs===null)return null;
+ const newest=Math.max(...Object.values(f.samples??{}).filter(x=>x.providerId==='mujoco_arm'&&x.simTimeNs!==null).map(x=>Number(x.simTimeNs)));
+ return newest-Number(s!.simTimeNs)>PLANT_CUP_STOPPED_NS?null:p;
+}
 const S=100;
 /** Observed path from the lossy telemetry: one polyline per run of consecutive samples; a jump in sim time larger than two sample periods is a gap and is
  * never joined (so no distance is drawn across it). */
@@ -43,7 +53,8 @@ export function sceneEntities(f:TwinFrame):SceneEntity[] {
   if(at)out.push({id:e.id,kind:e.kind,name:nameOf(f.preset,e.id),x:at.x,y:at.y,source:'derived'});
  }
  if(v&&l)jobsOf(v).forEach((j,i)=>out.push({id:j.jobId,kind:'job',name:j.jobId,x:l.machine.x-0.3+i*0.3,y:l.machine.y+0.42,source:'observed',status:j.status}));
- if(v)for(const c of v.coffee?.cups??[]){const at=cupLocation(c,p,v);out.push({id:c.cupId,kind:'cup',name:c.cupId,x:at?.x??NaN,y:at?.y??NaN,source:at?'observed':'unknown',status:`${c.ownerKind}:${c.ownerId}`});}
+ // a cup the plant reports is drawn where the plant has it; any other by its custodian (one entry per cup either way)
+ if(v)for(const c of v.coffee?.cups??[]){const q=plantCup(f,c.cupId),at=q?{x:q.positionM[0],y:q.positionM[1]}:cupLocation(c,p,v);out.push({id:c.cupId,kind:'cup',name:c.cupId,x:at?.x??NaN,y:at?.y??NaN,source:at?'observed':'unknown',status:`${c.ownerKind}:${c.ownerId}`,...q?{plant:q}:{}});}
  return out;
 }
 const kindLabel=(k:string)=>({amr:'AMR',arm:tr('Cánh tay','アーム','Arm'),coffee_machine:tr('Máy pha','コーヒーマシン','Coffee machine'),cup_station:tr('Trạm cốc','カップ置場','Cup station'),job:tr('Công việc','ジョブ','Job'),cup:tr('Cốc','カップ','Cup')})[k]??k;

@@ -20,7 +20,7 @@ import {inspect,identityItems} from '../twin/inspector';
 import {currentCup,reconciliationSubject} from '../twin/coffee-cell';
 import {attentionChain,cycleQueue,nextAction,runControls,statusText,type OpsState} from './operations-panel';
 import {caveatPopover,pickerItems,runBar,runtimePopover,runtimeWord,scenarioPicker,simLabel,type RunBarState} from './run-bar';
-import {collectProblems,nextStrip,problemsPanel,type Problem} from './problems';
+import {armMeshProblems,collectProblems,nextStrip,problemsPanel,type Problem} from './problems';
 import {transportBar,transportTime,type TransportState} from './transport';
 import {keyAction,shortcutsDialog} from './keys';
 import {inspector,loadUi,saveUi,type InspectorTab} from './inspector';
@@ -253,7 +253,9 @@ export class TwinWorkspace {
  private problems(f:TwinFrame):Problem[]{
   const pin=this.pinMismatch?[{id:'runtime-pin',severity:'blocker' as const,codes:['RUNTIME_PIN_MISMATCH'],action:{id:'twin-runtime-toggle',label:tr('Mở hộp runtime','ランタイムを開く','Open runtime')},
    text:tr(`Runtime chạy source ${this.pinMismatch[0]}, Lab ghim ${this.pinMismatch[1]}: không tạo lần chạy. Dùng runtime đúng bản ghim.`,`ランタイムのソースは ${this.pinMismatch[0]}、Labの固定は ${this.pinMismatch[1]} です。実行は作成しません。固定版のランタイムを使ってください。`,`The runtime runs source ${this.pinMismatch[0]}; the Lab is pinned to ${this.pinMismatch[1]}. No run is created: use the pinned runtime.`)}]:[];
-  return [...pin,...this.problemList(f)];
+  // the 3D view's reasons for drawing an arm as its joint chain (notices, last)
+  const arm=this.vs.view==='3d'&&this.viewer&&this.v3d?armMeshProblems(this.v3d.armMeshIssues(f),f.preset):[];
+  return [...pin,...this.problemList(f),...arm];
  }
  private problemList(f:TwinFrame){return collectProblems({paired:this.rt.paired,health:this.health,healthChecked:this.healthChecked,checks:this.showChecks()?preflight(this.readinessPreset(),this.health,this.rt.paired,this.readiness):[],view:f.view,linkState:this.archived?'closed':this.link.state,preset:f.preset});}
  /** Objects tab head: the cycle/resource queue and who holds the current cup (the attention chain is in the problems box). */
@@ -337,7 +339,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   void import('../viewer/twin3d').then(m=>{this.v3d=m;
    this.mounting=false;
    const now=document.getElementById('twin-stage');if(!now||this.vs.view!=='3d')return;
-   const v=m.mountTwin3d(now,id=>selectEntity(id),()=>this.fallback());
+   const v=m.mountTwin3d(now,id=>selectEntity(id),()=>this.fallback(),()=>this.paint());
    if(!v)return this.fallback();
    this.viewer=v;this.paint3d(this.frame());
   },()=>{this.mounting=false;this.fallback();});

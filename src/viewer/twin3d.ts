@@ -1,7 +1,8 @@
 // Optional WebGL view of the same TwinFrame/ViewState the 2D plan draws. Read-only. The scene is kept: update() rebuilds it only when its structure
 // (structureKey) changes and otherwise moves what is there; pose() only changes transforms. Renders on demand: the workspace drives pose() from an
 // animation frame only while live samples arrive and reduced motion is not requested. Any WebGL failure returns null or calls onFail and the
-// workspace stays on the 2D plan with the same selection.
+// workspace stays on the 2D plan with the same selection. An xArm 6 (MuJoCo plant) is drawn from its vendor meshes once they are loaded (D51), as its joint
+// chain until then or when they cannot be used; the swap happens in place, without a rebuild or a camera move.
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {observedSegments,sceneEntities,type SceneEntity,type TwinFrame,type ViewState} from '../twin/scene';
@@ -9,12 +10,21 @@ import {amrFootprint,assetOf} from '../twin/amr';
 import {footprintInMap} from '../twin/lidar';
 import {placeBody,rosQuat,yawOf} from '../twin/pose3d';
 import {armFrames,type ArmJointDef} from '../twin/arm/arm-frames';
-import {armJointsView,displayJoints} from '../twin/arm/arm-telemetry';
+import {armJointsView,armModelFor,displayJoints} from '../twin/arm/arm-telemetry';
 import {armChain,poseArmChain} from './arm-chain';
+import {armJoints,cloneArmMeshes,loadArmMeshes,poseArmMeshes,type ArmMeshSet} from './arm-mesh';
 import armComponent from '../../fixtures/engineering/arm-ref-3d-v1/component.json' with {type:'json'};
-const ARM_JOINTS=armComponent.joints as unknown as ArmJointDef[];
-/** Transforms only. `bodies`: an AMR's base origin in the ROS map (z up; z 0 for a planar plant) and its ROS orientation. `arms`: the joints shown. */
-export interface TwinPoses {arms:Record<string,{jointsRad:number[];gripperOpeningM:number|null}>;bodies:Record<string,{positionM:[number,number,number];quaternionXyzw:[number,number,number,number]}>}
+import xarmComponent from '../../fixtures/engineering/xarm6-g2-v1/component.json' with {type:'json'};
+import xarmPhysics from '../../fixtures/engineering/xarm6-g2-v1/physics.json' with {type:'json'};
+import xarmManifest from '../../fixtures/engineering/xarm6-g2-v1/manifest.json' with {type:'json'};
+import xarmLayout from '../../fixtures/engineering/xarm6-g2-v1/cell-layout.json' with {type:'json'};
+const XARM='xarm6-g2-v1',JOINTS:Record<ReturnType<typeof armModelFor>,ArmJointDef[]>={'arm-ref-3d-v1':armComponent.joints as unknown as ArmJointDef[],[XARM]:armJoints(xarmComponent,xarmPhysics)};
+/** The Lab serves the meshes from its own origin (public/, beside the vendor NOTICE), never from the runtime. */
+const XARM_BLOBS='/fixtures/xarm6-g2-v1/blobs/';
+type Pose7={positionM:[number,number,number];quaternionXyzw:[number,number,number,number]};
+/** Transforms only. `bodies`: an AMR's base origin in the ROS map (z up; z 0 for a planar plant) and its ROS orientation. `arms`: the joints shown and the
+ * measured gripper opening. `cups`: the cups drawn where the plant reports them (map frame, cup centre). */
+export interface TwinPoses {arms:Record<string,{jointsRad:number[];gripperOpeningM:number|null}>;bodies:Record<string,Pose7>;cups?:Record<string,Pose7>}
 export interface Twin3d {canvas:HTMLCanvasElement;/** Move into a re-rendered stage and size from it. */attach(host:HTMLElement):void;update(f:TwinFrame,vs:ViewState):void;pose(p:TwinPoses):void;
  /** Camera back to the view of the whole floor it starts with. */home():void;/** Frame one object, or the whole scene for null or an object not drawn. */fit(entityId:string|null):void;dispose():void}
 const LIME=0xb4f375,NAVY=0x182a33;
@@ -34,34 +44,59 @@ export function overlayShapes(f:TwinFrame,vs:ViewState):OverlayShape[]{
  }
  return out;
 }
-/** What the scene draws: placed entities (no jobs), and for an arm the joints it shows (observed, else commanded; frozen while stale). */
+/** The model revision the run reports (its arm trace, else the run project's arm profile, which the runtime checks against its fixture). */
+const runRevision=(f:TwinFrame)=>f.report?.coffee?.armTrace?.modelRevision??f.preset.project.armCollisionProfile?.modelRevision??null;
+/** What the scene draws: placed entities (no jobs), and for an arm the joints it shows (observed, else commanded; frozen while stale), the model its
+ * provider runs and whether that model is drawn from meshes (the xArm, when the Lab's fixture revision is the run's). */
 function drawn(f:TwinFrame){
  return sceneEntities(f).filter(e=>Number.isFinite(e.x)&&e.kind!=='job').map(e=>{
   if(e.kind!=='arm')return {e,arm:null};
-  const s=f.samples?.[e.id],v=s?armJointsView(s,f.nowMs??s.receivedAtMs):null;
-  return {e,arm:{...displayJoints(null,v),gripperOpeningM:v?.gripperOpeningM??null}};
+  const s=f.samples?.[e.id],v=s?armJointsView(s,f.nowMs??s.receivedAtMs):null,model=armModelFor(s?.providerId??''),run=runRevision(f);
+  return {e,arm:{...displayJoints(null,v),gripperOpeningM:v?.gripperOpeningM??null,model,mesh:model===XARM&&(run===null||run===xarmManifest.modelRevision)}};
  });
 }
 const armBase=(f:TwinFrame)=>f.preset.project.armCollisionProfile?.baseInMap;
+/** One mesh load per model per page: the parsed geometry is kept and shared by every drawing of it. */
+interface MeshLoad {set:ArmMeshSet|null;error:string|null;ms:number|null;done:Promise<void>}
+const loads=new Map<string,MeshLoad>();
+function meshLoad():MeshLoad{
+ let l=loads.get(XARM);if(l)return l;
+ const t0=performance.now(),x:MeshLoad={set:null,error:null,ms:null,done:Promise.resolve()};
+ x.done=loadArmMeshes(xarmComponent,xarmPhysics,async sha=>{const r=await fetch(`${XARM_BLOBS}${sha}.stl`);if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.arrayBuffer();},new THREE.MeshStandardMaterial())
+  .then(s=>{x.set=s;},(e:unknown)=>{x.error=e instanceof Error?e.message:String(e);}).finally(()=>{x.ms=performance.now()-t0;});
+ loads.set(XARM,l=x);return l;
+}
+export interface ArmMeshIssue {entityId:string;code:'ARM_MODEL_REVISION_MISMATCH'|'ARM_MESH_UNAVAILABLE';lab?:string;run?:string;detail?:string}
+/** Why an arm that has meshes is drawn as its joint chain instead (D51): the run reports another model revision than the Lab's fixture, or a mesh could not
+ * be used. Both are notices: the run goes on. */
+export function armMeshIssues(f:TwinFrame):ArmMeshIssue[]{
+ if(!armBase(f))return [];
+ return drawn(f).flatMap(({e,arm}):ArmMeshIssue[]=>{
+  if(!arm?.jointsRad||arm.model!==XARM)return [];
+  const run=runRevision(f),err=loads.get(XARM)?.error;
+  return !arm.mesh?[{entityId:e.id,code:'ARM_MODEL_REVISION_MISMATCH',lab:xarmManifest.modelRevision,run:run!}]:err?[{entityId:e.id,code:'ARM_MESH_UNAVAILABLE',detail:err}]:[];
+ });
+}
 const heightOf=(e:SceneEntity)=>e.kind==='amr'?0.225:e.kind==='coffee_machine'?1.125:e.kind==='arm'?1.25:e.kind==='cup'?(e.status?.startsWith('robot')?0.52:e.status?.startsWith('customer')?0.8:1.0):1.05;
 /** Changes when the project, the navigation scene, a layer, the selection, the set of objects (and how each is drawn) or the arm's display source
  * changes; never when only a pose or a joint angle does. Pure. */
 export function structureKey(f:TwinFrame,vs:ViewState):string{
  const p=f.preset.project,chain=!!armBase(f);
  return JSON.stringify([p.id,p.revision,p.world.width,p.world.height,f.navigation?.sceneDigest??null,vs.layers,vs.selected,
-  drawn(f).map(({e,arm})=>[e.id,e.kind,e.source,!!e.pose3d,arm&&[arm.source,arm.frozen,chain&&!!arm.jointsRad]])]);
+  drawn(f).map(({e,arm})=>[e.id,e.kind,e.source,!!e.pose3d,!!e.plant,arm&&[arm.source,arm.frozen,chain&&!!arm.jointsRad,arm.model,arm.mesh]])]);
 }
 /** The exact poses of a frame (no buffer): what update() shows, and the base the workspace's sample buffer overrides. Pure. */
 export function posesOf(f:TwinFrame):TwinPoses{
- const out:TwinPoses={arms:{},bodies:{}},chain=!!armBase(f);
+ const out:Required<TwinPoses>={arms:{},bodies:{},cups:{}},chain=!!armBase(f);
  for(const {e,arm} of drawn(f)){
   if(e.kind==='amr')out.bodies[e.id]={positionM:[e.x,e.y,e.pose3d?.z??0],quaternionXyzw:rosQuat(e.yawRad??0,e.pose3d?.pitchRad??0,e.pose3d?.rollRad??0)};
   else if(arm?.jointsRad&&chain)out.arms[e.id]={jointsRad:arm.jointsRad,gripperOpeningM:arm.gripperOpeningM};
+  else if(e.plant)out.cups[e.id]=e.plant;
  }
  return out;
 }
-/** Remove and free every child: geometries and materials are not shared across rebuilds. */
-const free=(g:THREE.Object3D)=>{for(const c of [...g.children]){g.remove(c);c.traverse(o=>{const m=o as THREE.Mesh,mt=m.material as THREE.Material|THREE.Material[]|undefined;m.geometry?.dispose();for(const x of Array.isArray(mt)?mt:mt?[mt]:[])x.dispose();});}};
+/** Remove and free every child: geometries and materials are not shared across rebuilds, except the arm meshes' parsed geometry (`userData.shared`), kept for the page. */
+const free=(g:THREE.Object3D)=>{for(const c of [...g.children]){g.remove(c);c.traverse(o=>{const m=o as THREE.Mesh,mt=m.material as THREE.Material|THREE.Material[]|undefined;if(!m.userData.shared)m.geometry?.dispose();for(const x of Array.isArray(mt)?mt:mt?[mt]:[])x.dispose();});}};
 /** The overlays as drawn: footprint and safety outlines in their entity's own frame (`anchored`: they move with its body, never rebuilt for a pose),
  * the rest in the map. Pure. */
 export function anchoredOverlays(f:TwinFrame,vs:ViewState):(OverlayShape&{anchored:boolean})[]{
@@ -73,7 +108,10 @@ export function anchoredOverlays(f:TwinFrame,vs:ViewState):(OverlayShape&{anchor
  });
 }
 const r6=(_k:string,v:unknown)=>typeof v==='number'?Math.round(v*1e6)/1e6:v;
-export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:()=>void):Twin3d|null {
+/** An arm as drawn: placed at its base (`at`), dressed as its joint chain or its meshes; `q`/`opening` are the last pose, for a swap. */
+interface ArmDraw {id:string;at:THREE.Group;joints:ArmJointDef[];look:{wire:boolean;emissive:boolean};wantMesh:boolean;chain?:THREE.Group;mesh?:ArmMeshSet;q:number[];opening:number|null}
+/** `onArmMesh`: the arm's drawing changed by itself (meshes ready or failed), so the page can update its problems list. */
+export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:()=>void,onArmMesh:()=>void=()=>{}):Twin3d|null {
  let renderer:THREE.WebGLRenderer;
  try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});}catch{return null;}
  renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -87,8 +125,8 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  const sun=new THREE.DirectionalLight(0xffffff,2.5);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun,sun.target);
  const world=new THREE.Group(),overlays=new THREE.Group();scene.add(world,overlays);
  /** Per drawn entity: its object, the height of its centre above the base origin (AMR), and the arm chain to re-pose. */
- const objs=new Map<string,{obj:THREE.Object3D;c:number;chain?:THREE.Group}>();
- let key='',rebuilds=0,lf:TwinFrame|null=null,floor='',okey='',overlayBuilds=0;
+ const objs=new Map<string,{obj:THREE.Object3D;c:number;arm?:ArmDraw}>();
+ let key='',rebuilds=0,lf:TwinFrame|null=null,floor='',okey='',overlayBuilds=0,gone=false;
  /** Per entity: the overlay group that moves with its body, and its path line whose first point is the body. */
  const anchors=new Map<string,THREE.Group>(),heads=new Map<string,THREE.Line>();
  const mat=(color:number,o:{wire?:boolean;emissive?:boolean}={})=>new THREE.MeshStandardMaterial({color,wireframe:!!o.wire,emissive:o.emissive?LIME:0x000000,emissiveIntensity:o.emissive?0.6:0,roughness:0.7});
@@ -102,6 +140,28 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  canvas.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];});
  canvas.addEventListener('pointerup',e=>{if(Math.hypot(e.clientX-down[0],e.clientY-down[1])<5)pick(e);});
  const at=(x:number,y:number,z=0)=>new THREE.Vector3(x,z,-y);
+ /** Dress an arm as its meshes (a copy sharing the loaded geometry) or as its joint chain, never a mix, posed at its last joints. */
+ const dress=(a:ArmDraw,set:ArmMeshSet|null)=>{
+  free(a.at);const m=mat(set?0xc5ccd0:NAVY+0x101010,a.look);
+  if(set){a.mesh=cloneArmMeshes(set,m);a.chain=undefined;a.at.add(a.mesh.group);poseArmMeshes(a.mesh,armFrames(a.joints,a.q),a.opening);}
+  else{a.chain=armChain(armFrames(a.joints,a.q),m);a.mesh=undefined;a.at.add(a.chain);}
+  a.at.traverse(o=>{o.userData.entityId=a.id;if((o as THREE.Mesh).isMesh)o.castShadow=o.receiveShadow=true;});
+ };
+ const arms=()=>[...objs.values()].flatMap(o=>o.arm?[o.arm]:[]);
+ /** What the view shows of the arm and the cups, for tests and evidence: the drawing in use, its mesh links, the drive angle, each plant cup's map position. */
+ /** Per pose (cheap); the fallback reason only when the drawing changes (a build or a finished load), off the animation path. */
+ const fallback=()=>{canvas.dataset.armFallback=lf?armMeshIssues(lf).map(i=>i.code).join(' '):'';};
+ const status=()=>{
+  const a=arms()[0],d=canvas.dataset,l=loads.get(XARM);
+  d.armModel=a?a.mesh?'mesh':'chain':'';d.armMeshLinks=String(a?.mesh?.links.length??0);d.armMeshMs=l?.ms==null?'':l.ms.toFixed(0);
+  d.gripperRad=a?.mesh?(a.mesh.group.userData.driveRad as number).toFixed(4):'';
+  d.cups=JSON.stringify(Object.fromEntries([...objs].filter(([,o])=>o.obj.userData.plant).map(([id,o])=>[id,[o.obj.position.x,-o.obj.position.z,o.obj.position.y].map(v=>Number(v.toFixed(4)))])));
+ };
+ /** Swap every arm waiting for these meshes in place once they are loaded (or report the failure): no rebuild, the camera stays. */
+ const waiting=new Set<MeshLoad>();
+ const await_=(l:MeshLoad)=>{if(waiting.has(l))return;waiting.add(l);void l.done.then(()=>{waiting.delete(l);if(gone)return;
+  if(l.set)for(const a of arms())if(a.wantMesh&&!a.mesh)dress(a,l.set);
+  fallback();status();render();onArmMesh();});};
  const build=(f:TwinFrame,vs:ViewState)=>{
   free(world);objs.clear();
   const w=f.preset.project.world,m=Math.max(w.width,w.height);
@@ -116,23 +176,27 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
    const on=e.id===vs.selected;
    // an arm with joint telemetry and a base pose is drawn as its joint chain (what the runtime last reported, never extrapolated); otherwise the single cylinder below
    if(arm?.jointsRad&&base){
-    const chain=armChain(armFrames(ARM_JOINTS,arm.jointsRad),mat(NAVY+0x101010,{wire:arm.source!=='observed'||arm.frozen,emissive:on}));
+    const a:ArmDraw={id:e.id,at:new THREE.Group(),joints:JOINTS[arm.model],look:{wire:arm.source!=='observed'||arm.frozen,emissive:on},wantMesh:arm.mesh,q:arm.jointsRad,opening:arm.gripperOpeningM};
     const [px,py,pz]=base.position as [number,number,number],[qx,qy,qz,qw]=base.quaternionXyzw as [number,number,number,number];
-    chain.quaternion.set(qx,qy,qz,qw);chain.position.set(px,py,pz);
-    const holder=new THREE.Group();holder.rotation.x=-Math.PI/2;holder.add(chain); // ROS (z up) -> scene (y up): (x, y, z) -> (x, z, -y); the chain sits at the base pose in the ROS map
-    holder.traverse(o=>{o.userData.entityId=e.id;});world.add(holder);objs.set(e.id,{obj:holder,c:0,chain});continue;
+    a.at.quaternion.set(qx,qy,qz,qw);a.at.position.set(px,py,pz);
+    const holder=new THREE.Group();holder.rotation.x=-Math.PI/2;holder.add(a.at); // ROS (z up) -> scene (y up): (x, y, z) -> (x, z, -y); the arm sits at the base pose in the ROS map
+    world.add(holder);objs.set(e.id,{obj:holder,c:0,arm:a});
+    // the meshes when they are loaded (once per page); the joint chain until then, and for good when they cannot be used
+    const l=a.wantMesh?meshLoad():null;dress(a,l?.set??null);if(l&&!l.set&&!l.error)await_(l);
+    continue;
    }
-   const geo=e.kind==='amr'?new THREE.CylinderGeometry(0.3,0.3,0.45,24):e.kind==='coffee_machine'?new THREE.BoxGeometry(0.4,0.45,0.3):e.kind==='arm'?new THREE.CylinderGeometry(0.09,0.12,0.7,16):e.kind==='cup'?new THREE.CylinderGeometry(0.05,0.04,0.12,16):new THREE.BoxGeometry(0.25,0.3,0.25);
+   // a cup the plant reports: its own size (cell layout, assumed) at the plant's pose, set by pose(); any other cup: the schematic cup at its custodian
+   const cup=xarmLayout.cup,geo=e.kind==='amr'?new THREE.CylinderGeometry(0.3,0.3,0.45,24):e.kind==='coffee_machine'?new THREE.BoxGeometry(0.4,0.45,0.3):e.kind==='arm'?new THREE.CylinderGeometry(0.09,0.12,0.7,16):e.kind==='cup'?e.plant?new THREE.CylinderGeometry(cup.radiusM,cup.radiusM,cup.heightM,20):new THREE.CylinderGeometry(0.05,0.04,0.12,16):new THREE.BoxGeometry(0.25,0.3,0.25);
    const mesh=new THREE.Mesh(geo,mat(e.kind==='amr'?0xd3dcd3:e.kind==='cup'?0xf5f0e6:NAVY+0x101010,{wire:e.source==='unknown'||e.source==='derived',emissive:on}));
    // a 3D plant: the body centre sits above the base origin by its height less the wheel radius (the base origin's height when it stands level)
    const wheel=f.navigation?.robots.find(r=>r.robotId===e.id)?.model.kinematics.wheelRadiusM??0.09;
-   mesh.userData.entityId=e.id;world.add(mesh);objs.set(e.id,{obj:mesh,c:heightOf(e)-(e.pose3d?wheel:0)});
+   mesh.userData.entityId=e.id;mesh.userData.plant=!!e.plant;world.add(mesh);objs.set(e.id,{obj:mesh,c:heightOf(e)-(e.pose3d?wheel:0)});
   }
   if(vs.layers.frames)world.add(new THREE.AxesHelper(0.6));
   world.traverse(o=>{if((o as THREE.Mesh).isMesh){o.castShadow=o!==ground;o.receiveShadow=true;}});
   sun.position.set(w.width/2+3,8,-w.height/2+4);sun.target.position.set(w.width/2,0,-w.height/2);
   const sc=sun.shadow.camera;sc.left=sc.bottom=-m;sc.right=sc.top=m;sc.near=0.5;sc.far=40;sc.updateProjectionMatrix();
-  canvas.dataset.rebuilds=String(++rebuilds);
+  canvas.dataset.rebuilds=String(++rebuilds);fallback();status();
  };
  /** Rebuilt only when the overlay data changes (a new path, a longer trail, a layer), never for a pose: `canvas.dataset.overlayBuilds` counts it. */
  const drawOverlays=(f:TwinFrame,vs:ViewState)=>{
@@ -152,7 +216,7 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  const pose=(p:TwinPoses)=>{
   for(const [id,b] of Object.entries(p.bodies)){
    const o=objs.get(id),g=anchors.get(id),head=heads.get(id),[x,y]=b.positionM;
-   if(o&&!o.chain){const pl=placeBody(b.positionM,b.quaternionXyzw,o.c);o.obj.position.set(...pl.position);o.obj.quaternion.set(...pl.quaternion);}
+   if(o&&!o.arm){const pl=placeBody(b.positionM,b.quaternionXyzw,o.c);o.obj.position.set(...pl.position);o.obj.quaternion.set(...pl.quaternion);}
    if(g){g.position.set(x,0,-y);g.rotation.y=yawOf(b.quaternionXyzw);}
    if(head){
     const pos=head.geometry.getAttribute('position') as THREE.BufferAttribute,dist=head.geometry.getAttribute('lineDistance') as THREE.BufferAttribute|undefined;
@@ -161,8 +225,12 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
     if(dist&&pos.count>1){const d=Math.hypot(pos.getX(1)-x,pos.getZ(1)+y)-dist.getX(1);for(let i=1;i<dist.count;i++)dist.setX(i,dist.getX(i)+d);dist.needsUpdate=true;}
    }
   }
-  for(const [id,a] of Object.entries(p.arms)){const o=objs.get(id);if(o?.chain&&a.jointsRad.length===ARM_JOINTS.length)poseArmChain(o.chain,armFrames(ARM_JOINTS,a.jointsRad));}
-  render();
+  for(const [id,p0] of Object.entries(p.arms)){const a=objs.get(id)?.arm;if(!a||p0.jointsRad.length!==a.joints.length)continue;
+   a.q=p0.jointsRad;a.opening=p0.gripperOpeningM;const fr=armFrames(a.joints,a.q);
+   if(a.mesh)poseArmMeshes(a.mesh,fr,a.opening);else if(a.chain)poseArmChain(a.chain,fr);// the fingers follow the measured opening only
+  }
+  for(const [id,c] of Object.entries(p.cups??{})){const o=objs.get(id);if(o?.obj.userData.plant){const pl=placeBody(c.positionM,c.quaternionXyzw,0);o.obj.position.set(...pl.position);o.obj.quaternion.set(...pl.quaternion);}}
+  status();render();
  };
  const home=()=>{if(!lf)return;const w=lf.preset.project.world,m=Math.max(w.width,w.height);camera.position.set(w.width/2,m*0.9,w.height*0.4+m*0.6);controls.target.set(w.width/2,0,-w.height/2);controls.update();render();};
  return {canvas,pose,home,
@@ -172,7 +240,7 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
    const k=structureKey(f,vs);if(k!==key){key=k;build(f,vs);}
    const w=f.preset.project.world,size=`${w.width}x${w.height}`;if(size!==floor){floor=size;home();}
    // objects without a pose of their own (cups, a cylinder arm, machines) move with the frame
-   for(const {e} of drawn(f)){const o=objs.get(e.id);if(o&&e.kind!=='amr'&&!o.chain)o.obj.position.copy(at(e.x,e.y,heightOf(e)));}
+   for(const {e} of drawn(f)){const o=objs.get(e.id);if(o&&e.kind!=='amr'&&!o.arm&&!e.plant)o.obj.position.copy(at(e.x,e.y,heightOf(e)));}
    drawOverlays(f,vs);pose(posesOf(f));
   },
   fit(id){
@@ -180,6 +248,6 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
    const s=box.getBoundingSphere(new THREE.Sphere()),d=Math.max(s.radius,0.3)/Math.sin(THREE.MathUtils.degToRad(camera.fov)/2),dir=camera.position.clone().sub(controls.target).normalize();
    controls.target.copy(s.center);camera.position.copy(s.center).addScaledVector(dir,d);controls.update();render();
   },
-  dispose(){free(world);free(overlays);objs.clear();anchors.clear();heads.clear();sun.dispose();ro.disconnect();controls.dispose();renderer.dispose();canvas.remove();},
+  dispose(){gone=true;free(world);free(overlays);objs.clear();anchors.clear();heads.clear();sun.dispose();ro.disconnect();controls.dispose();renderer.dispose();canvas.remove();},
  };
 }

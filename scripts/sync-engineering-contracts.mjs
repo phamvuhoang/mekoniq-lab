@@ -36,6 +36,18 @@ if(execFileSync('git',['status','--porcelain','--','robotics/simulation-3d/fixtu
 const armSource=here('../../source/robotics/simulation-3d/fixtures/arm-ref-3d-v1/'),armTarget=here('../fixtures/engineering/arm-ref-3d-v1/'),ARM_FILES=['manifest.json','component.json','fk-golden.json'];
 const armManifest=JSON.parse(await readFile(`${armSource}manifest.json`,'utf8'));
 const armFiles=await Promise.all(ARM_FILES.map(async(n)=>{const b=await readFile(`${armSource}${n}`);if(n!=='manifest.json'&&armManifest.files.find(f=>f.path===n)?.sha256!==createHash('sha256').update(b).digest('hex'))throw new Error(`ARM_FIXTURE_HASH:${n}`);return [n,b];}));
+// The MuJoCo arm fixture (xarm6-g2-v1): the 3D twin draws the xArm 6 from its visual meshes (D51). The JSON files go beside the other fixtures; the STL blobs and the
+// vendor NOTICE (BSD-3-Clause, it travels with every copy of the meshes) are served by the Lab itself from public/. Every file is checked against the fixture's manifest
+// (blobs by their sha256 name), the source fixture tree must be clean (no modified or untracked file), and the meshes stay within D51's 8 MB.
+const xarmSource=here('../../source/robotics/simulation-mujoco/fixtures/xarm6-g2-v1/'),xarmTarget=here('../fixtures/engineering/xarm6-g2-v1/'),xarmPublic=here('../public/fixtures/xarm6-g2-v1/');
+const XARM_FILES=['manifest.json','component.json','physics.json','cell-layout.json','fk-golden.json','coffee-cell-project.json'],XARM_MESH_LIMIT=8*1024*1024;
+if(execFileSync('git',['status','--porcelain','--untracked-files=all','--','robotics/simulation-mujoco/fixtures'],{cwd:sourceRoot,encoding:'utf8'}).trim())throw new Error('SOURCE_FIXTURES_DIRTY: commit source before syncing');
+const xarmManifest=JSON.parse(await readFile(`${xarmSource}manifest.json`,'utf8'));
+const sha=(b)=>createHash('sha256').update(b).digest('hex');
+const xarmFiles=await Promise.all([...XARM_FILES,'NOTICE'].map(async(n)=>{const b=await readFile(`${xarmSource}${n}`);if(n!=='manifest.json'&&xarmManifest.files.find(f=>f.path===n)?.sha256!==sha(b))throw new Error(`XARM_FIXTURE_HASH:${n}`);return [n,b];}));
+const xarmBlobs=await Promise.all(xarmManifest.blobs.map(async({sha256})=>{const b=await readFile(`${xarmSource}blobs/${sha256}.stl`);if(sha(b)!==sha256)throw new Error(`XARM_BLOB_HASH:${sha256}`);return [`blobs/${sha256}.stl`,b];}));
+if(xarmBlobs.reduce((n,[,b])=>n+b.length,0)>XARM_MESH_LIMIT)throw new Error('XARM_MESHES_TOO_LARGE: D51 allows 8 MB of visual meshes');
+const xarmOut=[...xarmFiles.map(([n,b])=>[n==='NOTICE'?`${xarmPublic}NOTICE`:`${xarmTarget}${n}`,b]),...xarmBlobs.map(([n,b])=>[`${xarmPublic}${n}`,b])];
 const schemaDir=here('../src/shared/engineering-schemas/');
 const schemaFiles=await Promise.all(SCHEMAS.map(async(n)=>[n,await readFile(here(`../../source/packages/contracts/schemas/${n}.schema.json`),'utf8')]));
 if(process.argv.includes('--check')){
@@ -48,5 +60,6 @@ if(process.argv.includes('--check')){
  for(const [n,b] of fixtureFiles)if(!b.equals(await readFile(`${fixtureTarget}${n}`).catch(()=>Buffer.alloc(0))))throw new Error(`SERVE_FIXTURE_DRIFT:${n}`);
  for(const [n,b] of fixture3dFiles)if(!b.equals(await readFile(`${fixture3dTarget}${n}`).catch(()=>Buffer.alloc(0))))throw new Error(`SERVE3D_FIXTURE_DRIFT:${n}`);
  for(const [n,b] of armFiles)if(!b.equals(await readFile(`${armTarget}${n}`).catch(()=>Buffer.alloc(0))))throw new Error(`ARM_FIXTURE_DRIFT:${n}`);
+ for(const [path,b] of xarmOut)if(!b.equals(await readFile(path).catch(()=>Buffer.alloc(0))))throw new Error(`XARM_FIXTURE_DRIFT:${path}`);
  console.log('Engineering contracts match source.');
-}else{await mkdir(schemaDir,{recursive:true});await mkdir(fixtureTarget,{recursive:true});await mkdir(fixture3dTarget,{recursive:true});for(const [n,b] of fixture3dFiles)await writeFile(`${fixture3dTarget}${n}`,b);await mkdir(armTarget,{recursive:true});for(const [n,b] of armFiles)await writeFile(`${armTarget}${n}`,b);for(const [n,text] of schemaFiles)await writeFile(`${schemaDir}${n}.schema.json`,text);for(const [n,b] of fixtureFiles)await writeFile(`${fixtureTarget}${n}`,b);await writeFile(target,output);await writeFile(navigationTarget,navigationOutput);console.log(`Wrote ${target}, ${navigationTarget} and the Serve fixture`);}
+}else{await mkdir(schemaDir,{recursive:true});await mkdir(fixtureTarget,{recursive:true});await mkdir(fixture3dTarget,{recursive:true});for(const [n,b] of fixture3dFiles)await writeFile(`${fixture3dTarget}${n}`,b);await mkdir(armTarget,{recursive:true});for(const [n,b] of armFiles)await writeFile(`${armTarget}${n}`,b);for(const [n,text] of schemaFiles)await writeFile(`${schemaDir}${n}.schema.json`,text);for(const [n,b] of fixtureFiles)await writeFile(`${fixtureTarget}${n}`,b);await mkdir(xarmTarget,{recursive:true});await mkdir(`${xarmPublic}blobs`,{recursive:true});for(const [path,b] of xarmOut)await writeFile(path,b);await writeFile(target,output);await writeFile(navigationTarget,navigationOutput);console.log(`Wrote ${target}, ${navigationTarget} and the Serve fixture`);}

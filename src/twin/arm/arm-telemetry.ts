@@ -19,3 +19,11 @@ export function displayJoints(previous:ArmJointsView|null,latest:ArmJointsView|n
  if(v.jointsCommandedRad)return {jointsRad:v.jointsCommandedRad,source:'commanded',frozen:v.stale};
  return {jointsRad:null,source:'unknown',frozen:v.stale};
 }
+/** The model the 3D view draws for an arm sample's provider: the MuJoCo plant runs the xArm 6 fixture; every other provider (Webots, the mock) the reference arm. */
+const finite=(v:unknown,n:number):v is number[]=>Array.isArray(v)&&v.length===n&&v.every(x=>typeof x==='number'&&Number.isFinite(x));
+/** A cup's pose as the MuJoCo plant reports it (map frame, a valid sample), or null: any other sample is not the plant's word on where the cup is. */
+export function plantCupPose(h:Held|undefined):{positionM:[number,number,number];quaternionXyzw:[number,number,number,number]}|null{
+ const o=h?.observed;if(!h||h.providerId!=='mujoco_arm'||h.frameId!=='map'||h.quality!=='valid'||!o||!finite(o.positionM,3)||!finite(o.quaternionXyzw,4))return null;
+ return {positionM:[...o.positionM] as [number,number,number],quaternionXyzw:[...o.quaternionXyzw] as [number,number,number,number]};
+}
+export const armModelFor=(providerId:string):'xarm6-g2-v1'|'arm-ref-3d-v1'=>providerId==='mujoco_arm'?'xarm6-g2-v1':'arm-ref-3d-v1';

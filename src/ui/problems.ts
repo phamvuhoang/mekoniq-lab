@@ -7,10 +7,11 @@ import {explain,reconcilable} from '../twin/coffee-cell';
 import type {NextAction} from './operations-panel';
 import {nameOf,type TwinPreset} from '../scenarios/catalog';
 import {icon,esc} from './icons';
+import type {ArmMeshIssue} from '../viewer/twin3d';
 import {tr} from '../i18n';
 /** `entityName`: the object's display name (nameOf), shown on its button. */
-export interface Problem {id:string;severity:'blocker'|'attention';text:string;codes:string[];entityId?:string;entityName?:string;action?:{id:string;label:string}}
-const SEVERITIES:Problem['severity'][]=['blocker','attention'];
+export interface Problem {id:string;severity:'blocker'|'attention'|'notice';text:string;codes:string[];entityId?:string;entityName?:string;action?:{id:string;label:string}}
+const SEVERITIES:Problem['severity'][]=['blocker','attention','notice'];
 const runtimeBox=()=>({id:'twin-runtime-toggle',label:tr('Mở hộp runtime','ランタイムを開く','Open runtime')});
 /** Blockers, then attention; input order within each group. `preset` names the objects. */
 export function collectProblems(i:{paired:boolean;health:TwinHealth|null;healthChecked:boolean;checks:ReturnType<typeof preflight>;view:RunView|null;linkState:LinkState;preset?:TwinPreset}):Problem[]{
@@ -30,7 +31,14 @@ export function collectProblems(i:{paired:boolean;health:TwinHealth|null;healthC
   p.push({id:`attention-${n}`,severity:'attention',text:`${x.observed} ${x.action}`,codes:[a.reason],...x.entities[0]?{entityId:x.entities[0],entityName:nameOf(i.preset,x.entities[0])}:{},...reconcilable(a,v!)?{action:{id:'twin-reconcile',label:tr('Đối soát','照合','Reconcile')}}:{}});}
  return SEVERITIES.flatMap(s=>p.filter(x=>x.severity===s));
 }
-const sevLabel=(s:Problem['severity'])=>({blocker:tr('Chặn','ブロック','Blocker'),attention:tr('Cần kiểm tra','要確認','Attention')})[s];
+/** Why the 3D view draws an arm as its joint chain instead of its meshes (D51): notices, listed after the problems; the run goes on. */
+export function armMeshProblems(issues:readonly ArmMeshIssue[],preset?:TwinPreset):Problem[]{
+ const short=(r?:string)=>(r??'?').slice(0,12);
+ return issues.map(i=>({...i,detail:i.detail?.replace(/[0-9a-f]{64}/,short)})).map(i=>({id:`arm-mesh-${i.entityId}`,severity:'notice' as const,codes:[i.code],entityId:i.entityId,entityName:nameOf(preset,i.entityId),
+  text:i.code==='ARM_MODEL_REVISION_MISMATCH'?tr(`Lab giữ mô hình tay máy bản ${short(i.lab)}, lần chạy báo bản ${short(i.run)}: 3D vẽ chuỗi khớp, không vẽ mesh.`,`Labのアームモデルは版 ${short(i.lab)}、実行の報告は版 ${short(i.run)} です。3Dはメッシュではなく関節チェーンで表示します。`,`The Lab holds arm model revision ${short(i.lab)}; the run reports revision ${short(i.run)}. The 3D view draws the joint chain, not the meshes.`)
+   :tr(`Không dùng được mesh của tay máy (${i.detail??''}: thiếu file hoặc sha256 khác): 3D vẽ chuỗi khớp. Lần chạy không bị ảnh hưởng.`,`アームのメッシュを使えません(${i.detail??''}:ファイル欠落またはsha256不一致)。3Dは関節チェーンで表示します。実行には影響しません。`,`The arm meshes cannot be used (${i.detail??''}: a file is missing or its sha256 differs). The 3D view draws the joint chain; the run is not affected.`)}));
+}
+const sevLabel=(s:Problem['severity'])=>({blocker:tr('Chặn','ブロック','Blocker'),attention:tr('Cần kiểm tra','要確認','Attention'),notice:tr('Lưu ý','注意','Notice')})[s];
 /** A button to the problem's object: its display name, and the name in its accessible label. */
 export const entityButton=(id:string,name:string,testid='')=>`<button class="text-button"${testid?` data-testid="${testid}"`:''} data-action="twin-select" data-value="${esc(id)}" aria-label="${tr('Xem','表示','Show')} ${esc(name)}">${icon('pin',14)}${esc(name)}</button>`;
 /** The run bar's problems box. `chains` (problem id -> its attention chain) are drawn inside that problem's card, whose object buttons they carry. Closed or empty: hidden. */
@@ -40,6 +48,6 @@ export function problemsPanel(p:readonly Problem[],open:boolean,chains:Readonly<
 /** The viewport strip: the recommended step when it needs a person, with the codes of the first problem behind it. No button: its action is the run bar's primary action. */
 export function nextStrip(p:readonly Problem[],next:NextAction):string{
  if(!next.action)return '';
- const codes=p[0]?.codes??[];
+ const codes=p.find(x=>x.severity!=='notice')?.codes??[];
  return `<div class="next-action" data-testid="next-action" role="status"><span class="eyebrow">${tr('BƯỚC TIẾP THEO','次の操作','NEXT ACTION')}</span><b>${esc(next.title)}</b>${codes.map(c=>`<code>${esc(c)}</code>`).join(' ')}<span>${esc(next.detail)}</span></div>`;
 }

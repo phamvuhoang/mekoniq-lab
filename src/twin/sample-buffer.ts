@@ -27,5 +27,10 @@ export class SampleBuffer<T> {
 }
 export const lerpJoints=(a:readonly number[],b:readonly number[],u:number):number[]=>a.length!==b.length?[...b]:a.map((x,i)=>x+(b[i]!-x)*u);
 const arc=(a:number,b:number,u:number)=>{const d=Math.atan2(Math.sin(b-a),Math.cos(b-a));return a+d*u;};
+/** A pose [x, y, z, qx, qy, qz, qw]: the position along the line, the orientation by normalised lerp on the shorter way (display, not a slerp). */
+export const lerpPlace=(a:readonly number[],b:readonly number[],u:number):number[]=>{
+ const s=a[3]!*b[3]!+a[4]!*b[4]!+a[5]!*b[5]!+a[6]!*b[6]!<0?-1:1,q=[3,4,5,6].map(i=>a[i]!+(s*b[i]!-a[i]!)*u),n=Math.hypot(...q)||1;
+ return [...[0,1,2].map(i=>a[i]!+(b[i]!-a[i]!)*u),...q.map(x=>x/n)];
+};
 /** A base pose [x, y, yaw, z?, roll?, pitch?]: the angles turn along the shorter arc. */
 export const lerpPose=(a:readonly number[],b:readonly number[],u:number):number[]=>a.length!==b.length?[...b]:a.map((x,i)=>i===2||i>3?arc(x,b[i]!,u):x+(b[i]!-x)*u);
