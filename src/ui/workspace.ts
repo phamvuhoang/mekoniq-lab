@@ -181,8 +181,8 @@ export class TwinWorkspace {
  /** Evidence is the report of the run as shown, never an older one (finalReport). */
  private async saveEvidence(){if(!this.runPreset||typeof indexedDB==='undefined'||!this.report&&!this.view)return;const report=await this.finalReport();await this.evidenceStore.save(captureEvidence(report,this.runPreset.project));this.saved=await this.evidenceStore.list();}
  /** Does this report describe the run exactly as the view shows it (same run, tick and status)? */
- /** A finished or paused run whose report does not describe it yet (or an action is fetching that report). */
- private reportPending(){const v=this.view;return this.reportLoading||!!v&&!this.replay&&!this.archived&&['completed','failed','cancelled','paused'].includes(v.run.status)&&!this.reportFits();}
+ /** A request is on its way for a finished or paused run whose report does not describe it yet (or an action is fetching that report). */
+ private reportPending(){const v=this.view;return this.reportLoading||this.reportBusy&&!!v&&!this.replay&&!this.archived&&['completed','failed','cancelled','paused'].includes(v.run.status)&&!this.reportFits();}
  private reportFits(r=this.report){const v=this.view;return !!r&&!!v&&r.manifest.runId===v.run.id&&r.outcome.tick===v.tick&&r.outcome.status===v.run.status;}
  /** The report as a record of the run as shown: the one held if it matches the view, otherwise fetched now; one that still does not match,
   * or a failed fetch, is a visible error (call() shows it), never a fallback to an older report. */
@@ -191,7 +191,7 @@ export class TwinWorkspace {
   if(this.reportFits())return this.report!;
   const seq=++this.reportSeq;this.reportLoading=true;this.paint();
   try{
-   const r=await this.rt.report(v.run.id);this.takeReport(v.run.id,seq,r,false);
+   const r=await this.fetchReport(v.run.id);this.takeReport(v.run.id,seq,r,false);
    if(!this.reportFits(r))throw new TwinRuntimeError('REPORT_NOT_CURRENT',[`report tick ${r.outcome.tick} ${r.outcome.status}`,`run tick ${v.tick} ${v.run.status}`],409);
    return r;
   }finally{this.reportLoading=false;}
@@ -218,7 +218,7 @@ export class TwinWorkspace {
  private watchReadinessExpiry(){
   clearTimeout(this.readinessExpiry);
   const delay=this.readiness?Date.parse(this.readiness.expiresAt)-Date.now():NaN;
-  if(Number.isFinite(delay)&&delay>0)this.readinessExpiry=setTimeout(()=>this.rerender(),Math.min(delay,30000));
+  if(Number.isFinite(delay)&&delay>0)this.readinessExpiry=setTimeout(()=>this.paint(),Math.min(delay,30000));
  }
  private async checkReadiness(p=this.readinessPreset()){
   const request=++this.readinessRequest;this.readiness=null;this.watchReadinessExpiry();
@@ -355,13 +355,16 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
    // LOOPBACK_BLOCKED: the browser gives the same TypeError for every cause, so the notice names them all and claims none
    const o=typeof location==='undefined'?'':location.origin;// this page's origin, for --allow-origin
    this.notice=e instanceof TwinRuntimeError&&e.code==='LOOPBACK_BLOCKED'?`LOOPBACK_BLOCKED: ${tr(`Không tới được runtime trên máy này. Kiểm tra: runtime đang chạy; runtime cho phép origin của trang này (--allow-origin ${o}); trình duyệt cho phép truy cập mạng cục bộ; Safari không cho trang HTTPS gọi http://127.0.0.1.`,`このマシンのランタイムに届きません。確認:ランタイムが起動している、ランタイムがこのページのオリジンを許可している(--allow-origin ${o})、ブラウザがローカルネットワークへのアクセスを許可している、SafariはHTTPSページからhttp://127.0.0.1を呼べない。`,`The runtime on this machine could not be reached. Check that the runtime is running, that it allows this page's origin (--allow-origin ${o}), that the browser allows local network access, and note that Safari does not let an HTTPS page reach http://127.0.0.1.`)}`
+    :e instanceof TwinRuntimeError&&e.code==='REPORT_TIMEOUT'?`REPORT_TIMEOUT: ${tr('Runtime không gửi báo cáo của lần chạy trong 30 s; hành động này không thực hiện. Thử lại khi runtime trả lời.','ランタイムが30秒以内に実行のレポートを返しませんでした。この操作は行っていません。ランタイムが応答したら再試行してください。','The runtime did not send the run\'s report within 30 s; this action was not done. Try again once the runtime answers.')}`
     :e instanceof TwinRuntimeError&&e.code==='PACED_STEP_TIMEOUT'?`PACED_STEP_TIMEOUT: ${tr('Runtime không trả lời một bước trong 30 s (đã gửi lại một lần). Tự chạy đã dừng; lần chạy giữ nguyên trạng thái runtime báo.','ランタイムが30秒以内にステップへ応答しませんでした(1回再送済み)。自動実行を停止しました。実行はランタイムが報告する状態のままです。','The runtime did not answer a step within 30 s (resent once). Auto-run stopped; the run stays as the runtime reports it.')}`
     :e instanceof TwinRuntimeError?`${tr('Runtime từ chối','ランタイムが拒否','Runtime refused')}: ${e.message}`:e instanceof Error?e.message:String(e);
    // a refused action leaves the run as the runtime has it: re-read instead of guessing
-   if(this.view)try{await this.apply(await this.rt.get(this.view.run.id));}catch{/* keep the last snapshot */}
+   // (the run first; its report follows off this path, so a failed report never holds the page twice)
+   // after a report that timed out, no new report is asked by itself (the user's next action asks)
+   if(this.view)try{this.applyView(await this.rt.get(this.view.run.id));if(!(e instanceof TwinRuntimeError&&e.code==='REPORT_TIMEOUT'))this.refreshReport(true);}catch{/* keep the last snapshot */}
   }finally{this.busy=false;this.rerender();}
  }
- private async apply(v:RunView){this.applyView(v);const seq=++this.reportSeq;let r:RunReport|null=null;try{r=await this.rt.report(v.run.id);}catch{/* shown as no report */}this.takeReport(v.run.id,seq,r,false);}
+ private async apply(v:RunView){this.applyView(v);const seq=++this.reportSeq;let r:RunReport|null=null;try{r=await this.fetchReport(v.run.id);}catch{/* shown as no report */}this.takeReport(v.run.id,seq,r,false);}
  /** The run snapshot only (the action receipt is the pause acknowledgement; heartbeats only refresh it between receipts, e.g. another tab). */
  private applyView(v:RunView){this.view=v;this.track(v);this.link={...this.link,paused:v.run.status==='paused'};}
  /** The report (trail, summary, caveats) may lag the live picture, which comes from the streams. Never on the paced loop's path:
@@ -370,11 +373,15 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   const v=this.view;if(!v)return;
   if(this.reportBusy){this.reportAgain||=final;return;}
   if(!final&&performance.now()<this.reportDue)return;
-  this.reportBusy=true;this.reportDue=performance.now()+1000;const id=v.run.id,seq=++this.reportSeq;let done=false;
-  // a request that never settles is abandoned after STEP_TIMEOUT_MS (its late answer is ignored) so the next one, and the final one, can run
-  const finish=()=>{if(done)return;done=true;clearTimeout(timer);this.reportBusy=false;if(this.reportAgain){this.reportAgain=false;this.refreshReport(true);}};
-  const timer=setTimeout(finish,STEP_TIMEOUT_MS);
-  void this.rt.report(id).then(r=>{if(!done)this.takeReport(id,seq,r);},()=>{/* keep the last report */}).finally(finish);
+  this.reportBusy=true;this.reportDue=performance.now()+1000;const id=v.run.id,seq=++this.reportSeq;
+  void this.fetchReport(id).then(r=>this.takeReport(id,seq,r),()=>{/* keep the last report */})
+   .finally(()=>{this.reportBusy=false;if(this.reportAgain){this.reportAgain=false;this.refreshReport(true);}});
+ }
+ /** Every report request: aborted after STEP_TIMEOUT_MS as REPORT_TIMEOUT (a runtime that accepts and never answers never holds the page). */
+ private fetchReport(id:string):Promise<RunReport>{
+  const c=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
+  const timeout=new Promise<never>((_r,reject)=>{timer=setTimeout(()=>{c.abort();reject(new TwinRuntimeError('REPORT_TIMEOUT',[],0));},STEP_TIMEOUT_MS);});
+  return Promise.race([this.rt.report(id,c.signal),timeout]).finally(()=>clearTimeout(timer));
  }
  private act(kind:Parameters<TwinRuntime['action']>[1],payload?:Record<string,unknown>){return this.rt.action(this.view!,kind,payload).then(v=>this.apply(v));}
  /** Recover display metadata from the recorded input; catalog entries provide labels/assets only. */
@@ -390,11 +397,24 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
    ...input.engineering?{engineering:{project:structuredClone(input.engineering.project),receipt:null}}:{}};
  }
  private retired:string|null=null;
+ /** The run the runtime no longer has (404): nothing more is asked about it. */
+ private lostRun:string|null=null;
+ /** Before the shown run is replaced: its evidence and the comparison record, both from its matching report, then it is archived.
+  * A run the runtime no longer has (404: a restart, run_lost) has no final report: that is said, and the new run is not blocked. Any other failure blocks. */
+ private async settlePrevious(){
+  if(this.view&&this.lostRun===this.view.run.id)return;
+  try{await this.saveEvidence();this.previous=this.view?await this.finalReport():this.report;await this.retire();}
+  catch(e){
+   if(!(e instanceof TwinRuntimeError&&e.status===404)||!this.view)throw e;
+   this.lostRun=this.view.run.id;this.previous=null;this.streams?.close();this.streams=null;clearInterval(this.ticker);
+   this.notice=tr('Lần chạy trước không còn trên runtime (runtime khởi động lại hoặc mất lần chạy): không lưu được bằng chứng của nó. Lần chạy mới vẫn được tạo.','前の実行はランタイムにありません(再起動または実行の喪失)。その証跡は保存できませんでした。新しい実行は作成します。','The previous run is no longer on the runtime (restarted, or the run was lost): its evidence could not be saved. The new run is created anyway.');
+  }
+ }
  private async retire(){if(this.view&&!this.archived&&this.rt.archive&&this.retired!==this.view.run.id){this.streams?.close();this.streams=null;clearInterval(this.ticker);await this.rt.archive(this.view.run.id);this.retired=this.view.run.id;}}
  private async create(p:TwinPreset,start=true){
   if(!this.health)throw new TwinRuntimeError('RUNTIME_UNAVAILABLE',[],0);
   // a finished run still owns the host's one Webots slot until it is archived: retire it before readiness, or the new run is refused WEBOTS_CAPACITY
-  if(this.view&&['completed','failed','cancelled'].includes(this.view.run.status)){await this.saveEvidence();await this.retire();}
+  if(this.view&&['completed','failed','cancelled'].includes(this.view.run.status))await this.settlePrevious();
   if(this.health.features?.readiness){
    if(!this.rt.readiness)throw new TwinRuntimeError('READINESS_NOT_CHECKED',[],0);
    const ref=this.refOf(p);if(ref===null)throw new TwinRuntimeError('ENGINEERING_NOT_COMPILED',[],0);
@@ -402,11 +422,8 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
    this.readiness=snapshot;this.watchReadinessExpiry();
    if(!ready(preflight(p,this.health,this.rt.paired,snapshot)))throw new TwinRuntimeError('RUNTIME_NOT_READY',snapshot.checks.flatMap(c=>c.reasonCodes),422);
   }
-  await this.saveEvidence();
-  await this.retire();
-  this.archived=false;
-  // the run kept for comparison is recorded by its matching report too, never an older one
-  this.previous=this.view?await this.finalReport():this.report;this.view=null;this.report=null;this.seen={};this.runPreset={...p,project:structuredClone(p.project)};this.stopReplay();this.replay=null;this.navigation=null;const token=++this.sceneLoad;
+  await this.settlePrevious();
+  this.archived=false;this.view=null;this.report=null;this.seen={};this.runPreset={...p,project:structuredClone(p.project)};this.stopReplay();this.replay=null;this.navigation=null;const token=++this.sceneLoad;
   const ref=this.refOf(p);if(ref){const s=await loadNavigationScene(this.rt,ref.bundleDigest).catch(()=>null);if(token===this.sceneLoad)this.navigation=s;}
   const v=await this.rt.create(requestForPreset(p),{sourceCommit:this.health.sourceCommit,schemaHash:this.health.schemaHash});this.pinMismatch=null;
   await this.apply(v);this.openStreams(v);if(start){await this.act('start');if(this.clock()?.step)await this.act('step',{ticks:STEP_TICKS});}
@@ -497,7 +514,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   if(action==='twin-open-evidence'&&value){const saved=this.saved.find(s=>s.id===value);if(!saved)return;this.playing=false;this.streams?.close();this.streams=null;clearInterval(this.ticker);this.stopReplay();this.archived=true;this.report=structuredClone(saved.report);const preset=presets.find(p=>p.scenarioId===saved.report.manifest.scenario.id)??this.preset;this.runPreset={...preset,project:structuredClone(saved.project)};const m=saved.report.manifest;this.loadScene(m.engineering?.bundleDigest);this.view={run:{schemaVersion:2,id:m.runId,mode:m.mode==='simulation'?'simulation':'mock',access:m.access,backendSetId:m.backendSetId,backends:m.backends.map(b=>b.id),status:saved.report.outcome.status as RunView['run']['status'],runRevision:0,eventCursor:null,telemetryCursor:null,fidelity:'modeled',ageMs:0,sourceCommit:m.sourceCommit,scenarioId:m.scenario.id,scenarioRevision:m.scenario.revision,seed:m.seed},tick:saved.report.outcome.tick,simTimeNs:saved.report.outcome.simTimeNs,model:m.backends[0]?.model??'unknown',entities:saved.project.entities.filter(e=>e.kind==='amr').map(e=>({id:e.id,kind:'amr',pose:{x:NaN,y:NaN,yawRad:NaN},quality:'stale',moving:false,hold:null,goal:null,path:[],distanceM:NaN})),workload:[],awaiting:[],attention:[],served:saved.report.outcome.served,coffee:null};this.replay={rp:openReplayV2(this.report),tick:saved.report.outcome.tick,playing:false};return this.rerender();}
   // export and replay are records of the run as shown: they wait for its matching report (finalReport)
   const current=!this.view||this.reportFits();// a matching report acts at once, as before; otherwise the action waits for the fetch
-  if(action==='twin-export'&&this.report)return current?this.download(value??'json'):void this.call(async()=>{await this.finalReport();this.download(value??'json');});
+  if(action==='twin-export'&&this.report)return current?this.download(value??'json',this.report):void this.call(async()=>{this.download(value??'json',await this.finalReport());});
   if(action==='twin-replay'&&this.report){
    if(current){this.playing=false;this.replay={rp:openReplayV2(this.report),tick:0,playing:false};return this.rerender();}
    return void this.call(async()=>{const r=await this.finalReport();this.playing=false;this.replay={rp:openReplayV2(r),tick:0,playing:false};});
@@ -549,8 +566,8 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   const range=document.getElementById('twin-replay-cursor') as HTMLInputElement|null;if(range&&(played||document.activeElement!==range))range.value=String(r.tick);
   this.painted='';this.tick();
  }
- private download(format:string){
-  const r=this.report!,name=`mekoniq-run-${r.manifest.scenario.id}-seed${r.manifest.seed}-${r.manifest.runId.slice(0,8)}`;
+ private download(format:string,r:RunReport){
+  const name=`mekoniq-run-${r.manifest.scenario.id}-seed${r.manifest.seed}-${r.manifest.runId.slice(0,8)}`;
   const [body,type,ext]=format==='csv'?[reportCsv(r),'text/csv','csv']:format==='html'?[reportHtml(r,this.previous?{compareWith:this.previous}:{}),'text/html','html']:[reportJson(r),'application/json','json'];
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([body],{type}));a.download=`${name}.${ext}`;a.rel='noopener';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
  }

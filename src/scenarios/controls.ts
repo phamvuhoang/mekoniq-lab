@@ -109,7 +109,7 @@ export interface TwinRuntime {
  /** `actionId`: resend a step whose response was lost with the same id; the runtime returns its stored receipt and does not act again. */
  action(view:RunView,kind:ActionKind,payload?:Record<string,unknown>,actionId?:string,signal?:AbortSignal):Promise<RunView>;
  readonly recoverableRunIds?:readonly string[];archive?(runId:string):Promise<void>;reclaim?(runId:string):Promise<RunView>;
- get(runId:string):Promise<RunView>;report(runId:string):Promise<RunReport>;
+ get(runId:string):Promise<RunView>;report(runId:string,signal?:AbortSignal):Promise<RunReport>;
  /** Where requests go (target.ts). Optional only so test doubles may omit it; httpTwinRuntime always has it. */
  readonly target?:RuntimeTarget;
  /** Point this client at another runtime: the old session (and its stored bearer) is dropped. */
@@ -197,7 +197,7 @@ export function httpTwinRuntime(target:RuntimeTarget={base:'/lab/v2',kind:'same_
   // expectedRevision comes from the last snapshot the UI rendered: a stale view is refused (REVISION_CONFLICT), never applied
   action:(v,kind,payload={},actionId=crypto.randomUUID(),signal)=>request<RunView>(`${run(v.run.id)}/actions`,{actionId,expectedRevision:v.run.runRevision,kind,payload},signal),
   get:id=>request<RunView>(run(id)),
-  report:id=>request<RunReport>(`${run(id)}/report`),
+  report:(id,signal)=>request<RunReport>(`${run(id)}/report`,undefined,signal),
  };
 }
 /** What the run controls may offer, from the set's execution metadata in health. Mock: Lab step/auto-run. Simulation with a source fixed-step clock:

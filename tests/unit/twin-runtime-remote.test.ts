@@ -384,3 +384,45 @@ test('a 2xx whose body is not JSON (or is cut off) is INVALID_RUNTIME_RESPONSE, 
  vi.stubGlobal('fetch',vi.fn(async()=>new Response(body,{status:200})));
  await expect(httpTwinRuntime({base:'https://a.example/lab/v2',kind:'remote'}).action({run:{id:'r1',runRevision:1}} as RunView,'step',{ticks:20})).rejects.toMatchObject({code:'INVALID_RUNTIME_RESPONSE'});
 });
+
+test('Save with a report that never comes: after 30 s it fails visibly (REPORT_TIMEOUT), the controls are usable and the pending line is gone',async()=>{
+ vi.stubGlobal('indexedDB',{});
+ vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});
+ try{
+  const {w,h,saved}=await loop({reportHang:true,completeAt:2,stepMs:0});
+  w.click('twin-play');await vi.advanceTimersByTimeAsync(50);expect(h.view.run.status).toBe('completed');
+  await vi.advanceTimersByTimeAsync(30_100);// the run-time and final refreshes time out too
+  w.click('twin-save-evidence');await vi.advanceTimersByTimeAsync(10);
+  expect(h.busy).toBe(true);expect(h.html()).toContain('data-testid="report-pending"');
+  await vi.advanceTimersByTimeAsync(30_100);
+  expect(h.busy).toBe(false);expect(h.notice).toContain('REPORT_TIMEOUT');expect(saved).toEqual([]);
+  expect(h.html()).not.toContain('data-testid="report-pending"');
+  w.leave();
+ }finally{vi.useRealTimers();}
+});
+
+test('an action whose report never comes releases the page after 30 s (apply is bounded too)',async()=>{
+ vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});
+ try{
+  const {w,h,sent}=await loop({reportHang:true,stepMs:0});
+  w.click('twin-step');await vi.advanceTimersByTimeAsync(10);expect(sent).toHaveLength(1);expect(h.busy).toBe(true);
+  await vi.advanceTimersByTimeAsync(30_100);
+  expect(h.busy).toBe(false);expect(h.view.tick).toBe(250);
+  w.leave();
+ }finally{vi.useRealTimers();}
+});
+
+test('a previous run the runtime no longer has (404) does not block a new one: no evidence, a notice; any other failure still blocks',async()=>{
+ vi.stubGlobal('indexedDB',{});
+ for(const [status,proceeds] of [[404,true],[500,false]] as const){
+  const {w,h,saved}=await loop({completeAt:1,reportMs:1});
+  w.click('twin-play');await vi.waitFor(()=>expect(h.busy).toBe(false),{timeout:3000});
+  const rt=(w as unknown as {rt:Record<string,unknown>}).rt,fail=async()=>{throw new TwinRuntimeError(status===404?'RUN_NOT_FOUND':'INTERNAL',[],status);};
+  Object.assign(h,{report:null});rt.report=fail;rt.archive=fail;
+  w.click('twin-reset');await vi.waitFor(()=>expect(h.busy).toBe(false),{timeout:3000});
+  expect(saved).toEqual([]);
+  if(proceeds){expect(h.view.run.id).toBe('r2');expect(h.notice).toContain('không còn trên runtime');}
+  else{expect(h.view.run.id).toBe('r1');expect(h.notice).toContain('INTERNAL');}
+  w.leave();
+ }
+});

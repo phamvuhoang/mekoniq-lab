@@ -60,7 +60,8 @@ test('a Lab on another origin sends nothing to the runtime before the click, the
  await page.locator('[data-action="twin-inspector-toggle"]').click();await expect(page.getByTestId('inspector-tab-objects')).toBeVisible();
  for(const speed of ['1','16']){
   await page.locator('#twin-run-speed').selectOption(speed);await btn('twin-play').click();await expect(btn('twin-stop')).toBeVisible();
-  // node identity: the same transport buttons, select and options, primary action and tabs after several steps
+  // node identity: the same transport buttons, select and options, primary action and tabs after several steps. For the select this is the
+  // proxy for "an open dropdown stays open" (a replaced select closes); the open native dropdown itself is not observed here
   expect(await remember()).toBeGreaterThan(10);const t0=await tick.textContent();
   await page.waitForTimeout(1300);
   await expect(tick).not.toHaveText(t0!);expect(await allKept(),`controls kept their elements at ${speed}×`).toBe(true);
