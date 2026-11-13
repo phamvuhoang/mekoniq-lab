@@ -74,6 +74,8 @@ test.describe.serial('viewport-first twin layout',()=>{
  });
 
  test('every relocated item is reachable from its container during a run',async()=>{
+  // the press on Details above closed the runtime box (a press outside an open box closes it): open it again
+  if(!await page.getByTestId('runtime-popover').isVisible())await page.getByTestId('runtime-chip').click();
   await page.locator('#twin-pair-token').fill(token!);
   await page.getByRole('button',{name:'Ghép nối runtime'}).click();
   await expect(page.getByTestId('runtime-popover')).toBeHidden();

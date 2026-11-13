@@ -2256,11 +2256,13 @@ label.button:has(+ input:focus-visible) {
 main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8px}
 .twin-shell{flex:1;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:6px}
 .twin-runbar{position:relative;z-index:6;display:flex;align-items:center;justify-content:space-between;gap:6px 14px;padding:2px 8px;background:var(--panel);border-radius:10px}
-/* I3: the bar wraps instead of clipping: each group starts at its one-row width and the right group goes to a second row when both do not fit;
-   inside a group, items wrap too (phones). The scenario name keeps a readable width (its full name is its title and accessible name). */
+/* I3: the bar wraps instead of clipping. The left group starts at its narrowest one-row width (the scenario at its readable minimum, the chip and
+   the label whole), so the right group goes to a second row only when even that does not fit; the scenario then grows back into the room it has.
+   Phones: inside a group, items wrap too. The scenario's full name is its title and accessible name. */
 .twin-runbar{flex-wrap:wrap}
 .twin-runbar-left,.twin-runbar-right{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;min-width:0}
-.twin-runbar-left{flex:1 1 auto}
+.twin-runbar-left{flex:1 1 0;min-width:auto}
+@media (min-width:768px){.twin-runbar-left{flex-wrap:nowrap}}
 .twin-runbar-right{flex:1 1 auto;justify-content:flex-end}
 .twin-runbar .twin-scenario{flex:0 1 auto;min-width:min(100%,calc(14ch + 48px))}
 .twin-runbar .twin-bar-item small{text-transform:none;letter-spacing:0}
