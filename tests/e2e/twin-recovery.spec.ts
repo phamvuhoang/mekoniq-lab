@@ -48,7 +48,7 @@ test("telemetry stream, stale/frozen states, reconnect, read-only replay, compar
   await expect(chip(page)).toHaveAttribute("data-state", "frozen_sim", { timeout: 5000 });
   await expect(chip(page)).toContainText("FROZEN_SIM");
   await shot(page, "telemetry-frozen-sim-desktop-vi");
-  await page.getByRole("button", { name: "Tiếp tục mô phỏng" }).click();
+  await page.getByTestId("twin-transport").getByRole("button", { name: "Tiếp tục mô phỏng" }).click();// item 2: the primary action resumes too
   await expect(page.getByTestId("run-status")).not.toContainText("Tạm dừng");
 
   // dropped stream: the browser goes offline; the link is no longer live; back online it reconnects and the twin updates again
