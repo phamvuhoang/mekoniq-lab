@@ -52,6 +52,18 @@ Launcher không tự tải hay cài gì khi khởi động, không mở bản m�
 
 Lab không bao giờ dùng cổng `1880`/`1884` (`FORBIDDEN_PORT`). `--ui-port/--runtime-port/--data-dir/--root` chỉ dành cho kiểm thử; runtime source chỉ nhận trình duyệt từ `127.0.0.1:4175`. `node scripts/start-mock.mjs --boot-only` khởi động tới trạng thái sẵn sàng rồi dừng (đo boot-to-ready). Hệ điều hành đã kiểm: macOS (Apple Silicon); Linux chưa kiểm, xem [bằng chứng F07](docs/implementation/evidence/digital-twin-v2/F07-launcher.md).
 
+## Tay máy MuJoCo (`pnpm lab:mujoco`) và hộp runtime
+
+```sh
+pnpm lab:mujoco                      # runtime đã pin + backend mujoco_arm trên các mock; UI 127.0.0.1:4175
+pnpm test:mujoco-e2e -- mujoco-coffee.spec.ts          # MJ-BV01 thật từ UI (một spec mỗi lần chạy launcher)
+pnpm test:mujoco-e2e -- mujoco-mesh-fallback.spec.ts   # chặn file STL: tay máy vẽ bằng chuỗi khớp, ghi chú ARM_MESH_UNAVAILABLE
+```
+
+`lab:mujoco` chạy runtime đã pin với `MEKONIQ_LAB_MUJOCO=1`: tay máy xArm 6 + kẹp G2 là plant MuJoCo (khối lượng và giới hạn danh định của nhà sản xuất, mọi tham số khác giả định, `not_calibrated`; không phải phần cứng). Trước khi mở cổng, launcher kiểm closure công cụ đã pin trong `../source` (`PORTABLE_TOOLS_MISMATCH`), `<source>/.venv-mujoco` đúng lock (`MUJOCO_PYTHON_MISSING`, `MUJOCO_LOCK_MISMATCH:…`; đổi bằng `--mujoco-python`) và `--data-dir` nằm ngoài mọi thư mục công cụ (`DATA_DIR_IN_TOOL_ROOT`: worker chạy trong thư mục run và engine ghi `MUJOCO_LOG.TXT` vào đó khi cảnh báo). Không cài gì, không thay bằng backend khác; health phải có `mujoco_arm` sống và capability `sim3d_arm_contact_v1` (`MUJOCO_PROVIDER_UNAVAILABLE`, `CAPABILITY_MISSING`). Các mã `RUNTIME_NOT_INSTALLED`, `PORT_IN_USE` như `lab:mock`.
+
+Trên trang **Twin**, bấm chip runtime để mở **hộp runtime**: chọn **Máy này** (runtime của trang khi mở từ launcher, hoặc `http://127.0.0.1:4176` khi Lab mở từ web) hoặc **Địa chỉ khác** (`https://…`), nhập mã một lần rồi bấm **Ghép nối runtime**. Lab chỉ liên lạc runtime khác origin sau một thao tác bấm. Hộp hiện commit Lab ghim và commit runtime báo; khác nhau thì `RUNTIME_PIN_MISMATCH` chặn mọi nút chạy. Preset `mujoco-coffee` (MJ-BV01, seed 42) bắt đầu ở tốc độ 1×.
+
 ## Gói offline có sẵn Node
 
 Trên máy build đúng hệ điều hành/kiến trúc đích, dùng Node 24, dependencies đã cài và runtime đã import/kiểm. Build lại UI sau mỗi lần đổi runtime pin:
