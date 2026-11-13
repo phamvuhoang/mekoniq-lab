@@ -109,7 +109,8 @@ export class TwinWorkspace {
   * press keeps its node, so the click it begins still lands. */
  private onPress=(e:PointerEvent)=>{
   const t=e.target as Element|null,open=(Object.entries(BOXES) as [string,keyof typeof BOX_IDS][]).find(([,k])=>this.ui[k]);if(!open||!t?.closest)return;
-  const [toggle,k]=open;if(t.closest(`#${BOX_IDS[k]},[data-action="${toggle}"]`))return;
+  // on the twin page itself (the app's header, language and navigation re-render or leave the page anyway)
+  const [toggle,k]=open;if(!t.closest('.twin-shell')||t.closest(`#${BOX_IDS[k]},[data-action="${toggle}"]`))return;
   this.ui={...this.ui,[k]:false};this.liveRender();
  };
  private runSpeed=16;private evidenceStore=new EvidenceStore();private saved:SavedEvidence[]=[];private savedLoaded=false;private archived=false;
