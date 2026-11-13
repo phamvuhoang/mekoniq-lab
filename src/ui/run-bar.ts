@@ -12,7 +12,7 @@ import {businessSimulationNote,illustrativeNote} from './labels';
 export type RuntimeState='none'|'connecting'|'live'|'slow'|'lost'|'recorded';
 /** `runtime.label` is one word (runtimeWord); the telemetry detail lives in the Engineering tab and the runtime box. */
 export interface RunBarState {scenarioTitle:string;runtime:{state:RuntimeState;label:string;detail:string};mode:string;
- status:string|null;simTimeS:number|null;served:string|null;problems:number;primary:{action:string;label:string;disabled:boolean}|null;inspectorOpen:boolean}
+ status:string|null;simTimeS:number|null;served:string|null;/** blockers and attention items */problems:number;/** notes, listed in the same panel and never counted as problems */notes?:number;primary:{action:string;label:string;disabled:boolean}|null;inspectorOpen:boolean}
 /** The run bar's runtime word: it describes the link. `link` is `closed` while paired with no run (ready) and `connecting` while the health check is
  * pending. Between steps no sample is due (the browser pumps the clock), so an old sample means a slow link only while auto-run is `playing`. */
 export function runtimeWord(link:LinkState,freshness:Freshness['state'],paired:boolean,replay:boolean,playing:boolean):{state:RuntimeState;label:string}{
@@ -21,6 +21,7 @@ export function runtimeWord(link:LinkState,freshness:Freshness['state'],paired:b
  const label=state==='live'&&link==='closed'?tr('Sẵn sàng','準備完了','Ready'):{none:tr('Chưa ghép nối','未ペアリング','Not paired'),connecting:tr('Đang kết nối','接続中','Connecting'),live:tr('Trực tiếp','ライブ','Live'),slow:tr('Chậm','遅延','Slow'),lost:tr('Mất kết nối','切断','Disconnected'),recorded:tr('Bản ghi','記録','Recorded')}[state];
  return {state,label};
 }
+const notesLabel=(n:number)=>tr(`${n} lưu ý`,`${n} 件の注意`,`${n} ${n===1?'note':'notes'}`);
 const item=(label:string,value:string,id:string)=>`<span class="twin-bar-item" data-testid="${id}"><small>${label}</small><b>${esc(value)}</b></span>`;
 /** The always-visible label: never drops "simulation", and says "not calibrated" for a simulation run unless its report says calibrated. */
 export function simLabel(mode:string|null,calibrated:boolean):string{
@@ -35,7 +36,7 @@ export function runBar(s:RunBarState,o:{pickerOpen?:boolean;runtimeOpen?:boolean
 <button class="twin-runtime-chip" id="twin-runtime-chip" data-testid="runtime-chip" data-action="twin-runtime-toggle" data-state="${s.runtime.state}" aria-expanded="${!!o.runtimeOpen}" aria-controls="twin-runtime-box"${s.runtime.detail?` title="${esc(s.runtime.detail)}"`:''}><i aria-hidden="true"></i><span class="visually-hidden">Runtime: </span><span id="twin-runtime-word">${esc(s.runtime.label)}</span></button>
 <button class="twin-mode${s.status?' live':''}" data-testid="mode-badge" data-action="twin-caveat-toggle" aria-expanded="${!!o.caveatOpen}" aria-controls="twin-caveat">${icon(s.status?'lock':'info',14)}<span>${esc(s.mode)}</span></button></div>
 <div class="twin-runbar-right">${item(tr('Trạng thái','状態','Status'),s.status??'—','run-status')}${s.runtime.state==='recorded'?`<span class="twin-recorded" data-testid="recorded-tag">${icon('lock',12)}${tr('Bản ghi','記録','Recorded')}</span>`:''}${item(tr('Thời gian mô phỏng','シミュレーション時間','Sim time'),s.simTimeS===null?'—':`${s.simTimeS.toFixed(1)} s`,'run-tick')}${item(tr('Đã giao','提供数','Served'),s.served??'—','run-served')}
-${s.problems?`<button class="twin-problems" data-testid="problems-count" data-action="twin-problems-toggle" aria-expanded="${!!o.problemsOpen}" aria-controls="twin-problems">${icon('info',14)}<span>${s.problems} <span class="twin-narrow-hide">${tr('vấn đề','件の問題','problems')}</span></span></button>`:''}
+${s.problems||s.notes?`<button class="twin-problems${s.problems?'':' notes-only'}"${s.problems?' data-testid="problems-count"':''} data-action="twin-problems-toggle" aria-expanded="${!!o.problemsOpen}" aria-controls="twin-problems">${icon('info',14)}${s.problems?`<span>${s.problems} <span class="twin-narrow-hide">${tr('vấn đề','件の問題','problems')}</span></span>${s.notes?`<span class="visually-hidden" data-testid="notes-count">, ${notesLabel(s.notes)}</span>`:''}`:`<span data-testid="notes-count">${notesLabel(s.notes!)}</span>`}</button>`:''}
 ${s.primary?`<button class="button primary" data-testid="primary-action" data-action="${esc(s.primary.action)}"${s.primary.disabled?' disabled':''}>${esc(s.primary.label)}</button>`:''}
 <button class="button quiet twin-details-toggle" data-action="twin-inspector-toggle" aria-expanded="${s.inspectorOpen}" aria-controls="twin-details">${icon('result',16)}<span class="twin-narrow-hide">${tr('Chi tiết','詳細','Details')}</span></button></div>
 ${o.boxesHtml??''}</div>`;

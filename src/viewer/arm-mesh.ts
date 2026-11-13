@@ -21,13 +21,15 @@ export function gripperDriveRad(physics:unknown,openingM:number|null):number{
  const g=(physics as Physics).gripper;if(openingM===null||!Number.isFinite(openingM))return 0;
  return g.closedRad*(1-Math.min(1,Math.max(0,openingM/g.openingMaxM)));
 }
+/** SHA-256 by crypto.subtle (native, off the main thread's long tasks); the synchronous pure-JS hash only where subtle is missing (an insecure context). */
+const hex=async(b:ArrayBuffer)=>globalThis.crypto?.subtle?Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',b)),x=>x.toString(16).padStart(2,'0')).join(''):sha256Hex(new Uint8Array(b));
 const q=(p:number[])=>new THREE.Quaternion(p[0],p[1],p[2],p[3]);
 /** Fetches every visual blob once, checks that its content's sha256 is its name and parses it. Throws `ARM_MESH_UNAVAILABLE:<sha256>` for a blob that cannot be
  * fetched, differs from its name or does not parse. */
 export async function loadArmMeshes(component:unknown,physics:unknown,blob:(sha256:string)=>Promise<ArrayBuffer>,material:THREE.Material):Promise<ArmMeshSet>{
  const c=component as Component,p=physics as Physics,stl=new STLLoader(),shas=[...new Set(c.links.flatMap(l=>(l.visual??[]).map(v=>v.geometry.blobSha256!).filter(Boolean)))];
  const geo=new Map(await Promise.all(shas.map(async sha=>{
-  try{const b=await blob(sha);if(sha256Hex(new Uint8Array(b))!==sha)throw 0;const g=stl.parse(b);g.computeVertexNormals();return [sha,g] as const;}
+  try{const b=await blob(sha);if(await hex(b)!==sha)throw 0;const g=stl.parse(b);g.computeVertexNormals();return [sha,g] as const;}
   catch{throw new Error(`ARM_MESH_UNAVAILABLE:${sha}`);}
  })));
  const obj=new Map(c.links.map(l=>{const o=new THREE.Object3D();o.name=`link:${l.id}`;

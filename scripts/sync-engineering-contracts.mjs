@@ -2,7 +2,7 @@
 // Copies the generated engineering contract types from the sibling source checkout (one definition, never hand-edited here) and records where they came from.
 //   node scripts/sync-engineering-contracts.mjs [--check]
 import {createHash} from 'node:crypto';
-import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {mkdir,readFile,readdir,rm,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 const here=(p)=>fileURLToPath(new URL(p,import.meta.url));
@@ -48,6 +48,8 @@ const xarmFiles=await Promise.all([...XARM_FILES,'NOTICE'].map(async(n)=>{const 
 const xarmBlobs=await Promise.all(xarmManifest.blobs.map(async({sha256})=>{const b=await readFile(`${xarmSource}blobs/${sha256}.stl`);if(sha(b)!==sha256)throw new Error(`XARM_BLOB_HASH:${sha256}`);return [`blobs/${sha256}.stl`,b];}));
 if(xarmBlobs.reduce((n,[,b])=>n+b.length,0)>XARM_MESH_LIMIT)throw new Error('XARM_MESHES_TOO_LARGE: D51 allows 8 MB of visual meshes');
 const xarmOut=[...xarmFiles.map(([n,b])=>[n==='NOTICE'?`${xarmPublic}NOTICE`:`${xarmTarget}${n}`,b]),...xarmBlobs.map(([n,b])=>[`${xarmPublic}${n}`,b])];
+/** Files under the two xArm target folders that the fixture does not list (a blob the manifest dropped, a stray file). */
+const xarmExtra=async()=>{const want=new Set(xarmOut.map(([path])=>path)),found=[];for(const dir of [xarmTarget,xarmPublic])for(const e of await readdir(dir,{recursive:true,withFileTypes:true}).catch(()=>[]))if(e.isFile())found.push(`${e.parentPath.replace(/\/?$/,'/')}${e.name}`);return found.filter(f=>!want.has(f));};
 const schemaDir=here('../src/shared/engineering-schemas/');
 const schemaFiles=await Promise.all(SCHEMAS.map(async(n)=>[n,await readFile(here(`../../source/packages/contracts/schemas/${n}.schema.json`),'utf8')]));
 if(process.argv.includes('--check')){
@@ -61,5 +63,6 @@ if(process.argv.includes('--check')){
  for(const [n,b] of fixture3dFiles)if(!b.equals(await readFile(`${fixture3dTarget}${n}`).catch(()=>Buffer.alloc(0))))throw new Error(`SERVE3D_FIXTURE_DRIFT:${n}`);
  for(const [n,b] of armFiles)if(!b.equals(await readFile(`${armTarget}${n}`).catch(()=>Buffer.alloc(0))))throw new Error(`ARM_FIXTURE_DRIFT:${n}`);
  for(const [path,b] of xarmOut)if(!b.equals(await readFile(path).catch(()=>Buffer.alloc(0))))throw new Error(`XARM_FIXTURE_DRIFT:${path}`);
+ const extra=await xarmExtra();if(extra.length)throw new Error(`XARM_FIXTURE_EXTRA:${extra.join(',')}`);
  console.log('Engineering contracts match source.');
-}else{await mkdir(schemaDir,{recursive:true});await mkdir(fixtureTarget,{recursive:true});await mkdir(fixture3dTarget,{recursive:true});for(const [n,b] of fixture3dFiles)await writeFile(`${fixture3dTarget}${n}`,b);await mkdir(armTarget,{recursive:true});for(const [n,b] of armFiles)await writeFile(`${armTarget}${n}`,b);for(const [n,text] of schemaFiles)await writeFile(`${schemaDir}${n}.schema.json`,text);for(const [n,b] of fixtureFiles)await writeFile(`${fixtureTarget}${n}`,b);await mkdir(xarmTarget,{recursive:true});await mkdir(`${xarmPublic}blobs`,{recursive:true});for(const [path,b] of xarmOut)await writeFile(path,b);await writeFile(target,output);await writeFile(navigationTarget,navigationOutput);console.log(`Wrote ${target}, ${navigationTarget} and the Serve fixture`);}
+}else{await mkdir(schemaDir,{recursive:true});await mkdir(fixtureTarget,{recursive:true});await mkdir(fixture3dTarget,{recursive:true});for(const [n,b] of fixture3dFiles)await writeFile(`${fixture3dTarget}${n}`,b);await mkdir(armTarget,{recursive:true});for(const [n,b] of armFiles)await writeFile(`${armTarget}${n}`,b);for(const [n,text] of schemaFiles)await writeFile(`${schemaDir}${n}.schema.json`,text);for(const [n,b] of fixtureFiles)await writeFile(`${fixtureTarget}${n}`,b);await mkdir(xarmTarget,{recursive:true});await mkdir(`${xarmPublic}blobs`,{recursive:true});for(const [path,b] of xarmOut)await writeFile(path,b);for(const f of await xarmExtra())await rm(f);await writeFile(target,output);await writeFile(navigationTarget,navigationOutput);console.log(`Wrote ${target}, ${navigationTarget} and the Serve fixture`);}

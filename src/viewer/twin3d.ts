@@ -5,7 +5,7 @@
 // chain until then or when they cannot be used; the swap happens in place, without a rebuild or a camera move.
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {observedSegments,sceneEntities,type SceneEntity,type TwinFrame,type ViewState} from '../twin/scene';
+import {droppedPlantCups,observedSegments,sceneEntities,type SceneEntity,type TwinFrame,type ViewState} from '../twin/scene';
 import {amrFootprint,assetOf} from '../twin/amr';
 import {footprintInMap} from '../twin/lidar';
 import {placeBody,rosQuat,yawOf} from '../twin/pose3d';
@@ -66,6 +66,8 @@ function meshLoad():MeshLoad{
   .then(s=>{x.set=s;},(e:unknown)=>{x.error=e instanceof Error?e.message:String(e);}).finally(()=>{x.ms=performance.now()-t0;});
  loads.set(XARM,l=x);return l;
 }
+/** The page's loaded mesh set (the parsed geometry every drawing shares), or null: read by the browser test that checks nothing accumulates on it. */
+export const cachedArmMeshes=():ArmMeshSet|null=>loads.get(XARM)?.set??null;
 export interface ArmMeshIssue {entityId:string;code:'ARM_MODEL_REVISION_MISMATCH'|'ARM_MESH_UNAVAILABLE';lab?:string;run?:string;detail?:string}
 /** Why an arm that has meshes is drawn as its joint chain instead (D51): the run reports another model revision than the Lab's fixture, or a mesh could not
  * be used. Both are notices: the run goes on. */
@@ -130,7 +132,9 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  /** Per entity: the overlay group that moves with its body, and its path line whose first point is the body. */
  const anchors=new Map<string,THREE.Group>(),heads=new Map<string,THREE.Line>();
  const mat=(color:number,o:{wire?:boolean;emissive?:boolean}={})=>new THREE.MeshStandardMaterial({color,wireframe:!!o.wire,emissive:o.emissive?LIME:0x000000,emissiveIntensity:o.emissive?0.6:0,roughness:0.7});
- const render=()=>{renderer.render(scene,camera);canvas.dataset.camera=camera.position.toArray().map(v=>v.toFixed(3)).join(',');};
+ /** A dataset attribute is written only when its value changed (pose() runs every animation frame). */
+ const put=(k:string,v:string)=>{if(canvas.dataset[k]!==v)canvas.dataset[k]=v;};
+ const render=()=>{renderer.render(scene,camera);put('camera',camera.position.toArray().map(v=>v.toFixed(3)).join(','));put('geometries',String(renderer.info.memory.geometries));};
  // size from wherever the canvas lives now: the stage element is replaced on every workspace render
  const resize=()=>{const p=canvas.parentElement,w=p?.clientWidth||640,h=p?.clientHeight||420;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();render();};
  const ro=new ResizeObserver(resize);ro.observe(host);controls.addEventListener('change',render);
@@ -150,17 +154,21 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  const arms=()=>[...objs.values()].flatMap(o=>o.arm?[o.arm]:[]);
  /** What the view shows of the arm and the cups, for tests and evidence: the drawing in use, its mesh links, the drive angle, each plant cup's map position. */
  /** Per pose (cheap); the fallback reason only when the drawing changes (a build or a finished load), off the animation path. */
- const fallback=()=>{canvas.dataset.armFallback=lf?armMeshIssues(lf).map(i=>i.code).join(' '):'';};
+ const fallback=()=>put('armFallback',lf?armMeshIssues(lf).map(i=>i.code).join(' '):'');
  const status=()=>{
-  const a=arms()[0],d=canvas.dataset,l=loads.get(XARM);
-  d.armModel=a?a.mesh?'mesh':'chain':'';d.armMeshLinks=String(a?.mesh?.links.length??0);d.armMeshMs=l?.ms==null?'':l.ms.toFixed(0);
-  d.gripperRad=a?.mesh?(a.mesh.group.userData.driveRad as number).toFixed(4):'';
-  d.cups=JSON.stringify(Object.fromEntries([...objs].filter(([,o])=>o.obj.userData.plant).map(([id,o])=>[id,[o.obj.position.x,-o.obj.position.z,o.obj.position.y].map(v=>Number(v.toFixed(4)))])));
+  const a=arms()[0],l=loads.get(XARM),plant=[...objs].filter(([,o])=>o.obj.userData.plant);
+  put('armModel',a?a.mesh?'mesh':'chain':'');put('armMeshLinks',String(a?.mesh?.links.length??0));put('armMeshMs',l?.ms==null?'':l.ms.toFixed(0));
+  put('gripperRad',a?.mesh?(a.mesh.group.userData.driveRad as number).toFixed(4):'');
+  put('cups',plant.length?JSON.stringify(Object.fromEntries(plant.map(([id,o])=>[id,[o.obj.position.x,-o.obj.position.z,o.obj.position.y].map(v=>Number(v.toFixed(4)))]))):'{}');
+ };
+ /** The meshes, or on any throw while dressing them the joint chain for good: the load is marked unusable (ARM_MESH_UNAVAILABLE), never an arm with no drawing. */
+ const dressMeshes=(a:ArmDraw,l:MeshLoad)=>{
+  try{dress(a,l.set);}catch(e){l.error=`ARM_MESH_UNAVAILABLE:render (${e instanceof Error?e.message:String(e)})`;l.set=null;dress(a,null);}
  };
  /** Swap every arm waiting for these meshes in place once they are loaded (or report the failure): no rebuild, the camera stays. */
  const waiting=new Set<MeshLoad>();
  const await_=(l:MeshLoad)=>{if(waiting.has(l))return;waiting.add(l);void l.done.then(()=>{waiting.delete(l);if(gone)return;
-  if(l.set)for(const a of arms())if(a.wantMesh&&!a.mesh)dress(a,l.set);
+  for(const a of arms())if(l.set&&a.wantMesh&&!a.mesh)dressMeshes(a,l);
   fallback();status();render();onArmMesh();});};
  const build=(f:TwinFrame,vs:ViewState)=>{
   free(world);objs.clear();
@@ -182,7 +190,7 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
     const holder=new THREE.Group();holder.rotation.x=-Math.PI/2;holder.add(a.at); // ROS (z up) -> scene (y up): (x, y, z) -> (x, z, -y); the arm sits at the base pose in the ROS map
     world.add(holder);objs.set(e.id,{obj:holder,c:0,arm:a});
     // the meshes when they are loaded (once per page); the joint chain until then, and for good when they cannot be used
-    const l=a.wantMesh?meshLoad():null;dress(a,l?.set??null);if(l&&!l.set&&!l.error)await_(l);
+    const l=a.wantMesh?meshLoad():null;if(l?.set)dressMeshes(a,l);else dress(a,null);if(l&&!l.set&&!l.error)await_(l);
     continue;
    }
    // a cup the plant reports: its own size (cell layout, assumed) at the plant's pose, set by pose(); any other cup: the schematic cup at its custodian
@@ -236,7 +244,7 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  return {canvas,pose,home,
   attach(next){if(canvas.parentElement!==next)next.replaceChildren(canvas);ro.disconnect();ro.observe(next);resize();},
   update(f,vs){
-   lf=f;
+   lf=f;put('plantCupsDropped',String(droppedPlantCups(f).length));
    const k=structureKey(f,vs);if(k!==key){key=k;build(f,vs);}
    const w=f.preset.project.world,size=`${w.width}x${w.height}`;if(size!==floor){floor=size;home();}
    // objects without a pose of their own (cups, a cylinder arm, machines) move with the frame
@@ -248,6 +256,7 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
    const s=box.getBoundingSphere(new THREE.Sphere()),d=Math.max(s.radius,0.3)/Math.sin(THREE.MathUtils.degToRad(camera.fov)/2),dir=camera.position.clone().sub(controls.target).normalize();
    controls.target.copy(s.center);camera.position.copy(s.center).addScaledVector(dir,d);controls.update();render();
   },
-  dispose(){gone=true;free(world);free(overlays);objs.clear();anchors.clear();heads.clear();sun.dispose();ro.disconnect();controls.dispose();renderer.dispose();canvas.remove();},
+  // the shared geometry stays parsed in the page cache, but its GPU buffers (and this renderer's dispose listeners on it) go with this view; a later view re-uploads it
+  dispose(){gone=true;loads.get(XARM)?.set?.group.traverse(o=>(o as THREE.Mesh).geometry?.dispose());free(world);free(overlays);objs.clear();anchors.clear();heads.clear();sun.dispose();ro.disconnect();controls.dispose();renderer.dispose();canvas.remove();},
  };
 }

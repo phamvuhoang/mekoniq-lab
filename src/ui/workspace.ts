@@ -20,7 +20,7 @@ import {inspect,identityItems} from '../twin/inspector';
 import {currentCup,reconciliationSubject} from '../twin/coffee-cell';
 import {attentionChain,cycleQueue,nextAction,runControls,statusText,type OpsState} from './operations-panel';
 import {caveatPopover,pickerItems,runBar,runtimePopover,runtimeWord,scenarioPicker,simLabel,type RunBarState} from './run-bar';
-import {armMeshProblems,collectProblems,nextStrip,problemsPanel,type Problem} from './problems';
+import {armMeshProblems,collectProblems,problemCounts,nextStrip,problemsPanel,type Problem} from './problems';
 import {transportBar,transportTime,type TransportState} from './transport';
 import {keyAction,shortcutsDialog} from './keys';
 import {inspector,loadUi,saveUi,type InspectorTab} from './inspector';
@@ -241,7 +241,7 @@ export class TwinWorkspace {
   const p=this.problems(f);if(!p.length)this.ui.problemsOpen=false;const u=this.ui;// an emptied problems box closes: a later problem never opens it by itself
   const boxes=scenarioPicker(pickerItems(presets,this.health),this.preset.id,u.pickerOpen)+runtimePopover({open:u.runtimeOpen,pairFormHtml:this.pairForm(),sourceCommit:this.rt.paired?this.health?.sourceCommit??null:null,telemetry:v?this.linkText():null})
    +problemsPanel(p,u.problemsOpen,attentionChain(ops))+caveatPopover(r?`${r.mode.toUpperCase()} · ${r.access}`:'—',f.report?.limitations??[],u.caveatOpen);
-  return runBar({scenarioTitle:f.preset.title(),runtime:this.runtimeState(),mode:simLabel(r?.mode??null,f.report?.manifest.calibration?.status==='calibrated'),status:r?statusText(r.status):null,simTimeS:v?Number(v.simTimeNs)/1e9:null,served:v?v.served:null,problems:p.length,primary,inspectorOpen:u.inspectorOpen},
+  return runBar({scenarioTitle:f.preset.title(),runtime:this.runtimeState(),mode:simLabel(r?.mode??null,f.report?.manifest.calibration?.status==='calibrated'),status:r?statusText(r.status):null,simTimeS:v?Number(v.simTimeNs)/1e9:null,served:v?v.served:null,...problemCounts(p),primary,inspectorOpen:u.inspectorOpen},
    {pickerOpen:u.pickerOpen,runtimeOpen:u.runtimeOpen,problemsOpen:u.problemsOpen,caveatOpen:u.caveatOpen,boxesHtml:boxes});
  }
  /** Engineering tab head: the run's locked identity and revision. */

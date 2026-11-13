@@ -1,5 +1,8 @@
 // One problems list for the twin page (D64): failing preflight items, run attention and a lost runtime link, each with a sentence, its
-// reason codes and, when there is one, the object it is about (a notice is not a problem: it stays in the viewport banner). Pure: the counts and rows only explain, the runtime decides.
+// reason codes and, when there is one, the object it is about. Notes (severity `notice`, such as an arm drawn as its joint chain) are listed in the same
+// panel after the problems but are not problems: the run bar counts blockers and attention items only (problemCounts); with notes only its button is
+// shown neutral and labelled as notes; the next-step strip ignores notes. The page's banner notices are separate and are not rows here.
+// Pure: the counts and rows only explain, the runtime decides.
 import type {RunView,TwinHealth} from '../scenarios/controls';
 import type {preflight} from '../scenarios/preflight';
 import type {LinkState} from '../runtime/stream';
@@ -11,6 +14,8 @@ import type {ArmMeshIssue} from '../viewer/twin3d';
 import {tr} from '../i18n';
 /** `entityName`: the object's display name (nameOf), shown on its button. */
 export interface Problem {id:string;severity:'blocker'|'attention'|'notice';text:string;codes:string[];entityId?:string;entityName?:string;action?:{id:string;label:string}}
+/** What the run bar counts: `problems` (blockers and attention items) and, apart, `notes`. */
+export const problemCounts=(p:readonly Problem[])=>({problems:p.filter(x=>x.severity!=='notice').length,notes:p.filter(x=>x.severity==='notice').length});
 const SEVERITIES:Problem['severity'][]=['blocker','attention','notice'];
 const runtimeBox=()=>({id:'twin-runtime-toggle',label:tr('Mở hộp runtime','ランタイムを開く','Open runtime')});
 /** Blockers, then attention; input order within each group. `preset` names the objects. */

@@ -21,6 +21,11 @@ export interface SceneEntity {id:string;kind:string;name:string;x:number;y:numbe
  /** Cup only: its pose in the map as the MuJoCo plant reports it (drawn there instead of at its custodian) */plant?:{positionM:[number,number,number];quaternionXyzw:[number,number,number,number]}}
 /** Plant cup samples older than the plant's newest sample by more than this (sim time) have stopped: the cup left the cell and is drawn by custody again. */
 const PLANT_CUP_STOPPED_NS=1e9;
+/** Cups the plant currently reports that the run view does not list: not drawn (a cup is never invented), counted so a test can see none is lost. */
+export function droppedPlantCups(f:TwinFrame):string[]{
+ const listed=new Set((f.view?.coffee?.cups??[]).map(c=>c.cupId));
+ return Object.keys(f.samples??{}).filter(id=>!listed.has(id)&&plantCup(f,id)).sort();
+}
 /** The cup's plant pose while the plant still reports it. */
 function plantCup(f:TwinFrame,cupId:string){
  const s=f.samples?.[cupId],p=plantCupPose(s);if(!p||s!.simTimeNs===null)return null;

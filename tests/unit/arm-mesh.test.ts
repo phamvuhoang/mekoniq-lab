@@ -104,3 +104,32 @@ test('live playback: the measured opening and a cup pose are interpolated betwee
  // a cup drawn by custody in the exact poses is never moved by an old buffer
  expect(p.poses({...ex,cups:{}},300).cups).toEqual({});
 });
+
+// Fix round 1: the blobs are hashed by crypto.subtle (the pure-JS hash is the fallback); a clone's finger pivots turn with the opening, by any multiplier;
+// a plant cup the view does not list is counted, not silently dropped.
+import {cloneArmMeshes} from '../../src/viewer/arm-mesh';
+import {droppedPlantCups} from '../../src/twin/scene';
+test('blobs are hashed with crypto.subtle; without it the pure-JS hash still refuses an altered blob',async()=>{
+ const spy=vi.spyOn(crypto.subtle,'digest');await load();expect(spy.mock.calls.length).toBeGreaterThanOrEqual(14);// one per blob (Node's digest may re-enter itself)spy.mockRestore();
+ vi.stubGlobal('crypto',undefined);
+ try{const bad=component.links[0]!.visual[0]!.geometry.blobSha256;await expect(load(async sha=>{const b=await fromDisk(sha);if(sha===bad)new Uint8Array(b)[90]^=1;return b;})).rejects.toThrow(`ARM_MESH_UNAVAILABLE:${bad}`);}
+ finally{vi.unstubAllGlobals();}
+});
+test('a clone\'s finger pivots follow the opening by their own multipliers (a synthetic gripper with multipliers other than 1); the original is untouched',async()=>{
+ const g=physics.gripper,synthetic={...physics,gripper:{...g,mimic:g.mimic.map((m,i)=>({...m,multiplier:[1,-0.5,2,0.25,-1][i]!}))}};
+ const set=await loadArmMeshes(component,synthetic,fromDisk,new THREE.MeshBasicMaterial()),clone=cloneArmMeshes(set,new THREE.MeshBasicMaterial()),f=armFrames(joints,golden.poses[1]!.q);
+ expect(clone.fingers.map(x=>x.multiplier)).toEqual([1,1,-0.5,2,0.25,-1]);
+ poseArmMeshes(set,f,null);const before=set.fingers.map(x=>angle(x.object));
+ for(const opening of [0,0.03,g.openingMaxM]){
+  poseArmMeshes(clone,f,opening);const drive=gripperDriveRad(synthetic,opening);
+  clone.fingers.forEach((x,i)=>expect(angle(x.object)).toBeCloseTo(x.multiplier*drive,9));
+  expect(clone.fingers.every(x=>x.object!==set.fingers.find(y=>y.object.name===x.object.name)!.object)).toBe(true);
+ }
+ expect(set.fingers.map(x=>angle(x.object))).toEqual(before);
+});
+test('a current plant cup that the view\'s cup list does not have is counted',()=>{
+ const extra=held('cup-9',{observed:{positionM:[3,0.7,0.9],quaternionXyzw:[0,0,0,1],restingOn:'stand'}});
+ expect(droppedPlantCups(xframe([armS(),cupS()]))).toEqual([]);
+ expect(droppedPlantCups(xframe([armS(),cupS(),extra]))).toEqual(['cup-9']);
+ expect(droppedPlantCups(xframe([armS({sim:5*S}),cupS({sim:5*S}),{...extra,simTimeNs:String(2*S)}]))).toEqual([]);// stopped: not the plant's word any more
+});
