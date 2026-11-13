@@ -22,7 +22,7 @@ test('coffee with the arm on Webots: run to completed, actual and commanded join
  await openScenarioPicker(page);await page.getByRole('button',{name:'Webots · coffee with a 3D arm'}).click();
  await expect(page.getByTestId('preflight').locator('li',{hasText:'Runtime readiness'})).toHaveClass(/ok/,{timeout:180000});
  await page.getByRole('button',{name:'Run Webots (arm)'}).click();
- await expect(page.getByTestId('mode-badge')).toHaveText('Mô phỏng · chưa hiệu chuẩn');await expect(page.getByTestId('mode-badge')).toHaveAttribute('data-mode','simulation');
+ await expect(page.getByTestId('mode-badge')).toHaveText('Simulation · not calibrated');// the page is in English hereawait expect(page.getByTestId('mode-badge')).toHaveAttribute('data-mode','simulation');
  await expect(page.getByTestId('run-identity')).toContainText('WB-BV01');
 
  // a step, then the arm: each joint block has two values (observed, commanded), the source row says which is which
