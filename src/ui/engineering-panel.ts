@@ -3,7 +3,7 @@ import type {Inspection} from '../twin/inspector';
 import type {Source} from '../twin/amr';
 import {icon,esc} from './icons';
 import {tr} from '../i18n';
-const sourceText=(s:Source|string)=>({observed:tr('quan sát','観測','observed'),commanded:tr('lệnh','指令','commanded'),modeled:tr('mô hình','モデル','modeled'),derived:tr('suy ra','推定','derived'),unknown:tr('chưa rõ','不明','unknown')})[s]??s;
+const sourceText=(s:Source|string)=>({observed:tr('quan sát','観測','observed'),commanded:tr('lệnh','指令','commanded'),modeled:tr('mô hình','モデル','modeled'),derived:tr('suy ra','推定','derived'),unknown:tr('chưa rõ','不明','unknown')})[s]??esc(s);
 const age=(ms:number|null)=>ms===null?`<span class="unknown-text">${tr('chưa rõ','不明','unknown')}</span>`:`${Math.max(0,Math.round(ms))} ms`;
 /** Faults the mock backends accept; ids are runtime contract values, labels are localized. */
 export const FAULTS:[string,()=>string][]=[
@@ -14,7 +14,7 @@ export const FAULTS:[string,()=>string][]=[
 export function engineeringInspection(insp:Inspection|null):string {
  const rows=insp?.rows??[];
  const table=insp?`<div class="inspector-head"><span class="eyebrow">${esc(insp.kind)} · ${sourceText(insp.source)}</span><h3 data-testid="inspector-title">${esc(insp.title)}${insp.title!==insp.id?` <small>${esc(insp.id)}</small>`:''}</h3></div>
-${rows.length?`<ul class="eng-list" aria-label="${tr('Giá trị kỹ thuật của','技術値:','Engineering values for')} ${esc(insp.title)}">${rows.map(r=>`<li class="eng-row" data-testid="eng-${esc(r.key)}"><b><span class="visually-hidden">${tr('Đại lượng','項目','Quantity')}: </span>${esc(r.label)}</b><dl><div><dt>${tr('Quan sát','観測','Observed')}</dt><dd>${esc(r.observed)}</dd></div><div><dt>${tr('Lệnh','指令','Commanded')}</dt><dd>${esc(r.commanded)}</dd></div></dl><p class="eng-meta"><span><small>${tr('Đơn vị','単位','Unit')}</small> ${esc(r.unit)||'—'}</span><span><small>${tr('Nguồn','出典','Source')}</small> <span class="source-tag ${r.source}">${sourceText(r.source)}</span></span><span><small>${tr('Tuổi dữ liệu','データ経過','Data age')}</small> ${age(r.ageMs)}</span></p></li>`).join('')}</ul>`:''}<p class="field-help">${esc(insp.note)}</p>`
+${rows.length?`<ul class="eng-list" aria-label="${tr('Giá trị kỹ thuật của','技術値:','Engineering values for')} ${esc(insp.title)}">${rows.map(r=>`<li class="eng-row" data-testid="eng-${esc(r.key)}"><b><span class="visually-hidden">${tr('Đại lượng','項目','Quantity')}: </span>${esc(r.label)}</b><dl><div><dt>${tr('Quan sát','観測','Observed')}</dt><dd>${esc(r.observed)}</dd></div><div><dt>${tr('Lệnh','指令','Commanded')}</dt><dd>${esc(r.commanded)}</dd></div></dl><p class="eng-meta"><span><small>${tr('Đơn vị','単位','Unit')}</small> ${esc(r.unit)||'—'}</span><span><small>${tr('Nguồn','出典','Source')}</small> <span class="source-tag ${esc(r.source)}">${sourceText(r.source)}</span></span><span><small>${tr('Tuổi dữ liệu','データ経過','Data age')}</small> ${age(r.ageMs)}</span></p></li>`).join('')}</ul>`:''}<p class="field-help">${esc(insp.note)}</p>`
   :`<p class="empty-inline">${tr('Chọn một đối tượng trong cảnh hoặc danh sách để xem chi tiết.','シーンまたは一覧から対象を選択。','Select an object in the scene or list to inspect it.')}</p>`;
  return table;
 }

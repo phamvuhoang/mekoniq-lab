@@ -65,7 +65,7 @@ const statusLabel = (status: string) =>
     completed: tr("Hoàn thành", "完了", "Completed"),
     cancelled: tr("Đã hủy", "キャンセル済み", "Cancelled"),
     needs_attention: tr("Cần kiểm tra", "要確認", "Needs attention"),
-  })[status] || status;
+  })[status] || esc(status);
 export class LabApp {
   private host: HTMLElement;
   private project: LabProject = defaultProject();
@@ -558,7 +558,7 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
 <input id="pair-token" type="password" autocomplete="off" placeholder="Local runtime token" required>
 <button class="button secondary" ${this.busy ? "disabled" : ""}>${icon("link", 17)}${this.paired ? tr("Đã ghép nối", "ペアリング済み", "Paired") : tr("Ghép nối", "ペアリング", "Pair runtime")}</button>${btn(tr("Kiểm tra", "確認", "Check"), "health", "rotate", "quiet")}</div>
 </form>
-<p class="field-help">${this.health ? `Source: ${esc(this.health.sourceCommit)} · protocol ${this.health.protocolMajor}` : tr("Khởi động pnpm runtime trong môi trường phát triển cục bộ. Token không được lưu vào dự án.", "ローカル開発環境で pnpm runtime を起動。トークンは保存されません。", "Start pnpm runtime in your local development environment. The token is never saved in your project.")}</p>
+<p class="field-help">${this.health ? `Source: ${esc(this.health.sourceCommit)} · protocol ${esc(this.health.protocolMajor)}` : tr("Khởi động pnpm runtime trong môi trường phát triển cục bộ. Token không được lưu vào dự án.", "ローカル開発環境で pnpm runtime を起動。トークンは保存されません。", "Start pnpm runtime in your local development environment. The token is never saved in your project.")}</p>
 </section>`;
   }
   private scenarios() {
@@ -612,7 +612,7 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
         ? `<div class="run-state">
 <span class="eyebrow">${esc(this.run.id)}</span>
 <h3>${statusLabel(this.run.status)}</h3>
-<p>Stage: ${esc(this.run.stage)} · Revision: ${this.run.revision} · ${(this.run.elapsedMs / 1000).toFixed(1)} s</p>
+<p>Stage: ${esc(this.run.stage)} · Revision: ${esc(this.run.revision)} · ${(this.run.elapsedMs / 1000).toFixed(1)} s</p>
 <div class="run-actions">${btn(tr("Bắt đầu", "開始", "Start"), "run-start", "play", "primary", this.busy || this.run.status !== "ready" ? "disabled" : "")}${btn("+1 s", "run-step", "arrow", "secondary", this.busy || ["completed", "cancelled"].includes(this.run.status) ? "disabled" : "")}${btn(tr("Xác nhận tại điểm dừng", "停止地点を確認", "Confirm stop"), "run-confirm", "check", "secondary", this.busy || !["awaiting_load", "awaiting_handoff"].includes(this.run.status) ? "disabled" : "")}${btn(tr("Hủy", "キャンセル", "Cancel"), "run-cancel", "cross", "quiet", this.busy || ["completed", "cancelled"].includes(this.run.status) ? "disabled" : "")}${btn(tr("Đọc trạng thái", "状態取得", "Refresh"), "run-refresh", "rotate", "quiet")}</div>
 <div class="fault-actions">
 <label for="fault-kind">${tr("Chèn lỗi thử nghiệm", "障害注入", "Inject test fault")}</label>
@@ -690,7 +690,7 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
         .map(
           ([label, value]) => `<article class="metric">
 <span>${label}</span>
-<strong>${value}</strong>
+<strong>${esc(value)}</strong>
 </article>`,
         )
         .join("")}</div>`;
@@ -707,7 +707,7 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
 <div class="panel-heading">
 <div>
 <h2>${statusLabel(this.run.status)}</h2>
-<p>${esc(this.run.id)} · ${this.run.mode} · ${esc(this.run.scenarioId)} · Seed ${this.run.seed}</p>
+<p>${esc(this.run.id)} · ${esc(this.run.mode)} · ${esc(this.run.scenarioId)} · Seed ${esc(this.run.seed)}</p>
 </div>${btn(tr("Tải báo cáo", "レポート取得", "Fetch report"), "report", "result", "secondary")}</div>
 <div class="evidence-warning">${icon("info", 20)}<div>
 <strong>${tr("Bằng chứng nghiệp vụ phần mềm", "業務ソフトウェア検証", "Business software evidence")}</strong>
@@ -720,7 +720,7 @@ ${p ? `<label class="field-label" for="world-object">${tr("Chọn đối tượn
 </div>
 <div>
 <dt>Run revision</dt>
-<dd>${this.run.revision}</dd>
+<dd>${esc(this.run.revision)}</dd>
 </div>
 <div>
 <dt>${tr("Thời gian mô phỏng", "シミュレーション時間", "Simulation time")}</dt>
