@@ -3,7 +3,8 @@
 // Idle (no run) disables every button.
 import {icon,esc} from './icons';
 import {tr} from '../i18n';
-export interface TransportState {mode:'idle'|'live'|'replay';playing:boolean;canPlay:boolean;canStep:boolean;canPause:boolean;paused:boolean;canCancel:boolean;speeds:number[];speed:number;simTimeS:number;tick:number;
+export interface TransportState {mode:'idle'|'live'|'replay';playing:boolean;canPlay:boolean;canStep:boolean;canPause:boolean;paused:boolean;
+ /** Pause was pressed during a paced auto-run: the step in flight finishes, then pause is sent; the button says so and is disabled. */pausing?:boolean;canCancel:boolean;speeds:number[];speed:number;simTimeS:number;tick:number;
  /** Tốc độ đo được khi đang tự chạy; hiện cạnh tốc độ chọn khi lệch quá 10 % (data-testid measured-speed). */measuredSpeed?:number;
  replay?:{fromTick:number;toTick:number;tick:number;playing:boolean;marks:{tick:number;label:string}[]}}
 const btn=(label:string,action:string,ico:string,on:boolean,cls='secondary')=>`<button class="button ${cls}" data-action="${action}"${on?'':' disabled'}>${icon(ico,16)}<span>${label}</span></button>`;
@@ -14,7 +15,7 @@ export const transportTime=(simTimeS:number,tick:number,toTick?:number)=>`${simT
 export function transportBar(s:TransportState):string{
  const run=s.mode==='live',r=s.mode==='replay'?s.replay:undefined;
  const play=r?btn(r.playing?tr('Dừng phát','停止','Pause'):tr('Phát','再生','Play'),'twin-replay-play',r.playing?'cross':'play',true):s.playing?btn(tr('Tạm dừng tự chạy','自動実行を停止','Stop auto-run'),'twin-stop','cross',run):btn(tr('Tự chạy','自動実行','Auto-run'),'twin-play','play',run&&s.canPlay);
- const pause=s.paused?btn(tr('Tiếp tục mô phỏng','シミュレーション再開','Resume simulation'),'twin-resume','play',run&&s.canPause):btn(tr('Tạm dừng mô phỏng','シミュレーション一時停止','Pause simulation'),'twin-pause','cross',run&&s.canPause);
+ const pause=s.pausing?btn(tr('Đang tạm dừng…','一時停止中…','Pausing…'),'twin-pause','cross',false):s.paused?btn(tr('Tiếp tục mô phỏng','シミュレーション再開','Resume simulation'),'twin-resume','play',run&&s.canPause):btn(tr('Tạm dừng mô phỏng','シミュレーション一時停止','Pause simulation'),'twin-pause','cross',run&&s.canPause);
  const measured=s.measuredSpeed!==undefined&&Math.abs(s.measuredSpeed-s.speed)>0.1*s.speed?`<span class="twin-measured" data-testid="measured-speed">${tr('đo được','実測','measured')} ${esc(decimal(s.measuredSpeed))}×</span>`:'';
  const cursor=r?`<label for="twin-replay-cursor" class="visually-hidden">${tr('Vị trí xem lại (tick)','再生位置(tick)','Replay position (tick)')}</label><input id="twin-replay-cursor" type="range" min="${esc(r.fromTick)}" max="${esc(r.toTick)}" step="5" value="${esc(r.tick)}"${r.marks.length?' list="twin-replay-marks"':''}>${r.marks.length?`<datalist id="twin-replay-marks">${r.marks.map(m=>`<option value="${esc(m.tick)}" label="${esc(m.label)}"></option>`).join('')}</datalist>`:''}`:'<span class="twin-transport-fill"></span>';
  return `<div class="twin-transport" id="twin-transport" data-testid="twin-transport" role="group" aria-label="${tr('Điều khiển lần chạy','実行の操作','Run controls')}">

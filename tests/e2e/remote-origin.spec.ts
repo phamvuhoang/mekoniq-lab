@@ -6,6 +6,7 @@ import {openScenarioPicker} from '../support/twin';
 const token=process.env.LAB_TEST_PAIRING_TOKEN,shots=process.env.LAB_EVIDENCE_DIR;
 const LAB='http://localhost:4177',RUNTIME='http://127.0.0.1:4176';
 const shot=async(page:Page,name:string)=>{if(shots)await page.screenshot({path:`${shots}/N03-${name}.png`});};
+const PAGES=['design','assembly','restaurant','scenarios','results','deployment','twin'];
 
 test('a Lab on another origin sends nothing to the runtime before the click, then pairs with a bearer and runs BV01 to completed',async({page})=>{
  test.skip(!token,'Run scripts/test-mock-e2e.mjs remote-origin.spec.ts: it starts the pinned runtime for this origin and supplies its one-time token.');
@@ -28,8 +29,13 @@ test('a Lab on another origin sends nothing to the runtime before the click, the
  await expect(address).toHaveAttribute('aria-invalid','true');
  await shot(page,'address-error');
  expect(toRuntime).toHaveLength(0);
+ // typing a different value removes the error at once (before any submit), keeping focus in the field
+ await address.focus();await address.press('ControlOrMeta+a');await address.pressSequentially(RUNTIME);
+ await expect(page.getByTestId('runtime-address-error')).toHaveCount(0);await expect(address).not.toHaveAttribute('aria-invalid','true');
+ await expect(address).toBeFocused();await expect(address).toHaveValue(RUNTIME);
+ await shot(page,'address-corrected');
 
- await address.fill(RUNTIME);await page.locator('#twin-pair-token').fill(token!);
+ await page.locator('#twin-pair-token').fill(token!);
  await shot(page,'pair-form-filled');
  expect(toRuntime).toHaveLength(0);
  await page.getByRole('button',{name:'Ghép nối runtime'}).click();
@@ -46,6 +52,18 @@ test('a Lab on another origin sends nothing to the runtime before the click, the
  await expect(chip).toHaveAttribute('data-state','live',{timeout:15000});await expect(chip).toContainText('Trực tiếp');
  await shot(page,'connected-run-bar');
 
+ // one press of Pause during a paced run at 1×: the step in flight finishes, then the run is paused
+ await page.locator('#twin-run-speed').selectOption('1');await page.getByRole('button',{name:'Tự chạy'}).click();
+ await expect(page.locator('#twin-transport [data-action="twin-pause"]')).toBeEnabled();await page.waitForTimeout(900);
+ // the transport is re-rendered after every step: dispatch on the element present now (the same delegated handler a click reaches)
+ await page.locator('#twin-transport [data-action="twin-pause"]').dispatchEvent('click');
+ await shot(page,'pausing');
+ await expect(page.getByTestId('run-status')).toContainText('Tạm dừng');
+ await expect(page.locator('#twin-transport [data-action="twin-play"]')).toBeVisible();
+ const pauses=toRuntime.filter(r=>r.url().endsWith('/actions')&&r.method()==='POST').map(r=>r.postDataJSON()).filter(b=>b.kind==='pause');
+ expect(pauses).toHaveLength(1);
+ await page.locator('#twin-transport [data-action="twin-resume"]').click();await expect(page.getByTestId('run-status')).toContainText('Đang chạy');
+ await page.locator('#twin-run-speed').selectOption('16');
  await page.getByRole('button',{name:'Tự chạy'}).click();
  await expect(page.getByTestId('run-status')).toContainText('Hoàn thành',{timeout:150000});
  await expect(page.getByTestId('run-served')).toContainText('2');
@@ -61,16 +79,21 @@ test('a Lab on another origin sends nothing to the runtime before the click, the
  expect(toRuntime.some(r=>r.url().includes('/events'))).toBe(true);
  // paced auto-run: every step names a factor the runtime accepts and at most 50 ticks
  const steps=authed.filter(r=>r.url().endsWith('/actions')).map(r=>r.postDataJSON()).filter(b=>b.kind==='step'&&b.payload.pace);
- expect(steps.length).toBeGreaterThan(0);for(const b of steps)expect(b.payload).toEqual({ticks:20,pace:{factor:16}});
+ expect(steps.length).toBeGreaterThan(0);for(const b of steps){expect(b.payload.ticks).toBe(20);expect([1,16]).toContain(b.payload.pace.factor);}
+ expect(steps.some(b=>b.payload.pace.factor===1)&&steps.some(b=>b.payload.pace.factor===16)).toBe(true);
 
  // a reload keeps the address and the bearer (the one-use code is spent), but reaching the runtime is still a click
- toRuntime.length=0;await page.reload();
+ // and on every page: listened at browser-context level for any request that leaves this page's origin
+ const foreign:string[]=[];page.context().on('request',r=>{if(new URL(r.url()).origin!==LAB)foreign.push(`${r.method()} ${r.url()}`);});
+ await page.goto(`${LAB}/#assembly`);await page.reload();await expect(page.getByTestId('asm-scene')).toBeVisible();await page.waitForTimeout(1000);
+ for(const p of PAGES){await page.goto(`${LAB}/#${p}`);await page.waitForTimeout(300);}
+ await page.reload();
  await expect(page.getByTestId('runtime-address')).toHaveText(RUNTIME);await expect(page.locator('#twin-pair-token')).toHaveCount(0);
- await page.waitForTimeout(1500);expect(toRuntime).toHaveLength(0);
+ await page.waitForTimeout(1500);expect(foreign).toEqual([]);
  await page.locator('[data-action="twin-connect"]').click();
  await expect(page.getByTestId('runtime-popover')).toBeHidden();
  await expect(chip).toContainText('Sẵn sàng');
- expect(toRuntime.some(r=>r.url().endsWith('/health'))).toBe(true);
+ expect(foreign.some(r=>r.endsWith('/health'))).toBe(true);
  // disconnect drops the bearer from this tab
  await chip.click();await page.locator('[data-action="twin-disconnect"]').click();
  await expect(page.locator('#twin-pair-token')).toBeVisible();await expect(page.locator('#twin-runtime-address')).toHaveValue(RUNTIME);

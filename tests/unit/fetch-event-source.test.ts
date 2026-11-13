@@ -1,12 +1,12 @@
 import {expect,test,vi} from 'vitest';
 import {FetchEventSource} from '../../src/runtime/fetch-event-source';
 // A fake fetch whose body is a ReadableStream the test writes into chunk by chunk.
-function server(status=200){
+function server(status=200,type='text/event-stream'){
  let ctl!:ReadableStreamDefaultController<Uint8Array>;const enc=new TextEncoder(),calls:{url:string;init:RequestInit}[]=[];
  const body=new ReadableStream<Uint8Array>({start:c=>{ctl=c;}});
  const fetch=vi.fn(async(url:string,init:RequestInit)=>{calls.push({url,init});
   init.signal?.addEventListener('abort',()=>{try{ctl.error(new DOMException('aborted','AbortError'));}catch{/* already closed */}});
-  return new Response(status===200?body:'{"error":"SESSION_REQUIRED"}',{status});});
+  return new Response(status===200?body:'{"error":"SESSION_REQUIRED"}',{status,headers:{'Content-Type':status===200?type:'application/json'}});});
  return {fetch:fetch as unknown as typeof globalThis.fetch,calls,send:(s:string)=>ctl.enqueue(enc.encode(s)),end:()=>ctl.close()};
 }
 const flush=()=>new Promise(r=>setTimeout(r,5));
@@ -49,4 +49,19 @@ test('close() aborts the fetch and reports no error, before or after the stream 
  await flush();expect(errors).not.toHaveBeenCalled();
  const early=server(),closed=new FetchEventSource('/y',{fetch:early.fetch}),errors2=vi.fn();closed.onerror=errors2;closed.close();
  await flush();expect(errors2).not.toHaveBeenCalled();expect(closed.readyState).toBe(2);
+});
+
+test('a 200 that is not text/event-stream is a failure (a proxy page, a JSON error), never opened',async()=>{
+ const s=server(200,'text/html'),es=new FetchEventSource('/x',{fetch:s.fetch}),opened=vi.fn(),errors=vi.fn();es.onopen=opened;es.onerror=errors;
+ await flush();expect(es.readyState).toBe(2);expect(errors).toHaveBeenCalledTimes(1);expect(opened).not.toHaveBeenCalled();
+ const ok=server(200,'text/event-stream; charset=utf-8'),es2=new FetchEventSource('/y',{fetch:ok.fetch});await flush();expect(es2.readyState).toBe(1);es2.close();
+});
+
+test('an unparsed buffer beyond 1 MiB fails once and aborts the request',async()=>{
+ const s=server(),es=new FetchEventSource('/x',{fetch:s.fetch}),errors=vi.fn(),got=vi.fn();es.onerror=errors;es.addEventListener('message',got);
+ await flush();
+ s.send('data: '+'x'.repeat(600*1024));await flush();expect(errors).not.toHaveBeenCalled();// one line without a break, still under the bound
+ s.send('x'.repeat(600*1024));await flush();
+ expect(es.readyState).toBe(2);expect(errors).toHaveBeenCalledTimes(1);expect(s.calls[0]!.init.signal!.aborted).toBe(true);expect(got).not.toHaveBeenCalled();
+ await flush();expect(errors).toHaveBeenCalledTimes(1);
 });

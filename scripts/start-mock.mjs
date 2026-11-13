@@ -73,7 +73,9 @@ export async function launch({argv=process.argv.slice(2),prepare=async()=>({args
  // SIGTERM, a bounded wait, then SIGKILL and a wait for the group (or process) to disappear
  const stopOne=async(c)=>{signal(c,'SIGTERM');if(!await gone(c,5000)){signal(c,'SIGKILL');await gone(c,2000);}};
  // a child tracked while teardown runs (spawned by a step already in flight) is stopped too: the loop runs until no tracked group is left
- const stop=()=>stopping??=(async()=>{for(let n=0;n<owned.length;){const batch=owned.slice(n);n=owned.length;await Promise.all(batch.filter(live).map(stopOne));}})();
+ // in-process servers this launcher opened (the extra UI origin): closed on every stop path, so the port is free once the launcher stops
+ const servers=[],closeServers=()=>Promise.all(servers.splice(0).map(s=>new Promise(r=>{s.close(()=>r());s.closeAllConnections();})));
+ const stop=()=>stopping??=(async()=>{for(let n=0;n<owned.length;){const batch=owned.slice(n);n=owned.length;await Promise.all(batch.filter(live).map(stopOne));}await closeServers();})();
  for(const [s,code] of [['SIGINT',130],['SIGTERM',143]])process.on(s,()=>{if(stopping)return;exitCode=ready?0:code;console.log(ready?'\nStopping the runtime and UI this launcher started…':`\n${s} before ready: start aborted, stopping what this launcher started…`);void stop().then(()=>process.exit(exitCode));});
  process.once('exit',()=>{for(const c of owned)if(live(c))signal(c,'SIGKILL');});
  try{
@@ -97,8 +99,9 @@ export async function launch({argv=process.argv.slice(2),prepare=async()=>({args
   check(health,lock);go();
   const ui=spawn(process.execPath,[vite,'--host','127.0.0.1','--port',String(o.uiPort),'--strictPort'],{cwd:lab,stdio:['ignore','ignore','inherit'],env:{...process.env,LAB_RUNTIME_PORT:String(o.runtimePort)},detached:true});ui.groupKill=true;track(ui);
   await waitFor(ui,'UI',async()=>(await fetch(`http://127.0.0.1:${o.uiPort}/`)).ok||undefined,30000);go();
-  // in-process: it ends with the launcher
-  const extraServer=o.extraUiPort===undefined?null:await extraUi(o.extraUiPort,o.uiPort);go();
+  const extraServer=o.extraUiPort===undefined?null:await extraUi(o.extraUiPort,o.uiPort);
+  if(extraServer){servers.push(extraServer);if(stopping)await closeServers();}// a stop that began while it opened has already closed the others
+  go();
   console.log(`${banner??'Mekoniq Robot Lab — mock twin (simulated; no robot hardware)'}
 Source ${lock.sourceCommit} · artifact ${lock.artifactSha256.slice(0,12)} · protocol ${health.protocolMajors.join('/')}
 Backends: ${extra.backends??MOCK_BACKENDS.join(', ')} · journal ${o.dataDir}

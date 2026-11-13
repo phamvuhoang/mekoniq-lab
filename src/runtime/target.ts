@@ -8,7 +8,10 @@ export function parseTarget(input:string|null,pageOrigin:string):RuntimeTarget{
  const s=input?.trim();if(!s)return {...SAME};
  const bad=()=>new TwinRuntimeError('INVALID_RUNTIME_URL',[],0);
  let u:URL;try{u=new URL(s);}catch{throw bad();}
- const loopback=LOOPBACK.includes(u.hostname);
+ const loopback=LOOPBACK.includes(u.hostname),h=u.hostname.replace(/\.$/,'');
+ // never the unspecified address; a local runtime only by http://127.0.0.1, http://localhost or http://[::1] (an https "remote" that is this machine is refused)
+ const local=/^127\./.test(h)||h==='[::1]'||/^\[::ffff:(7f[0-9a-f]{2}:[0-9a-f]{1,4}|127\.[\d.]+)\]$/.test(h)||h==='localhost'||h.endsWith('.localhost');
+ if(h==='0.0.0.0'||h==='[::]'||u.protocol==='https:'&&local)throw bad();
  if(!(u.protocol==='https:'||u.protocol==='http:'&&loopback)||u.username||u.password||u.search||u.hash||!['/','/lab/v2','/lab/v2/'].includes(u.pathname))throw bad();
  return u.origin===pageOrigin?{...SAME}:{base:`${u.origin}/lab/v2`,kind:loopback?'loopback':'remote'};
 }

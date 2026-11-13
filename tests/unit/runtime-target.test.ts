@@ -16,6 +16,15 @@ test('parseTarget: empty is this page\'s runtime; http only for loopback hosts; 
   expect(()=>parseTarget(bad,'https://lab.example'),bad).toThrow('INVALID_RUNTIME_URL');
 });
 
+test('the unspecified address is refused in every scheme; https to a loopback host or name is refused (a local runtime is reached by http only)',()=>{
+ for(const bad of ['http://0.0.0.0:4176','https://0.0.0.0','http://[::]:4176','https://[::]','http://0:4176',
+  'https://127.0.0.1','https://127.0.0.2','https://127.1','https://localhost','https://app.localhost','https://[::1]','https://[::ffff:127.0.0.1]','https://[::ffff:7f00:2]',
+  'http://127.0.0.2:4176','http://[::ffff:127.0.0.1]:4176'])
+  expect(()=>parseTarget(bad,'https://lab.example'),bad).toThrow('INVALID_RUNTIME_URL');
+ expect(parseTarget('https://128.0.0.1','https://lab.example').kind).toBe('remote');
+ expect(parseTarget('https://notlocalhost.example','https://lab.example').kind).toBe('remote');
+});
+
 test('requestInit: same origin keeps the cookie; other targets send the bearer, no cookie, and loopback names its address space',()=>{
  expect(requestInit({base:'/lab/v2',kind:'same_origin'},'tok')).toEqual({credentials:'same-origin'});
  expect(requestInit({base:'http://127.0.0.1:4176/lab/v2',kind:'loopback'},'tok')).toEqual({credentials:'omit',headers:{Authorization:'Bearer tok'},targetAddressSpace:'loopback'});

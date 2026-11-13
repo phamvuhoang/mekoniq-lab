@@ -9,6 +9,7 @@ import {modelValidationPanel,validationView,type ValidationState} from './model-
 import {estimateSummary} from '../design/engineering-estimates';
 import {buildEngineeringCandidate} from '../deployment/engineering-bundle';
 import {httpTwinRuntime,type TwinRuntime} from '../scenarios/controls';
+import {mayAutoProbe} from '../runtime/target';
 import {loadBom,loadCompiledScene} from '../scenarios/engineering';
 import {hashJson} from '../twin/hash';
 import {tr} from '../i18n';
@@ -68,9 +69,13 @@ export class AssemblyWorkspace {
       const saved=await this.repository.loadActive();
       if (saved&&this.designChanges===changesAtStart&&checkArchive(saved).ok) this.open(saved,'reset');
     } catch {/* no stored draft, or storage unavailable: start fresh */}
-    try {this.canCompile=!!(await this.rt.health()).capabilities?.includes('engineering_bundle_v1');} catch {this.canCompile=false;}
+    // only a loopback page asks its own runtime by itself; any other runtime is asked when the user presses Compile (D52)
+    if (this.autoProbe()) await this.probe();
     this.rerender();
   }
+  /** Outside a browser (Node tests) there is no page origin to protect: treated as a loopback page. */
+  private autoProbe():boolean {return mayAutoProbe(this.rt.target??{base:'/lab/v2',kind:'same_origin'},typeof location==='undefined'?'localhost':location.hostname);}
+  private async probe():Promise<void> {try {this.canCompile=!!(await this.rt.health()).capabilities?.includes('engineering_bundle_v1');} catch {this.canCompile=false;}}
   /** Takes everything the archive holds into the catalog (nothing is dropped) and opens its project with the identity it was saved with. */
   private open(archive:ReturnType<typeof archiveFor>,how:'load'|'reset'):void {
     mergeCatalog(this.catalog,catalogFromArchive(archive));
@@ -111,7 +116,7 @@ export class AssemblyWorkspace {
 <button class="button quiet" data-action="asm-export">${tr('Xuất dự án kỹ thuật','エンジニアリング書き出し','Export engineering project')}</button>
 <label class="button quiet">${tr('Nhập tệp','ファイルを読み込む','Import file')}<input id="asm-import" type="file" accept="application/json,.json" hidden></label>
 <button class="button quiet" data-action="asm-candidate">${tr('Tải bản nháp ứng viên','候補ドラフト','Download candidate draft')}</button>
-<button class="button primary" data-action="asm-compile" ${this.canCompile?'':'disabled'}>${tr('Compile trên runtime','ランタイムでコンパイル','Compile on runtime')}</button>
+<button class="button primary" data-action="asm-compile" ${this.canCompile||this.canCompile===null&&!this.autoProbe()?'':'disabled'}>${tr('Compile trên runtime','ランタイムでコンパイル','Compile on runtime')}</button>
 <span class="asm-status" data-testid="asm-save-state" data-state="${this.saveState}">${{idle:'',saving:tr('đang lưu…','保存中…','saving…'),saved:tr('đã lưu','保存済み','saved'),error:tr('chưa lưu: ','未保存: ','not saved: ')+esc(this.message)}[this.saveState]}</span></div>
 ${this.message&&this.saveState!=='error'?`<p role="status" data-testid="asm-message">${esc(this.message)}</p>`:''}
 ${compile}
@@ -209,6 +214,8 @@ ${validation}
     if (!this.rt.compileEngineering||this.busy) return;
     this.busy=true;this.message='';this.rerender();
     try {
+      // not asked yet (a runtime this page may not probe by itself): this click asks first
+      if (this.canCompile===null) {await this.probe();if (!this.canCompile) return;}
       const project=this.design(),receipt=await this.rt.compileEngineering(project);
       this.receipt=receipt;this.bom=null;this.scene=null;
       if (receipt.state==='compiled') {

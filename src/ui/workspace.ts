@@ -42,7 +42,9 @@ import {EvidenceStore,captureEvidence,evidenceStatus,type SavedEvidence} from '.
 import {MAX_PROJECT_BYTES,validateProjectV2} from '../project/schema';
 const STEP_TICKS=250,PLAY_TICKS=25,PACED_TICKS=20,PACE_FACTORS=[1,4,16,64],SAME_ORIGIN:RuntimeTarget={base:'/lab/v2',kind:'same_origin'};
 /** The request never got an answer (network error, or the browser refused a loopback request): the step may have run. */
-const lostResponse=(e:unknown)=>e instanceof TypeError||e instanceof TwinRuntimeError&&e.code==='LOOPBACK_BLOCKED';
+const lostResponse=(e:unknown)=>e instanceof TypeError||e instanceof TwinRuntimeError&&['LOOPBACK_BLOCKED','PACED_STEP_TIMEOUT'].includes(e.code);
+/** A paced step holds at most 50 ticks (≤ 1 s at 1×): no answer after this is a lost response. */
+const STEP_TIMEOUT_MS=30_000;
 /** Twin-page boxes that scroll on their own (the window does not at desktop sizes). */
 const SCROLL_BOXES=['inspector-panel-objects','inspector-panel-engineering','inspector-panel-report','inspector-panel-setup','twin-display-menu','twin-picker','twin-problems','twin-caveat'];
 /** The boxes the run bar and the viewport open: one at a time. */
@@ -87,6 +89,12 @@ export class TwinWorkspace {
  private addressDraft='';private addressError='';private pinMismatch:string[]|null=null;
  /** Paced auto-run (features.pacedStep): stopped by a hidden tab (resumes when shown); `speedLog` [wall ms, sim s] of the last 2 s gives `measuredSpeed` (U06 shows it). */
  private hiddenStop=false;private speedLog:[number,number][]=[];private measuredSpeed:number|undefined;
+ /** One Pause press during a paced run: the loop stops, the in-flight step returns, then `pause` goes with that step's revision. */
+ private pausing=false;
+ /** The address that failed validation: the error stays only while the field still holds it. */
+ private failedAddress='';
+ /** Report refresh off the paced loop's critical path: at most one request in flight, at most once a second, `reportAgain` = one more when it lands. */
+ private reportBusy=false;private reportDue=0;private reportAgain=false;
  private tokenDraft='';private busy=false;private playing=false;private notice='';private fault='cup-removed';private confirming:string|null=null;private confirmationKind:'reconcile'|'restoreCup'='reconcile';private reconcileTargets:string[]=[];
  /** `engineeringProjectDigest` is the digest of the engineering design the Assembly page holds now; saved engineering evidence is current only while it matches. */
  /** `engineeringInput` is the Assembly page's current design and receipt; an engineering preset runs from it only when its profile matches (re-checked against the receipt). */
@@ -220,7 +228,9 @@ export class TwinWorkspace {
  private transport(f:TwinFrame):TransportState{
   // a runtime that paces steps accepts exactly these factors; an older one keeps the clock's own list
   const v=f.view,c=runControls(this.ops(f)),r=this.replay,speeds=this.health?.features?.pacedStep?PACE_FACTORS:this.clock()?.speeds.length?this.clock()!.speeds:[1,4,16,64];
-  return {mode:r?'replay':v?'live':'idle',playing:this.playing,canPlay:c.canPlay,canStep:c.canStep,canPause:c.canPause,paused:c.paused,canCancel:c.canCancel,speeds,speed:this.runSpeed,
+  // a paced run pauses with one press (the loop stops, then pause follows its last step); while that is pending it says so and cannot be pressed again
+  const pacedPause=!!this.health?.features?.pacedStep&&this.playing&&!r;
+  return {mode:r?'replay':v?'live':'idle',playing:this.playing,canPlay:c.canPlay,canStep:c.canStep,canPause:!this.pausing&&(c.canPause||pacedPause),pausing:this.pausing,paused:c.paused,canCancel:c.canCancel,speeds,speed:this.runSpeed,
    simTimeS:r?r.tick*r.rp.range.tickMs/1000:v?Number(v.simTimeNs)/1e9:0,tick:r?r.tick:v?.tick??0,measuredSpeed:undefined,// U01: nothing measures the auto-run speed yet
    ...r?{replay:{fromTick:r.rp.range.fromTick,toTick:r.rp.range.toTick,tick:r.tick,playing:r.playing,marks:this.report?replayMarks(this.report):[]}}:{}};
  }
@@ -305,15 +315,27 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
    this.playing=false;
    if(e instanceof TwinRuntimeError&&e.code==='RUNTIME_PIN_MISMATCH')this.pinMismatch=e.reasonCodes;
    // LOOPBACK_BLOCKED: the browser gives the same TypeError for every cause, so the notice names them all and claims none
-   this.notice=e instanceof TwinRuntimeError&&e.code==='LOOPBACK_BLOCKED'?`LOOPBACK_BLOCKED: ${tr('Không tới được runtime trên máy này. Kiểm tra: runtime đang chạy; trình duyệt cho phép truy cập mạng cục bộ; Safari không cho trang HTTPS gọi http://127.0.0.1.','このマシンのランタイムに届きません。確認:ランタイムが起動している、ブラウザがローカルネットワークへのアクセスを許可している、SafariはHTTPSページからhttp://127.0.0.1を呼べない。','The runtime on this machine could not be reached. Check that the runtime is running, that the browser allows local network access, and note that Safari does not let an HTTPS page reach http://127.0.0.1.')}`
+   const o=typeof location==='undefined'?'':location.origin;// this page's origin, for --allow-origin
+   this.notice=e instanceof TwinRuntimeError&&e.code==='LOOPBACK_BLOCKED'?`LOOPBACK_BLOCKED: ${tr(`Không tới được runtime trên máy này. Kiểm tra: runtime đang chạy; runtime cho phép origin của trang này (--allow-origin ${o}); trình duyệt cho phép truy cập mạng cục bộ; Safari không cho trang HTTPS gọi http://127.0.0.1.`,`このマシンのランタイムに届きません。確認:ランタイムが起動している、ランタイムがこのページのオリジンを許可している(--allow-origin ${o})、ブラウザがローカルネットワークへのアクセスを許可している、SafariはHTTPSページからhttp://127.0.0.1を呼べない。`,`The runtime on this machine could not be reached. Check that the runtime is running, that it allows this page's origin (--allow-origin ${o}), that the browser allows local network access, and note that Safari does not let an HTTPS page reach http://127.0.0.1.`)}`
+    :e instanceof TwinRuntimeError&&e.code==='PACED_STEP_TIMEOUT'?`PACED_STEP_TIMEOUT: ${tr('Runtime không trả lời một bước trong 30 s (đã gửi lại một lần). Tự chạy đã dừng; lần chạy giữ nguyên trạng thái runtime báo.','ランタイムが30秒以内にステップへ応答しませんでした(1回再送済み)。自動実行を停止しました。実行はランタイムが報告する状態のままです。','The runtime did not answer a step within 30 s (resent once). Auto-run stopped; the run stays as the runtime reports it.')}`
     :e instanceof TwinRuntimeError?`${tr('Runtime từ chối','ランタイムが拒否','Runtime refused')}: ${e.message}`:e instanceof Error?e.message:String(e);
    // a refused action leaves the run as the runtime has it: re-read instead of guessing
    if(this.view)try{await this.apply(await this.rt.get(this.view.run.id));}catch{/* keep the last snapshot */}
   }finally{this.busy=false;this.rerender();}
  }
- private async apply(v:RunView){this.view=v;this.track(v);
-  // the action receipt/snapshot is the pause acknowledgement; heartbeats only refresh it between receipts (e.g. another tab)
-  this.link={...this.link,paused:v.run.status==='paused'};try{this.report=await this.rt.report(v.run.id);}catch{this.report=null;}if(this.report&&this.replay)this.replay={...this.replay,rp:openReplayV2(this.report)};}
+ private async apply(v:RunView){this.applyView(v);try{this.report=await this.rt.report(v.run.id);}catch{this.report=null;}if(this.report&&this.replay)this.replay={...this.replay,rp:openReplayV2(this.report)};}
+ /** The run snapshot only (the action receipt is the pause acknowledgement; heartbeats only refresh it between receipts, e.g. another tab). */
+ private applyView(v:RunView){this.view=v;this.track(v);this.link={...this.link,paused:v.run.status==='paused'};}
+ /** The report (trail, summary, caveats) may lag the live picture, which comes from the streams. Never on the paced loop's path:
+  * one request at a time, the newest answer wins, at most once per second unless `final` (then queued behind one in flight). */
+ private refreshReport(final=false){
+  const v=this.view;if(!v)return;
+  if(this.reportBusy){this.reportAgain||=final;return;}
+  if(!final&&performance.now()<this.reportDue)return;
+  this.reportBusy=true;this.reportDue=performance.now()+1000;const id=v.run.id;
+  void this.rt.report(id).then(r=>{if(this.view?.run.id===id){this.report=r;if(this.replay)this.replay={...this.replay,rp:openReplayV2(r)};this.rerender();}},()=>{/* keep the last report */})
+   .finally(()=>{this.reportBusy=false;if(this.reportAgain){this.reportAgain=false;this.refreshReport(true);}});
+ }
  private act(kind:Parameters<TwinRuntime['action']>[1],payload?:Record<string,unknown>){return this.rt.action(this.view!,kind,payload).then(v=>this.apply(v));}
  /** Recover display metadata from the recorded input; catalog entries provide labels/assets only. */
  private reclaimedPreset(v:RunView):TwinPreset {
@@ -357,19 +379,28 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
     // one paced step in flight; the next goes when it returns, with its revision. The runtime holds each step at real time × factor:
     // no client timer paces anything, and a run nobody steps stands still (a hidden tab sends nothing after the step in flight)
     this.speedLog=[];this.measuredSpeed=undefined;
-    while(live()){if(document.visibilityState==='hidden'){this.hiddenStop=true;document.addEventListener('visibilitychange',this.onVisible);break;}await this.pacedStep();this.rerender();}
+    try{while(live()){if(document.visibilityState==='hidden'){this.hiddenStop=true;document.addEventListener('visibilitychange',this.onVisible);break;}await this.pacedStep();this.rerender();}}
+    finally{this.refreshReport(true);}// the loop ended for any reason: one report for where the run stands
+    // one press of Pause: the in-flight step has returned (this.view is its receipt), so pause carries the revision it returned
+    if(this.pausing&&this.view&&['running','awaiting_confirmation'].includes(this.view.run.status))await this.act('pause');
    }else while(live()){const started=performance.now();await this.act('step',{ticks:PLAY_TICKS});this.rerender();const delay=PLAY_TICKS*(this.report?.manifest.clock.tickMs??20)/this.runSpeed-(performance.now()-started);if(delay>0)await new Promise(resolve=>setTimeout(resolve,delay));}
   });
-  this.playing=false;this.rerender();
+  this.playing=false;this.pausing=false;this.rerender();
  }
  /** The tab is shown again: auto-run resumes if it stopped only because the tab was hidden (a user's stop clears hiddenStop). */
  private onVisible=()=>{if(document.visibilityState==='hidden')return;document.removeEventListener('visibilitychange',this.onVisible);if(this.hiddenStop){this.hiddenStop=false;void this.play();}};
  /** One `step{ticks:20,pace:{factor}}` (the factor read now, so a change applies to the next step). A lost response is resent once with the same
   * actionId and body: the runtime returns the stored receipt instead of stepping again. A second failure stops the loop (call() shows it). */
+ /** A step with no answer after STEP_TIMEOUT_MS is aborted and reported as lost (PACED_STEP_TIMEOUT). */
+ private async stepOnce(v:RunView,payload:Record<string,unknown>,actionId:string){
+  const c=new AbortController(),t=setTimeout(()=>c.abort(),STEP_TIMEOUT_MS);
+  try{return await this.rt.action(v,'step',payload,actionId,c.signal);}catch(e){if(c.signal.aborted)throw new TwinRuntimeError('PACED_STEP_TIMEOUT',[],0);throw e;}finally{clearTimeout(t);}
+ }
  private async pacedStep(){
   const v=this.view!,payload={ticks:PACED_TICKS,pace:{factor:this.runSpeed}},actionId=crypto.randomUUID();
-  let next:RunView;try{next=await this.rt.action(v,'step',payload,actionId);}catch(e){if(!lostResponse(e))throw e;next=await this.rt.action(v,'step',payload,actionId);}
-  await this.apply(next);
+  let next:RunView;try{next=await this.stepOnce(v,payload,actionId);}catch(e){if(!lostResponse(e))throw e;next=await this.stepOnce(v,payload,actionId);}
+  // the receipt is the view; the next step goes at once (the runtime re-anchors after 250 ms idle) and the report follows off this path
+  this.applyView(next);this.refreshReport();
   // measured rate: simulated time advanced over wall time in the last 2 s (a slow plant or link shows here, never hidden behind the factor)
   const now=performance.now();this.speedLog=[...this.speedLog.filter(([t])=>now-t<=2000),[now,Number(next.simTimeNs)/1e9]];
   const [t0,s0]=this.speedLog[0]!,dt=(now-t0)/1000;this.measuredSpeed=dt>0?(Number(next.simTimeNs)/1e9-s0)/dt:undefined;
@@ -400,7 +431,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   if(action==='twin-dismiss'){this.notice='';return this.rerender();}
   // a runtime on another origin, paired earlier in this tab (the bearer survived a reload): reaching it is still the user's click
   if(action==='twin-connect')return void this.call(async()=>{this.health=await this.rt.health();this.healthChecked=true;await this.checkReadiness();if(this.rt.paired)this.ui={...this.ui,runtimeOpen:false};});
-  if(action==='twin-disconnect'&&!this.busy&&!this.playing){this.rt.forget();this.streams?.close();this.streams=null;clearInterval(this.ticker);this.health=null;this.healthChecked=false;this.readiness=null;this.pinMismatch=null;this.ui={...this.ui,runtimeOpen:true};return this.rerender();}
+  if(action==='twin-disconnect'&&!this.busy&&!this.playing){this.rt.forget();this.dropRuntime();this.ui={...this.ui,runtimeOpen:true};return this.rerender();}
   if(action==='twin-reclaim'&&value&&this.rt.reclaim)return void this.call(async()=>{
    const reclaimed=await this.rt.reclaim!(value);
    this.stopReplay();this.replay=null;this.archived=false;this.streams?.close();this.streams=null;clearInterval(this.ticker);
@@ -438,6 +469,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   if(action==='twin-play')return void this.play();
   if(action==='twin-stop'){this.playing=false;this.hiddenStop=false;return this.rerender();}
   if(action==='twin-cancel')return void this.call(()=>this.act('cancel'));
+  if(action==='twin-pause'&&this.playing){if(this.health?.features?.pacedStep&&!this.pausing){this.pausing=true;this.playing=false;this.hiddenStop=false;this.rerender();}return;}
   if(action==='twin-pause')return void this.call(()=>this.act('pause'));
   if(action==='twin-resume')return void this.call(()=>this.act('resume'));
   if(action==='twin-fault')return void this.call(()=>this.act('injectFault',{faultId:this.fault}));
@@ -446,10 +478,19 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   if(action==='twin-confirm-cancel'){this.confirming=null;this.reconcileTargets=[];return this.rerender();}
   if(action==='twin-confirm-ok'&&this.confirming){const subjectId=this.confirming;this.confirming=null;this.reconcileTargets=[];if(this.confirmationKind==='reconcile'&&!this.knownReconciliationTargets().includes(subjectId))return this.rerender();return void this.call(()=>this.act(this.confirmationKind,{subjectId}));}
  }
+ /** Leaving a runtime (Disconnect, another address): its streams close and its run goes with it; that run can be reclaimed after reconnecting to it. */
+ private dropRuntime(){
+  this.streams?.close();this.streams=null;this.streamRun='';clearInterval(this.ticker);this.stopReplay();this.replay=null;this.archived=false;this.playing=false;this.hiddenStop=false;
+  this.view=null;this.report=null;this.runPreset=null;this.seen={};this.link={state:'closed',lastHeartbeatMs:null,paused:false};
+  this.health=null;this.healthChecked=false;this.readiness=null;this.pinMismatch=null;
+ }
  private knownReconciliationTargets(){return this.view?[...new Set(this.view.attention.map(a=>reconciliationSubject(a,this.view!)).filter((id):id is string=>id!==null))]:[];}
  change(id:string,value:string){if(id==='twin-backend-set'&&!this.busy&&!this.playing&&!this.replay&&!this.archived){const set=backendSetOptions(this.health).find(s=>s.id===value&&s.selectable)?this.health!.backendSets.find(s=>s.id===value):undefined;if(set){const compatible=set.id===WEBOTS_ARM_SET?presetById('webots-coffee'):this.preset.id==='webots-coffee'?presetById(set.mode==='mock'?'coffee':'native-bv01'):set.mode==='simulation'&&this.preset.scenarioId==='BV01'?presetById('native-bv01'):set.mode==='mock'&&this.preset.id==='native-bv01'?presetById('coffee'):this.preset;this.preset={...(compatible??this.preset),mode:set.mode as 'mock'|'simulation',backendSetId:set.id};if(set.mode==='simulation')this.scheduleDraft={...this.scheduleDraft,faultId:'cup-removed',targetId:''};this.readiness=null;void this.checkReadiness(this.preset).then(()=>this.rerender());}return this.rerender();}if(id.startsWith('twin-schedule-')){const d=this.scheduleDraft;if(id==='twin-schedule-fault'){d.faultId=value;d.targetId='';}if(id==='twin-schedule-target')d.targetId=value;if(id==='twin-schedule-trigger'&&(value==='phase'||value==='elapsed_sim_ms')){d.trigger=value;d.value=value==='phase'?'grasp':'1000';}if(id==='twin-schedule-value')d.value=value;if(id==='twin-schedule-duration')d.durationMs=value;return this.rerender();}if(id==='twin-reconcile-target'&&this.confirmationKind==='reconcile'){this.confirming=this.reconcileTargets.includes(value)&&this.knownReconciliationTargets().includes(value)?value:null;return this.rerender();}if(id==='twin-run-speed'&&[1,4,16,64].includes(Number(value))){this.runSpeed=Number(value);this.rerender();}if(id==='twin-speed-limit'){const n=Number(value);if(Number.isFinite(n)&&n>0&&n<=0.5){this.preset={...this.preset,project:{...this.preset.project,revision:this.preset.project.revision+1,entities:this.preset.project.entities.map(e=>e.kind==='amr'?{...e,speedLimitMps:n}:e)}};this.rerender();}}if(id==='twin-fault')this.fault=value;if(id==='twin-replay-cursor')this.input(id,value);}
  /** Scrub: update the replay body and the scene in place so the range input keeps focus and drag state. */
- input(id:string,value:string){if(id!=='twin-replay-cursor'||!this.replay)return;this.replay.tick=Number(value);this.scrubbed();}
+ input(id:string,value:string){
+  // the address error goes as soon as the field no longer holds the value that failed; no re-render, so focus and caret stay
+  if(id==='twin-runtime-address'){this.addressDraft=value;if(this.addressError&&value!==this.failedAddress){this.addressError='';document.getElementById('twin-runtime-address-error')?.remove();const f=document.getElementById(id);f?.removeAttribute('aria-invalid');f?.removeAttribute('aria-describedby');}return;}
+  if(id!=='twin-replay-cursor'||!this.replay)return;this.replay.tick=Number(value);this.scrubbed();}
  private scrubbed(played=false){// played: moved by playback, so the scrubber follows even with focus (a drag is never overwritten)
   const r=this.replay!;const body=document.getElementById('twin-replay-body');if(body)body.innerHTML=replayBody(r,this.vs.selected);
   const verification=document.querySelector('[data-testid="controller-verification"]');if(verification&&this.report)verification.outerHTML=controllerVerificationHtml(this.report,r.tick);
@@ -465,12 +506,12 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   if(form.id!=='twin-pair-form')return false;
   const token=(form.querySelector('#twin-pair-token') as HTMLInputElement).value,address=(form.querySelector('#twin-runtime-address') as HTMLInputElement|null)?.value??'';
   let t:RuntimeTarget;try{t=parseTarget(address,location.origin);}catch{
-   this.addressDraft=address;this.addressError=tr('Địa chỉ không hợp lệ: dùng https://… hoặc http://127.0.0.1:<cổng>, http://localhost:<cổng>, http://[::1]:<cổng>, chỉ origin.','無効なアドレス:https://… または http://127.0.0.1:<ポート>、http://localhost:<ポート>、http://[::1]:<ポート>(オリジンのみ)を使ってください。','Invalid address: use https://… or http://127.0.0.1:<port>, http://localhost:<port>, http://[::1]:<port>, origin only.');
+   this.addressDraft=address;this.failedAddress=address;this.addressError=tr('Địa chỉ không hợp lệ: dùng https://… hoặc http://127.0.0.1:<cổng>, http://localhost:<cổng>, http://[::1]:<cổng>, chỉ origin.','無効なアドレス:https://… または http://127.0.0.1:<ポート>、http://localhost:<ポート>、http://[::1]:<ポート>(オリジンのみ)を使ってください。','Invalid address: use https://… or http://127.0.0.1:<port>, http://localhost:<port>, http://[::1]:<port>, origin only.');
    this.rerender();return true;
   }
   this.addressError='';this.tokenDraft='';
   // another address: drop the old session and everything learned from the old runtime; the new one is reached by this click
-  if(t.base!==this.target().base){saveTarget(t.kind==='same_origin'?null:address);this.rt.retarget?.(t);this.streams?.close();this.streams=null;clearInterval(this.ticker);this.health=null;this.healthChecked=false;this.readiness=null;this.pinMismatch=null;}
+  if(t.base!==this.target().base){saveTarget(t.kind==='same_origin'?null:address);this.rt.retarget?.(t);this.dropRuntime();}
   this.addressDraft=targetAddress(t);
   void this.call(async()=>{if(!this.health){if(t.kind==='same_origin')await this.checkHealth();else{this.health=await this.rt.health();this.healthChecked=true;}}await this.rt.pair(token);this.ui={...this.ui,runtimeOpen:false};await this.checkReadiness();this.notice=tr('Runtime v2 đã ghép nối.','ランタイムv2とペアリングしました。','Runtime v2 paired.');});
   return true;

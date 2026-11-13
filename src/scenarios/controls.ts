@@ -107,7 +107,7 @@ export interface TwinRuntime {
  forget():void;
  create(request:CreateRun,identity:{sourceCommit:string;schemaHash:string}):Promise<RunView>;
  /** `actionId`: resend a step whose response was lost with the same id; the runtime returns its stored receipt and does not act again. */
- action(view:RunView,kind:ActionKind,payload?:Record<string,unknown>,actionId?:string):Promise<RunView>;
+ action(view:RunView,kind:ActionKind,payload?:Record<string,unknown>,actionId?:string,signal?:AbortSignal):Promise<RunView>;
  readonly recoverableRunIds?:readonly string[];archive?(runId:string):Promise<void>;reclaim?(runId:string):Promise<RunView>;
  get(runId:string):Promise<RunView>;report(runId:string):Promise<RunReport>;
  /** Where requests go (target.ts). Optional only so test doubles may omit it; httpTwinRuntime always has it. */
@@ -127,18 +127,21 @@ const pinnedCommit=()=>pin??=fetch('/source-runtime.lock.json',{cache:'no-store'
 export function httpTwinRuntime(target:RuntimeTarget={base:'/lab/v2',kind:'same_origin'}):TwinRuntime {
  let csrf='',token=target.kind==='same_origin'?'':loadToken(target);
  const remote=()=>target.kind!=='same_origin',auth=()=>requestInit(target,token);
- const storageKey='mekoniq-lab-reclaim';let proofs:Record<string,string>={};
- try{proofs=JSON.parse(localStorage.getItem(storageKey)??'{}');}catch{/* no local ownership proofs */}
+ // reclaim proofs belong to the runtime that issued them: same origin keeps its original key, any other runtime has its own
+ const proofKey=(t:RuntimeTarget)=>t.kind==='same_origin'?'mekoniq-lab-reclaim':`mekoniq-lab-reclaim:${t.base}`;
+ const loadProofs=(t:RuntimeTarget):Record<string,string>=>{try{return JSON.parse(localStorage.getItem(proofKey(t))??'{}');}catch{return {};/* no local ownership proofs */}};
+ let proofs=loadProofs(target);
  const forget=()=>{csrf='';if(token){token='';saveToken(target,'');}};
- /** A loopback fetch the browser refuses (local network access denied, nothing listening, Safari's HTTPS-to-http rule) rejects with a TypeError we cannot tell apart. */
- const send=async(url:string,init:RequestInit)=>{
+ /** Every request is judged by the target it was made for: a late 401 from a previous runtime never drops the current bearer.
+  * A loopback fetch the browser refuses (local network access denied, nothing listening, Safari's HTTPS-to-http rule) rejects with a TypeError we cannot tell apart. */
+ const send=async(url:string,init:RequestInit,t:RuntimeTarget)=>{
   let response:Response;
-  try{response=await fetch(url,init);}catch(e){if(target.kind==='loopback'&&e instanceof TypeError)throw new TwinRuntimeError('LOOPBACK_BLOCKED',[],0);throw e;}
-  if(response.status===401&&remote())forget();
+  try{response=await fetch(url,init);}catch(e){if(t.kind==='loopback'&&e instanceof TypeError)throw new TwinRuntimeError('LOOPBACK_BLOCKED',[],0);throw e;}
+  if(response.status===401&&t.kind!=='same_origin'&&t===target)forget();
   return response;
  };
- const request=async<T>(path:string,body?:unknown):Promise<T>=>{
-  const post=body!==undefined,a=auth(),response=await send(target.base+path,{method:post?'POST':'GET',...a,cache:'no-store',headers:{...a.headers as Record<string,string>,...post?{'Content-Type':'application/json',...csrf&&!remote()?{'X-CSRF-Token':csrf}:{}}:{}},...post?{body:JSON.stringify(body)}:{}});
+ const request=async<T>(path:string,body?:unknown,signal?:AbortSignal):Promise<T>=>{
+  const t=target,post=body!==undefined,a=auth(),response=await send(t.base+path,{method:post?'POST':'GET',...a,cache:'no-store',headers:{...a.headers as Record<string,string>,...post?{'Content-Type':'application/json',...csrf&&!remote()?{'X-CSRF-Token':csrf}:{}}:{}},...post?{body:JSON.stringify(body)}:{},...signal?{signal}:{}},t);
   const data=await response.json().catch(()=>({error:'INVALID_RUNTIME_RESPONSE'}));
   if(!response.ok)throw new TwinRuntimeError(String(data.error??'RUNTIME_REQUEST_FAILED'),Array.isArray(data.reasonCodes)?data.reasonCodes.map(String):[],response.status);
   return data as T;
@@ -147,13 +150,13 @@ export function httpTwinRuntime(target:RuntimeTarget={base:'/lab/v2',kind:'same_
  return {
   get paired(){return remote()?!!token:!!csrf;},forget,
   get target(){return target;},
-  retarget(t){forget();target=t;token=t.kind==='same_origin'?'':loadToken(t);},
+  retarget(t){forget();target=t;token=t.kind==='same_origin'?'':loadToken(t);proofs=loadProofs(t);},
   streamDeps(){
    if(!remote())return {base:target.base,EventSource:globalThis.EventSource};
    // the bearer is read when each stream opens (a re-pair is picked up by the next reconnect), and only while this client still points at that runtime
    const t=target,a=()=>requestInit(t,t===target?token:''),init=()=>{const {headers,...extra}=a();return {headers:headers as Record<string,string>,extra};};
    return {base:t.base,EventSource:class extends FetchEventSource{constructor(url:string){super(url,init());}} as unknown as typeof EventSource,
-    fetch:((url:string,i:RequestInit={})=>{const x=a();return send(url,{...i,...x,headers:{...i.headers as Record<string,string>,...x.headers as Record<string,string>}});}) as typeof fetch};
+    fetch:((url:string,i:RequestInit={})=>{const x=a();return send(url,{...i,...x,headers:{...i.headers as Record<string,string>,...x.headers as Record<string,string>}},t);}) as typeof fetch};
   },
   health:()=>request<TwinHealth>('/health'),
   compileEngineering:project=>request<BundleReceipt>('/engineering/compile',{project}),
@@ -167,7 +170,7 @@ export function httpTwinRuntime(target:RuntimeTarget={base:'/lab/v2',kind:'same_
   },
   engineeringManifest:digest=>request<EngineeringManifest>(`/engineering/bundles/${encodeURIComponent(digest)}/manifest`),
   async engineeringBlob(sha256){
-   const response=await send(`${target.base}/engineering/blobs/${encodeURIComponent(sha256)}`,{...auth(),cache:'no-store'});
+   const response=await send(`${target.base}/engineering/blobs/${encodeURIComponent(sha256)}`,{...auth(),cache:'no-store'},target);
    if(!response.ok){const data=await response.json().catch(()=>({error:'INVALID_RUNTIME_RESPONSE'}));throw new TwinRuntimeError(String(data.error??'RUNTIME_REQUEST_FAILED'),[],response.status);}
    const bytes=new Uint8Array(await response.arrayBuffer());
    // content addressing is checked here too: a blob that does not hash to its name is never rendered
@@ -183,12 +186,14 @@ export function httpTwinRuntime(target:RuntimeTarget={base:'/lab/v2',kind:'same_
   async create(r,identity){
    // a runtime on another origin was not installed by the launcher: it must be the pinned one (same origin is checked by the launcher)
    if(remote()){const [h,p]=await Promise.all([request<TwinHealth>('/health'),pinnedCommit()]);if(h.sourceCommit!==p)throw new TwinRuntimeError('RUNTIME_PIN_MISMATCH',[String(h.sourceCommit).slice(0,7),p.slice(0,7)],409);}
-   const {reclaimToken,...view}=await request<RunView&{reclaimToken?:string}>('/runs',{...r,runtimeIdentity:identity});if(reclaimToken){proofs[view.run.id]=reclaimToken;try{localStorage.setItem(storageKey,JSON.stringify(proofs));}catch{/* current tab retains the proof if storage is unavailable */}}return view;},
+   const t=target,{reclaimToken,...view}=await request<RunView&{reclaimToken?:string}>('/runs',{...r,runtimeIdentity:identity});
+   if(reclaimToken){const own=t===target?proofs:loadProofs(t);own[view.run.id]=reclaimToken;try{localStorage.setItem(proofKey(t),JSON.stringify(own));}catch{/* current tab retains the proof if storage is unavailable */}}
+   return view;},
   get recoverableRunIds(){return Object.keys(proofs);},
   async archive(id){await request(`${run(id)}/archive`,{});},
   reclaim:id=>{const proof=proofs[id];if(!proof)throw new TwinRuntimeError('RUN_PROOF_MISSING',[],403);return request<RunView>(`${run(id)}/reclaim`,{proof});},
   // expectedRevision comes from the last snapshot the UI rendered: a stale view is refused (REVISION_CONFLICT), never applied
-  action:(v,kind,payload={},actionId=crypto.randomUUID())=>request<RunView>(`${run(v.run.id)}/actions`,{actionId,expectedRevision:v.run.runRevision,kind,payload}),
+  action:(v,kind,payload={},actionId=crypto.randomUUID(),signal)=>request<RunView>(`${run(v.run.id)}/actions`,{actionId,expectedRevision:v.run.runRevision,kind,payload},signal),
   get:id=>request<RunView>(run(id)),
   report:id=>request<RunReport>(`${run(id)}/report`),
  };

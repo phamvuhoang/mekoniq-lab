@@ -108,6 +108,8 @@ test.describe.serial('viewport-first twin layout',()=>{
    await expect(transport.getByRole('button',{name:'Tự chạy',exact:true})).toBeEnabled({timeout:30000});
   };
   await expect(canvas).toHaveAttribute('data-camera',/^-?\d+\.\d{3},/);
+  // 4×: the 8 s of auto-run below must not finish the ~100 s run (a paced 16× run now keeps real 16× and would)
+  await page.locator('#twin-run-speed').selectOption('4');
   // 5 s of auto-run: the tick moves on every sample batch and the scene is not rebuilt for it; only a change of the set of objects (a new cup) rebuilds it
   const objects=()=>page.locator('#twin-entity-list [data-action="twin-select"]').evaluateAll(b=>b.map(x=>(x as HTMLElement).dataset.value).join());
   let r0=0,o0=0,before=0;const ticks=new Set<string|null>(),sets=new Set<string>();

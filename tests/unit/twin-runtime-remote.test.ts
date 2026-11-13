@@ -7,7 +7,7 @@ afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
 const flush=()=>new Promise(r=>setTimeout(r,5));
 /** A stand-in gateway on an ephemeral loopback port: bearer only (401 without it), pairing, health, a run and its two SSE streams. */
 async function gateway(){
- const seen:{method:string;url:string;auth:string|undefined;csrf:string|undefined}[]=[];let eventsOpened=0;
+ const seen:{method:string;url:string;auth:string|undefined;csrf:string|undefined}[]=[];let eventsOpened=0;const state={revoked:false};
  const sse=(res:ServerResponse)=>res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store'});
  const record=(seq:number)=>`id: ${seq}\nevent: business\ndata: ${JSON.stringify({sequence:String(seq),at:'t',events:[]})}\n\n`;
  const server=createServer((req:IncomingMessage,res:ServerResponse)=>{
@@ -15,7 +15,7 @@ async function gateway(){
   const json=(status:number,body:unknown)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(body));};
   if(url.pathname==='/lab/v2/health')return json(200,{sourceCommit:'b'.repeat(40),schemaHash:'s',protocolMajors:[2],features:{bearer:true,pacedStep:true}});
   if(url.pathname==='/lab/v2/sessions'&&req.method==='POST')return json(201,{csrfToken:'csrf-1',sessionToken:'tok-1',principal:'p'});
-  if(req.headers.authorization!=='Bearer tok-1')return json(401,{error:'SESSION_REQUIRED'});
+  if(req.headers.authorization!=='Bearer tok-1'||state.revoked)return json(401,{error:'SESSION_REQUIRED'});
   if(url.pathname==='/lab/v2/runs/r1')return json(200,{run:{id:'r1',runRevision:7}});
   if(url.pathname==='/lab/v2/runs/r1/actions')return json(200,{run:{id:'r1',runRevision:8}});
   if(url.pathname==='/lab/v2/runs/r1/telemetry'){sse(res);res.write(': open\n\n');return;}
@@ -30,11 +30,12 @@ async function gateway(){
  });
  await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));
  const port=(server.address() as AddressInfo).port;
- return {seen,base:`http://127.0.0.1:${port}/lab/v2`,close:()=>new Promise<void>(r=>{server.closeAllConnections();server.close(()=>r());})};
+ return {seen,state,base:`http://127.0.0.1:${port}/lab/v2`,close:()=>new Promise<void>(r=>{server.closeAllConnections();server.close(()=>r());})};
 }
 
+const memory=()=>{const m=new Map<string,string>();return {m,getItem:(k:string)=>m.get(k)??null,setItem:(k:string,v:string)=>void m.set(k,v),removeItem:(k:string)=>void m.delete(k)};};
 test('a loopback target pairs once, then sends the bearer (never a CSRF header or a cookie) and forgets it on 401',async()=>{
- const g=await gateway();
+ const g=await gateway(),session=memory();vi.stubGlobal('sessionStorage',session);
  try{
   const rt=httpTwinRuntime({base:g.base,kind:'loopback'});
   expect(rt.target).toEqual({base:g.base,kind:'loopback'});expect(rt.paired).toBe(false);
@@ -43,9 +44,12 @@ test('a loopback target pairs once, then sends the bearer (never a CSRF header o
   const post=g.seen.find(s=>s.url.endsWith('/actions'))!;
   expect(post.auth).toBe('Bearer tok-1');expect(post.csrf).toBeUndefined();
   expect(g.seen.find(s=>s.url.endsWith('/sessions'))!.auth).toBeUndefined();
-  // the token is the session: a runtime that no longer knows it (restart) answers 401 and the pairing form comes back
-  rt.forget();expect(rt.paired).toBe(false);
+  expect(session.m.get(`mekoniq-lab-session:${g.base}`)).toBe('tok-1');
+  // the token is the session: a runtime that no longer knows it (restart) answers 401; the bearer is dropped from memory and storage
+  g.state.revoked=true;
   await expect(rt.get('r1')).rejects.toMatchObject({code:'SESSION_REQUIRED',status:401});
+  expect(rt.paired).toBe(false);expect(session.m.size).toBe(0);
+  expect(httpTwinRuntime({base:g.base,kind:'loopback'}).paired).toBe(false);// a reload finds no bearer either
  }finally{await g.close();}
 });
 
@@ -109,31 +113,39 @@ test('a loopback fetch the browser refuses becomes LOOPBACK_BLOCKED; a remote on
 // The play loop of the workspace against a runtime that paces steps (features.pacedStep).
 const docStub={getElementById:()=>null,activeElement:null,visibilityState:'visible' as 'visible'|'hidden',listeners:[] as (()=>void)[],
  addEventListener(t:string,f:()=>void){if(t==='visibilitychange')this.listeners.push(f);},removeEventListener(t:string,f:()=>void){this.listeners=this.listeners.filter(x=>x!==f);}};
-async function loop(o:{conflictAt?:number;lostAt?:number;completeAt?:number;onSend?:(n:number)=>void}={}){
+async function loop(o:{conflictAt?:number;lostAt?:number;completeAt?:number;onSend?:(n:number)=>void;stepMs?:number;reportMs?:number;hangAt?:number[];onPause?:()=>void}={}){
  vi.stubGlobal('localStorage',{getItem:()=>null,setItem:()=>{}});vi.stubGlobal('innerWidth',600);
  docStub.visibilityState='visible';docStub.listeners=[];vi.stubGlobal('document',docStub);
  const {TwinWorkspace}=await import('../../src/ui/workspace');
- let rev=3,inflight=0,maxInflight=0,gets=0;let tick=0;const receipts=new Map<string,RunView>();
- const sent:{expected:number;payload:Record<string,unknown>;actionId:string}[]=[];
- const viewAt=():RunView=>({run:{schemaVersion:2,id:'r1',mode:'mock',access:'simulated',backendSetId:'mock-default',backends:[],status:o.completeAt!==undefined&&tick>=o.completeAt*20?'completed':'running',runRevision:rev,eventCursor:null,telemetryCursor:null,fidelity:'modeled',ageMs:0,sourceCommit:'d',scenarioId:'BV01',scenarioRevision:1,seed:42},
+ let rev=3,inflight=0,maxInflight=0,gets=0,paused=false,reportsInFlight=0,maxReports=0;let tick=0;const receipts=new Map<string,RunView>();
+ const sent:{expected:number;payload:Record<string,unknown>;actionId:string;at:number;answeredAt?:number}[]=[],pauses:number[]=[],reports:{at:number;done?:number}[]=[];
+ const viewAt=():RunView=>({run:{schemaVersion:2,id:'r1',mode:'mock',access:'simulated',backendSetId:'mock-default',backends:[],status:paused?'paused':o.completeAt!==undefined&&tick>=o.completeAt*20?'completed':'running',runRevision:rev,eventCursor:null,telemetryCursor:null,fidelity:'modeled',ageMs:0,sourceCommit:'d',scenarioId:'BV01',scenarioRevision:1,seed:42},
   tick,simTimeNs:String(tick*20_000_000),model:'m',entities:[],workload:[],awaiting:[],attention:[],served:'0',coffee:null});
- const rt={paired:true,target:{base:'http://127.0.0.1:4176/lab/v2',kind:'loopback'},forget(){},health:async()=>({}),report:async()=>{throw new Error('none');},
+ const rt={paired:true,target:{base:'http://127.0.0.1:4176/lab/v2',kind:'loopback'},forget(){},health:async()=>({}),
+  report:async()=>{if(o.reportMs===undefined)throw new Error('none');const r={at:performance.now()} as {at:number;done?:number};reports.push(r);reportsInFlight++;maxReports=Math.max(maxReports,reportsInFlight);
+   await new Promise(res=>setTimeout(res,o.reportMs));reportsInFlight--;r.done=performance.now();return {manifest:{clock:{tickMs:20}},limitations:[]};},
   get:async()=>{gets++;return viewAt();},
-  action:async(v:RunView,kind:string,payload:Record<string,unknown>={},actionId='')=>{
-   inflight++;maxInflight=Math.max(maxInflight,inflight);await new Promise(r=>setTimeout(r,3));inflight--;
-   sent.push({expected:v.run.runRevision,payload,actionId});const n=sent.length;o.onSend?.(n);
-   const receipt=receipts.get(actionId);if(receipt)return receipt;// the runtime's idempotency: a known actionId returns its stored receipt
+  action:async(v:RunView,kind:string,payload:Record<string,unknown>={},actionId='',signal?:AbortSignal)=>{
+   if(kind==='pause'){if(v.run.runRevision!==rev)throw new TwinRuntimeError('REVISION_CONFLICT',[],409);pauses.push(v.run.runRevision);o.onPause?.();rev++;paused=true;return viewAt();}
+   const entry={expected:v.run.runRevision,payload,actionId,at:performance.now()} as (typeof sent)[number];sent.push(entry);const n=sent.length;
+   inflight++;maxInflight=Math.max(maxInflight,inflight);
+   try{
+    if(o.hangAt?.includes(n))await new Promise((_r,reject)=>signal?.addEventListener('abort',()=>reject(new DOMException('aborted','AbortError'))));
+    await new Promise(r=>setTimeout(r,o.stepMs??3));
+   }finally{inflight--;}
+   o.onSend?.(n);
+   const receipt=receipts.get(actionId);if(receipt){entry.answeredAt=performance.now();return receipt;}// the runtime's idempotency: a known actionId returns its stored receipt
    // another tab steps with the same expectedRevision first: ours is the second and is refused
    if(n===o.conflictAt)rev++;
    if(v.run.runRevision!==rev)throw new TwinRuntimeError('REVISION_CONFLICT',[],409);
    expect(kind).toBe('step');rev++;tick+=Number(payload.ticks);const r=viewAt();receipts.set(actionId,r);
    if(n===o.lostAt)throw new TypeError('Failed to fetch');// the step ran; its response was lost
-   return r;
+   entry.answeredAt=performance.now();return r;
   }} as unknown as TwinRuntime;
  const w=new TwinWorkspace(()=>{},rt);
  Object.assign(w,{health:{sourceCommit:'d',schemaHash:'s',protocolMajors:[2],scenarioIds:[],backends:[],backendSets:[],features:{pacedStep:true}},view:viewAt(),openStreams:()=>{}});
- const h=w as unknown as {playing:boolean;busy:boolean;notice:string;view:RunView;measuredSpeed:number|undefined};
- return {w,h,sent,stats:()=>({maxInflight,gets,rev})};
+ const h=w as unknown as {playing:boolean;busy:boolean;notice:string;view:RunView;measuredSpeed:number|undefined;html():string};
+ return {w,h,sent,pauses,reports,stats:()=>({maxInflight,gets,rev,maxReports,reportsInFlight})};
 }
 
 test('Review Focus: paced steps one at a time; a REVISION_CONFLICT re-reads the run and stops the loop',async()=>{
@@ -176,4 +188,110 @@ test('a hidden tab stops sending after the in-flight step and resumes when visib
  docStub.visibilityState='hidden';for(const f of [...docStub.listeners])f();docStub.visibilityState='visible';for(const f of [...docStub.listeners])f();
  await new Promise(r=>setTimeout(r,30));expect(sent).toHaveLength(m);
  w.leave();
+});
+
+test('reclaim proofs are kept per runtime: a proof from one runtime is never listed for, nor sent to, another',async()=>{
+ const local=memory();local.m.set('mekoniq-lab-reclaim',JSON.stringify({old:'p-old'}));vi.stubGlobal('localStorage',local);vi.stubGlobal('sessionStorage',memory());
+ const sent:string[]=[];
+ vi.stubGlobal('fetch',vi.fn(async(u:string,init:RequestInit)=>{sent.push(`${u} ${init.body??''}`);
+  if(u.endsWith('/sessions'))return new Response(JSON.stringify({csrfToken:'c',sessionToken:'t'}),{status:201});
+  if(u==='/source-runtime.lock.json'||u.endsWith('/health'))return new Response(JSON.stringify({sourceCommit:'a'.repeat(40)}));
+  return new Response(JSON.stringify({run:{id:'run-a'},reclaimToken:'proof-a'}),{status:201});}));
+ // the same-origin key stays as it was: existing proofs keep working
+ expect(httpTwinRuntime().recoverableRunIds).toEqual(['old']);
+ const a={base:'https://a.example/lab/v2',kind:'remote'} as const,b={base:'https://b.example/lab/v2',kind:'remote'} as const;
+ const rt=httpTwinRuntime(a);expect(rt.recoverableRunIds).toEqual([]);
+ await rt.pair('k');await rt.create({} as never,{sourceCommit:'a'.repeat(40),schemaHash:'s'});
+ expect(rt.recoverableRunIds).toEqual(['run-a']);expect(JSON.parse(local.m.get('mekoniq-lab-reclaim')!)).toEqual({old:'p-old'});
+ rt.retarget!(b);expect(rt.recoverableRunIds).toEqual([]);
+ sent.length=0;expect(()=>rt.reclaim!('run-a')).toThrow('RUN_PROOF_MISSING');expect(()=>rt.reclaim!('old')).toThrow('RUN_PROOF_MISSING');expect(sent).toEqual([]);
+ expect(httpTwinRuntime(b).recoverableRunIds).toEqual([]);expect(httpTwinRuntime().recoverableRunIds).toEqual(['old']);
+ const back=httpTwinRuntime(a);expect(back.recoverableRunIds).toEqual(['run-a']);
+ await back.reclaim!('run-a');expect(sent.at(-1)).toBe('https://a.example/lab/v2/runs/run-a/reclaim {"proof":"proof-a"}');
+});
+
+test('a late 401 from a stream of the previous runtime never clears the bearer of the current one; its errors are typed by its own target',async()=>{
+ vi.stubGlobal('sessionStorage',memory());
+ let deny=false;
+ vi.stubGlobal('fetch',vi.fn(async(u:string)=>{
+  if(u.endsWith('/sessions'))return new Response(JSON.stringify({csrfToken:'c',sessionToken:'t'}),{status:201});
+  if(u.startsWith('http://127.0.0.1'))throw new TypeError('Failed to fetch');
+  return new Response('{"error":"SESSION_REQUIRED"}',{status:deny?401:200});}));
+ const rt=httpTwinRuntime({base:'https://a.example/lab/v2',kind:'remote'});await rt.pair('k');
+ const old=rt.streamDeps!();
+ const loop=httpTwinRuntime({base:'http://127.0.0.1:4176/lab/v2',kind:'loopback'});const oldLoop=loop.streamDeps!();
+ rt.retarget!({base:'https://b.example/lab/v2',kind:'remote'});await rt.pair('k2');expect(rt.paired).toBe(true);
+ deny=true;expect((await old.fetch!('https://a.example/lab/v2/runs/r1')).status).toBe(401);
+ expect(rt.paired).toBe(true);
+ loop.retarget!({base:'https://c.example/lab/v2',kind:'remote'});
+ await expect(oldLoop.fetch!('http://127.0.0.1:4176/lab/v2/runs/r1')).rejects.toMatchObject({code:'LOOPBACK_BLOCKED'});
+});
+
+test('the paced loop never waits for the report: one report request at a time, at most once a second, and one more when the loop ends',async()=>{
+ const {w,h,sent,reports,stats}=await loop({reportMs:600,completeAt:10});
+ w.click('twin-play');
+ await vi.waitFor(()=>expect(h.busy).toBe(false),{timeout:3000});
+ expect(sent).toHaveLength(10);
+ for(let i=1;i<sent.length;i++)expect(sent[i]!.at-sent[i-1]!.answeredAt!,`gap before step ${i+1}`).toBeLessThan(50);
+ expect(sent.at(-1)!.answeredAt!-sent[0]!.at).toBeLessThan(500);// ten steps finished long before one 600 ms report
+ await vi.waitFor(()=>expect(stats().reportsInFlight).toBe(0),{timeout:3000});
+ expect(stats().maxReports).toBe(1);
+ // one report while the loop ran (the next was not yet due), then the final one after the loop ended
+ expect(reports).toHaveLength(2);expect(reports[1]!.at).toBeGreaterThanOrEqual(sent.at(-1)!.answeredAt!);
+ w.leave();
+});
+
+test('one Pause press during a paced step: the loop stops, the in-flight step returns, then exactly one pause with that step\'s revision',async()=>{
+ const {w,h,sent,pauses}=await loop({stepMs:40});
+ w.click('twin-play');await vi.waitFor(()=>expect(sent.length).toBeGreaterThanOrEqual(2));
+ expect(h.html()).toMatch(/data-action="twin-pause"(?![^>]*disabled)/);// enabled during a paced run
+ w.click('twin-pause');const n=sent.length;
+ expect(h.html()).toMatch(/data-action="twin-pause"[^>]*disabled/);expect(h.html()).toContain('Đang tạm dừng');
+ w.click('twin-pause');// a second press while pausing does nothing
+ await vi.waitFor(()=>expect(h.busy).toBe(false),{timeout:3000});
+ expect(sent).toHaveLength(n);expect(pauses).toHaveLength(1);
+ expect(pauses[0]).toBe(sent.at(-1)!.expected+1);// the revision the in-flight step returned
+ expect(h.view.run.status).toBe('paused');expect(h.playing).toBe(false);expect(h.notice).toBe('');
+ w.leave();
+});
+
+test('a paced step with no answer after 30 s is aborted and resent once; a second silence stops the loop with the problem shown',async()=>{
+ vi.useFakeTimers({toFake:['setTimeout','clearTimeout']});
+ try{
+  const first=await loop({hangAt:[2],completeAt:4,stepMs:0});
+  first.w.click('twin-play');
+  await vi.advanceTimersByTimeAsync(100);expect(first.sent).toHaveLength(2);
+  await vi.advanceTimersByTimeAsync(30_000);
+  await vi.advanceTimersByTimeAsync(100);
+  expect(first.sent[2]!.actionId).toBe(first.sent[1]!.actionId);expect(first.sent[2]!.payload).toEqual(first.sent[1]!.payload);
+  expect(first.h.view.run.status).toBe('completed');expect(first.h.busy).toBe(false);first.w.leave();
+  const second=await loop({hangAt:[1,2],stepMs:0});
+  second.w.click('twin-play');
+  await vi.advanceTimersByTimeAsync(30_100);expect(second.sent).toHaveLength(2);
+  await vi.advanceTimersByTimeAsync(30_100);
+  expect(second.sent).toHaveLength(2);expect(second.h.busy).toBe(false);expect(second.h.playing).toBe(false);expect(second.h.notice).toContain('PACED_STEP_TIMEOUT');
+  second.w.leave();
+ }finally{vi.useRealTimers();}
+});
+
+test('disconnecting, or another address, closes the streams and drops the run of the old runtime',async()=>{
+ const {w,h}=await loop();
+ vi.stubGlobal('location',{origin:'http://127.0.0.1:4175',hostname:'127.0.0.1'});
+ const closed=vi.fn();Object.assign(w,{streams:{state:'live',close:closed},report:{}});
+ w.click('twin-disconnect');
+ expect(closed).toHaveBeenCalled();expect(h.view).toBeNull();expect((w as unknown as {report:unknown}).report).toBeNull();
+ w.leave();
+});
+
+test('Assembly sends nothing to a runtime it may not probe by itself; the compile click asks first',async()=>{
+ vi.stubGlobal('localStorage',{getItem:()=>null,setItem:()=>{}});vi.stubGlobal('indexedDB',undefined);
+ const {AssemblyWorkspace}=await import('../../src/ui/assembly-page');
+ const calls:string[]=[];
+ const rt=(kind:'same_origin'|'loopback')=>({paired:true,target:{base:kind==='same_origin'?'/lab/v2':'http://127.0.0.1:4176/lab/v2',kind},health:async()=>{calls.push('health');return {capabilities:[]};},compileEngineering:async()=>{calls.push('compile');throw new Error('x');}}) as unknown as TwinRuntime;
+ for(const [kind,host,probes] of [['loopback','lab.example',false],['loopback','127.0.0.1',false],['same_origin','lab.example',false],['same_origin','127.0.0.1',true]] as const){
+  vi.stubGlobal('location',{hostname:host,origin:`http://${host}`});calls.length=0;
+  const a=new AssemblyWorkspace(()=>{},rt(kind)) as unknown as {restore():Promise<void>;click(a:string):void;canCompile:boolean|null};
+  await a.restore();expect(calls,`${kind} on ${host}`).toEqual(probes?['health']:[]);
+  if(!probes){a.click('asm-compile');await vi.waitFor(()=>expect(calls).toEqual(['health']));expect(a.canCompile).toBe(false);}
+ }
 });
