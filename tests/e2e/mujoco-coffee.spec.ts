@@ -80,8 +80,8 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  await fit.click();await expect.poll(async()=>(await fr()).floorInView,{message:'one press of fit shows the whole floor'}).toBe(true);
  await home.click();await expect.poll(async()=>(await fr()).camera).toBe(cell);
  // the cell's supports are drawn with the arm, and the Display menu says what they are
- expect(await ds('armSupports')).toBe('2');
- await openDisplayMenu(page);await expect(page.getByTestId('arm-cell-note')).toContainText('giả định');await expect(page.getByTestId('arm-cell-note')).toContainText('không có trong mô phỏng');
+ expect(await ds('armSupports')).toBe('2');expect(await ds('armIllustrative')).toBe('3');// the mount and a leg under each support
+ await openDisplayMenu(page);await expect(page.getByTestId('arm-cell-note')).toContainText('giả định');await expect(page.getByTestId('arm-cell-note')).toContainText('không có trong mô phỏng');await expect(page.getByTestId('arm-cell-note')).toContainText('khay ở nguyên chỗ khi robot rời đi');
  await page.locator('[data-action="twin-display-toggle"]').click();
  await expect.poll(()=>ds('cups'),{timeout:20000}).not.toBe('{}');await shot(page,'cell-start');
  // a fresh mount (2D, then 3D again): the same framing at the real viewport
@@ -110,7 +110,7 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  const s1=await simS(page),w1=Date.now(),measured=(s1-s0)/((w1-w0)/1000);
  expect(await allKept(),'controls kept their elements at 1×, the runtime box opened and closed').toBe(true);
  expect(measured,'1× runs at about real time').toBeGreaterThan(0.5);expect(measured).toBeLessThan(1.25);
- expect(await ds('plantCupsDropped')).toBe('0');expect(await ds('armSupports')).toBe('2');
+ expect(await ds('plantCupsDropped')).toBe('0');expect(await ds('armSupports')).toBe('2');expect(await ds('armIllustrative')).toBe('3');
  // the user orbits during the run: the steps that land and the report refreshes keep the user's camera; home brings back the cell
  const cb=(await page.locator('#twin-stage canvas').boundingBox())!,[cx,cy]=[cb.x+cb.width/2,cb.y+cb.height/2];
  await page.mouse.move(cx,cy);await page.mouse.down();await page.mouse.move(cx+160,cy+40,{steps:6});await page.mouse.up();
@@ -130,7 +130,7 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  await fit.click();await expect.poll(async()=>(await fr()).floorInView).toBe(true);await shot(page,'mujoco-1x-holding-fit');await home.click();await expect.poll(async()=>(await fr()).camera).toBe(cell);
  // still at 1×: released, the cup rests on the tray (its centre 5 cm over the tray's top face at 0.76 m)
  await expect.poll(async()=>Object.values(JSON.parse(await ds('cups')||'{}') as Record<string,number[]>).some(p=>Math.abs(p[2]!-0.81)<0.01&&Math.hypot(p[0]!-3.016,p[1]!-1.016)<0.05),{timeout:120000,intervals:[200]}).toBe(true);
- await shot(page,'cup-on-tray');
+ await shot(page,'cup-on-tray-robot-docked');
  const rebuildsBeforeSelect=await ds('rebuilds');
  expect(rebuildsBeforeSelect,'the scene was not rebuilt while the run went on').toBe(rebuilds0);
  // both joint columns, labelled (selecting the arm is the user's change of the scene: one rebuild, counted apart)
@@ -154,6 +154,8 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  // the completed run with the details closed (the brief's screens/mujoco-coffee.png)
  await page.locator('[data-action="twin-inspector-toggle"]').click();await expect(page.getByTestId('twin-inspector')).toBeHidden();
  if(dir){mkdirSync(`${dir}/screens`,{recursive:true});await page.screenshot({path:`${dir}/screens/mujoco-coffee.png`});}
+ // the robot has left the pickup for the table: the tray stays on its leg in the cell, as the simulated cell has it
+ await shot(page,'cell-robot-left');
 
  // the report tab: the plant block
  await openInspector(page,'report');
@@ -170,8 +172,10 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  expect(r.outcome).toMatchObject({status:'completed',served:'2'});
  expect(r.arm).toMatchObject({armPlant:{engine:'mujoco_3d',grip:'contact',calibration:'not_calibrated'},collision:{result:'pass'}});
  expect(r.coverage.armSceneCollision,'the docked robot was in the arm\'s collision check').toBe(true);
- const late=steps.filter(s=>s.ms>20*20/s.factor+250);
+ // late: a step's round trip more than 250 ms past its due time (20 ticks x 20 ms / factor), the runtime's re-anchor threshold; lateness = round trip - due
+ const due=(f:number)=>20*20/f,late=steps.filter(s=>s.ms>due(s.factor)+250),lateBy=(f:number)=>late.filter(s=>s.factor===f).length;
+ const maxLateness=Math.round(Math.max(0,...steps.map(s=>s.ms-due(s.factor))));
  console.log(`MJ-BV01 ${JSON.stringify({measured1x:Number(measured.toFixed(3)),simS:[s0,s1],wallS:(w1-w0)/1000,totalWallS:Number(total.toFixed(1)),finalTick:r.outcome.tick,
-  steps:steps.length,maxStepMs:{1:Math.max(0,...steps.filter(s=>s.factor===1).map(s=>Math.round(s.ms))),16:Math.max(0,...steps.filter(s=>s.factor===16).map(s=>Math.round(s.ms)))},late:late.length,rebuilds:[rebuilds0,rebuildsBeforeSelect,rebuildsSelected,rebuilds1],armFrac:armFrac0,armFracFresh,redraws:[redraws0,redraws1],cupsWhileHolding:holding})}`);
+  steps:steps.length,maxStepMs:{1:Math.max(0,...steps.filter(s=>s.factor===1).map(s=>Math.round(s.ms))),16:Math.max(0,...steps.filter(s=>s.factor===16).map(s=>Math.round(s.ms)))},late:late.length,late1x:lateBy(1),late16x:lateBy(16),maxLatenessMs:maxLateness,rebuilds:[rebuilds0,rebuildsBeforeSelect,rebuildsSelected,rebuilds1],armFrac:armFrac0,armFracFresh,redraws:[redraws0,redraws1],cupsWhileHolding:holding})}`);
  await context.close();
 });

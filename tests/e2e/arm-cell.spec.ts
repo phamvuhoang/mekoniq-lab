@@ -6,7 +6,7 @@ import {test,expect,type Page} from '@playwright/test';
 import layout from '../../fixtures/engineering/xarm6-g2-v1/cell-layout.json' with {type:'json'};
 const HOME=[-4.93613604879e-10,-1.14779631171,-0.324460234973,-3.14159266066,0.098539780113,7.05694566235e-09];
 type V3=[number,number,number];type Box={min:V3;max:V3};
-type Drawn={supports:(Box&{id:string})[];mount:Box|null;cups:Record<string,Box>};
+type Drawn={supports:(Box&{id:string})[];mount:Box|null;legs:(Box&{id:string})[];cups:Record<string,Box>};
 type Opts={q?:number[];cup?:V3|null;provider?:string;yawRad?:number;width?:number};
 /** Rotate v by a yaw about the map's z, then add the base: what baseInMap does to a point of the arm-base frame (a rotation about z only here). */
 const toMap=(v:readonly number[],base:readonly number[],yaw=0):V3=>[base[0]!+Math.cos(yaw)*v[0]!-Math.sin(yaw)*v[1]!,base[1]!+Math.sin(yaw)*v[0]!+Math.cos(yaw)*v[1]!,base[2]!+v[2]!];
@@ -19,7 +19,7 @@ async function mount(page:Page){
   const w=window as unknown as Record<string,unknown>;let v=t3.mountTwin3d(host,()=>{},()=>{w.webglFailed=true;})!,seq=0;
   // as the workspace does (mountTwin3d, then paint3d at once): a fresh view and its first frame in the same task, before its first resize
   w.remount=(o:unknown)=>{v.dispose();v=t3.mountTwin3d(host,()=>{},()=>{})!;(w.draw as (o:unknown)=>unknown)(o);};w.home=()=>v.home();
-  w.resize=(width:number)=>{host.style.width=`${width}px`;};
+  w.resize=(width:number,height?:number)=>{host.style.width=`${width}px`;if(height)host.style.height=`${height}px`;};
   w.draw=(o:{q:number[];cup:number[]|null;provider:string;yawRad:number})=>{
    const p=structuredClone(presets.find(x=>x.id==='mujoco-coffee')!.project),prof=p.armCollisionProfile!;prof.baseInMap.quaternionXyzw=[0,0,Math.sin(o.yawRad/2),Math.cos(o.yawRad/2)];
    const preset={...presets.find(x=>x.id==='mujoco-coffee')!,project:p},sim=String(++seq*1e8),now=performance.now();
@@ -51,20 +51,34 @@ test('the MuJoCo cell shows its two supports and a mount; a cup at the pick stan
  const rest=toMap([layout.grasp.place.position[0]!,layout.grasp.place.position[1]!,TRAY.centerM[2]!+TRAY.sizeM[2]!/2+H/2],BASE);
  await draw(page,{cup:rest});d=await ev<Drawn>(page,'drawn');
  expect(Math.abs(d.cups['cup-1']!.min[2]-d.supports.find(s=>s.id==='tray')!.max[2]),'the cup\'s bottom on the tray\'s top face').toBeLessThan(0.001);
+ // tied to the fixture's place pose: a cup centred on it has its bottom within 3 mm of the tray's top (the pose is 2 mm over it: the release height)
+ await draw(page,{cup:toMap(layout.grasp.place.position,BASE)});d=await ev<Drawn>(page,'drawn');
+ expect(Math.abs(d.cups['cup-1']!.min[2]-d.supports.find(s=>s.id==='tray')!.max[2]),'the place pose\'s cup bottom near the tray top').toBeLessThan(0.003);
  // the mount: from the floor to the base plane, under the base
  expect(d.mount!.min[2]).toBeCloseTo(0,3);expect(d.mount!.max[2]).toBeCloseTo(BASE[2]!,3);centre(d.mount!).slice(0,2).forEach((v,i)=>expect(v).toBeCloseTo(BASE[i]!,3));
 });
 
-test('the supports turn with a turned baseInMap',async({page})=>{
+/** Each support stands on an illustrative leg: from the floor straight up to the support's underside, under its centre. */
+const legsHold=(d:Drawn)=>{
+ expect(d.legs.map(l=>l.id).sort()).toEqual(['nozzle-stand','tray']);
+ for(const l of d.legs){const s=d.supports.find(x=>x.id===l.id)!;
+  expect(Math.abs(l.min[2]),`${l.id} leg on the floor`).toBeLessThan(0.001);expect(Math.abs(l.max[2]-s.min[2]),`${l.id} leg up to its underside`).toBeLessThan(0.001);
+  centre(l).slice(0,2).forEach((v,i)=>expect(Math.abs(v-centre(s)[i]!),`${l.id} leg under its centre`).toBeLessThan(0.001));}
+};
+test('the supports stand on illustrative legs from the floor; the mount and the legs are counted as illustrative parts',async({page})=>{
+ await mount(page);expect((await draw(page)).armIllustrative).toBe('3');legsHold(await ev<Drawn>(page,'drawn'));
+});
+test('the supports turn with a turned baseInMap; their legs and the mount stay vertical under them',async({page})=>{
  await mount(page);await draw(page,{yawRad:Math.PI/2});
- const d=await ev<Drawn>(page,'drawn');
+ const d=await ev<Drawn>(page,'drawn');legsHold(d);
+ expect(d.mount!.max[0]-d.mount!.min[0]).toBeLessThan(0.17);expect(Math.abs(d.mount!.min[2])).toBeLessThan(0.001);
  centre(d.supports.find(s=>s.id==='nozzle-stand')!).forEach((v,i)=>expect(v).toBeCloseTo(toMap(STAND.centerM,BASE,Math.PI/2)[i]!,3));
  centre(d.supports.find(s=>s.id==='tray')!).forEach((v,i)=>expect(v).toBeCloseTo(toMap(TRAY.centerM,BASE,Math.PI/2)[i]!,3));
 });
 
 test('another arm (Webots): no supports and no mount',async({page})=>{
- await mount(page);expect((await draw(page,{provider:'webots_arm'})).armSupports).toBe('0');
- const d=await ev<Drawn>(page,'drawn');expect(d.supports).toEqual([]);expect(d.mount).toBeNull();
+ await mount(page);const ds=await draw(page,{provider:'webots_arm'});expect(ds.armSupports).toBe('0');expect(ds.armIllustrative).toBe('0');
+ const d=await ev<Drawn>(page,'drawn');expect(d.supports).toEqual([]);expect(d.mount).toBeNull();expect(d.legs).toEqual([]);
 });
 
 test('the arm-cell framing is computed with the real viewport on a fresh mount, and never over a camera the user moved',async({page})=>{
@@ -89,4 +103,18 @@ test('the arm-cell framing is computed with the real viewport on a fresh mount, 
  await ev(page,'home');const h2=(await ev<F>(page,'framing')).camera;await page.mouse.move(cx,cy);await page.mouse.wheel(0,-300);await page.waitForTimeout(200);
  const zoomed=(await ev<F>(page,'framing')).camera;expect(zoomed).not.toBe(h2);await draw(page);await ev(page,'resize',1100);await page.waitForTimeout(300);
  expect((await ev<F>(page,'framing')).camera).toBe(zoomed);
+});
+
+test('a click (no camera change) does not count as moving the camera: a later resize re-frames; a drag does count',async({page})=>{
+ type F={camera:string};const opts={q:HOME,cup:null,provider:'mujoco_arm',yawRad:0};
+ await mount(page);await ev(page,'remount',opts);await page.waitForTimeout(300);
+ const box=(await page.locator('#u06 canvas').boundingBox())!,[cx,cy]=[box.x+box.width/2,box.y+box.height/2];
+ const before=(await ev<F>(page,'framing')).camera;
+ await page.mouse.click(cx,cy);// a plain click (select)
+ await ev(page,'resize',500,620);await page.waitForTimeout(300);const after=(await ev<F>(page,'framing')).camera;
+ await ev(page,'home');expect(after,'re-framed at the new size after a click').toBe((await ev<F>(page,'framing')).camera);
+ const b2=(await page.locator('#u06 canvas').boundingBox())!,[dx,dy]=[b2.x+b2.width/2,b2.y+b2.height/2];
+ await page.mouse.move(dx,dy);await page.mouse.down();await page.mouse.move(dx+120,dy+20,{steps:5});await page.mouse.up();
+ const dragged=(await ev<F>(page,'framing')).camera;await ev(page,'resize',1100,620);await page.waitForTimeout(300);
+ expect((await ev<F>(page,'framing')).camera,'a drag keeps the user\'s camera').toBe(dragged);
 });

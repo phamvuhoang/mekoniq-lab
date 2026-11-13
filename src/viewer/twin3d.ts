@@ -171,9 +171,10 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  const toMap=(b:THREE.Box3):MapBox=>({min:[b.min.x,-b.max.z,b.min.y],max:[b.max.x,-b.min.z,b.max.y]});
  const drawnCell=()=>{
   scene.updateMatrixWorld();const supports:(MapBox&{id:string})[]=[];let mount:MapBox|null=null;const cups:Record<string,MapBox>={};
-  world.traverse(o=>{if(o.userData.support)supports.push({id:o.userData.support as string,...toMap(new THREE.Box3().setFromObject(o))});if(o.userData.mount)mount=toMap(new THREE.Box3().setFromObject(o));});
+  const legs:(MapBox&{id:string})[]=[];
+  world.traverse(o=>{if(o.userData.support)supports.push({id:o.userData.support as string,...toMap(new THREE.Box3().setFromObject(o))});if(o.userData.mount)mount=toMap(new THREE.Box3().setFromObject(o));if(o.userData.leg)legs.push({id:o.userData.leg as string,...toMap(new THREE.Box3().setFromObject(o))});});
   for(const [id,o] of objs)if(o.obj.userData.plant)cups[id]=toMap(new THREE.Box3().setFromObject(o.obj));
-  return {supports,mount,cups};
+  return {supports,mount,legs,cups};
  };
  Object.assign(canvas,{twinFraming:framing,twinDrawn:drawnCell});
  const render=()=>{renderer.render(scene,camera);put('camera',camera.position.toArray().map(v=>v.toFixed(3)).join(','));put('geometries',String(renderer.info.memory.geometries));};
@@ -181,8 +182,10 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  // a new size re-applies the home framing (it depends on the viewport's shape) unless the user has moved the camera since: a fresh mount frames at its real size
  const resize=()=>{const p=canvas.parentElement,w=p?.clientWidth||640,h=p?.clientHeight||420;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();if(floor&&!userMoved)home();else render();};
  const ro=new ResizeObserver(resize);ro.observe(host);controls.addEventListener('change',render);
- // the user's own orbit, pan or zoom: from then on the camera is the user's until home is pressed or the floor or preset changes
- controls.addEventListener('start',()=>{userMoved=true;});
+ // the user's own orbit, pan or zoom: from then on the camera is the user's until home is pressed or the floor or preset changes. Only an interaction
+ // that moved the camera counts (OrbitControls starts one on any pointer-down or wheel: a plain click to select moves nothing)
+ const cameraPose=()=>[...camera.position.toArray(),...controls.target.toArray()].map(v=>v.toFixed(6)).join(',');let atStart='';
+ controls.addEventListener('start',()=>{atStart=cameraPose();});controls.addEventListener('end',()=>{if(cameraPose()!==atStart)userMoved=true;});
  const pick=(e:PointerEvent)=>{const r=canvas.getBoundingClientRect(),ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1),camera);
   const hit=ray.intersectObjects(world.children,true).find(h=>h.object.userData.entityId);if(hit)onSelect(String(hit.object.userData.entityId));};
  let down:[number,number]=[0,0];
@@ -202,7 +205,7 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  const fallback=()=>put('armFallback',lf?armMeshIssues(lf).map(i=>i.code).join(' '):'');
  const status=()=>{
   const a=arms()[0],l=loads.get(XARM),plant=[...objs].filter(([,o])=>o.obj.userData.plant);
-  put('armSupports',String([...objs.values()].reduce((n,o)=>n+((o.obj.userData.supports as number|undefined)??0),0)));put('armModel',a?a.mesh?'mesh':'chain':'');put('armMeshLinks',String(a?.mesh?.links.length??0));put('armMeshMs',l?.ms==null?'':l.ms.toFixed(0));
+  const sum=(k:string)=>String([...objs.values()].reduce((n,o)=>n+((o.obj.userData[k] as number|undefined)??0),0));put('armSupports',sum('supports'));put('armIllustrative',sum('illustrative'));put('armModel',a?a.mesh?'mesh':'chain':'');put('armMeshLinks',String(a?.mesh?.links.length??0));put('armMeshMs',l?.ms==null?'':l.ms.toFixed(0));
   put('gripperRad',a?.mesh?(a.mesh.group.userData.driveRad as number).toFixed(4):'');
   put('cups',plant.length?JSON.stringify(Object.fromEntries(plant.map(([id,o])=>[id,[o.obj.position.x,-o.obj.position.z,o.obj.position.y].map(v=>Number(v.toFixed(4)))]))):'{}');
  };
@@ -231,8 +234,12 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
    if(arm.model===XARM){
     const cell=new THREE.Group();cell.quaternion.copy(a.at.quaternion);cell.position.copy(a.at.position);holder.add(cell);
     for(const [id,b] of SUPPORTS){const m=new THREE.Mesh(new THREE.BoxGeometry(...b.sizeM as [number,number,number]),mat(0x7d8b8f));m.position.set(...b.centerM as [number,number,number]);m.userData.support=id;cell.add(m);}
-    const mount=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,pz,16,1,true),mat(0x9fb3b8,{wire:true}));mount.rotation.x=Math.PI/2;mount.position.set(0,0,-pz/2);mount.userData.mount=true;cell.add(mount);
-    cell.traverse(o=>{o.raycast=()=>{};});holder.userData.supports=SUPPORTS.length;
+    // illustrative, not simulated: the mount under the base and a leg under each support, standing vertically in the map from the floor to the point under them
+    const props=new THREE.Group(),leg=(id:string,top:THREE.Vector3,r:number)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,top.z,12,1,true),mat(0x9fb3b8,{wire:true}));m.rotation.x=Math.PI/2;m.position.set(top.x,top.y,top.z/2);m.userData[id==='mount'?'mount':'leg']=id;props.add(m);};
+    leg('mount',new THREE.Vector3(px,py,pz),0.08);
+    for(const [id,b] of SUPPORTS)leg(id,new THREE.Vector3(b.centerM[0],b.centerM[1],b.centerM[2]-b.sizeM[2]/2).applyQuaternion(a.at.quaternion).add(a.at.position),0.03);
+    holder.add(props);
+    for(const g of [cell,props])g.traverse(o=>{o.raycast=()=>{};});holder.userData.supports=SUPPORTS.length;holder.userData.illustrative=props.children.length;
    }
    // the meshes when they are loaded (once per page); the joint chain until then, and for good when they cannot be used
    const l=a.wantMesh?meshLoad():null;if(l?.set)dressMeshes(a,l);else dress(a,null);if(l&&!l.set&&!l.error)await_(l);
