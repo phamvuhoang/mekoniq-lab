@@ -25,7 +25,9 @@ const startIdentity=captureRegressionIdentity(SRC,LAB);assertRecordableIdentity(
 const identityCheckpoints=[];
 function identityCheckpoint(id){const identity=captureRegressionIdentity(SRC,LAB);assertStableRecording(startIdentity,identity);identityCheckpoints.push({id,identity});}
 if(!explicitOut)rmSync(OUT,{recursive:true,force:true});mkdirSync(OUT,{recursive:true});
-const env={...process.env,LAB_V2_REQUIRE_LAB_FIXTURES:'1'};
+// no step writes Python bytecode: source's vitest steps start Python under robotics/simulation (source-engineering: lab-v2-bv01-sil, lab-v2-sil-review,
+// lab-v2-native-profile, lab-v2-arm-collision-evidence), and the Lab launchers refuse a pinned tool closure with __pycache__ (PORTABLE_TOOLS_MISMATCH)
+const env={...process.env,LAB_V2_REQUIRE_LAB_FIXTURES:'1',PYTHONDONTWRITEBYTECODE:'1'};
 const sha=f=>createHash('sha256').update(readFileSync(f)).digest('hex');
 // paths and anything shaped like a key/token are removed before a file is stored or hashed
 const scrub=(text,kind)=>scrubEvidence(text,{node:process.execPath,workspace:W,home:os.homedir()},kind);
