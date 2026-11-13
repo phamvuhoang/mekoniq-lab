@@ -46,9 +46,10 @@ test('Serve on Webots 3D: compile, run WB-FD01 to completion, report and replay 
  await expect(page.locator('#twin-scene-title')).toContainText('20 × 12 m');
  for(const t of ['T01','T10'])await expect(page.getByTestId('twin-scene')).toContainText(t);
  await expect(page.getByTestId('preflight').locator('li',{hasText:'Compiled bundle for this exact draft'})).toHaveClass(/ok/);
- await expect(page.getByTestId('preflight').locator('li',{hasText:'Runtime readiness'})).toHaveClass(/ok/,{timeout:120000});
+ // polled with its text: a readiness that never becomes ok fails with the runtime's own reasons
+ await expect.poll(async()=>{const li=page.getByTestId('preflight').locator('li',{hasText:'Runtime readiness'});return await li.getAttribute('class')==='ok'?'ok':await li.innerText();},{timeout:120000,intervals:[1000]}).toBe('ok');
  await page.getByRole('button',{name:'Run Webots 3D'}).click();
- await expect(page.getByTestId('mode-badge')).toHaveText('Simulation · not calibrated');// the page is in English hereawait expect(page.getByTestId('mode-badge')).toHaveAttribute('data-mode','simulation');
+ await expect(page.getByTestId('mode-badge')).toHaveText('Simulation · not calibrated');/* the page is in English here */await expect(page.getByTestId('mode-badge')).toHaveAttribute('data-mode','simulation');
  await expect(page.getByTestId('run-identity')).toContainText('WB-FD01');
  await expect(page.locator('polygon[data-layer="footprint"]')).toHaveCount(1);
 

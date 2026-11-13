@@ -55,7 +55,7 @@ test('Serve on IR-SIM 2D: validate, run IR-FD01 to completion, report and replay
  await expect(page.getByTestId('preflight').locator('li',{hasText:'Compiled bundle for this exact draft'})).toHaveClass(/ok/);
  await expect(page.getByTestId('preflight').locator('li',{hasText:'Runtime readiness'})).toHaveClass(/ok/,{timeout:30000});
  await page.getByRole('button',{name:'Run IR-SIM 2D'}).click();
- await expect(page.getByTestId('mode-badge')).toHaveText('Simulation · not calibrated');// the page is in English hereawait expect(page.getByTestId('mode-badge')).toHaveAttribute('data-mode','simulation');
+ await expect(page.getByTestId('mode-badge')).toHaveText('Simulation · not calibrated');/* the page is in English here */await expect(page.getByTestId('mode-badge')).toHaveAttribute('data-mode','simulation');
  await expect(page.getByTestId('run-identity')).toContainText('IR-FD01');
  // layers with provenance: compiled footprint and obstacles, safety envelope; LiDAR says why it is not drawn on a live run
  await expect(page.getByTestId('layer-provenance')).toContainText('drive → base');

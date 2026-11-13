@@ -20,9 +20,10 @@ test('coffee with the arm on Webots: run to completed, actual and commanded join
  await expect(page.locator('#twin-backend-set option[value="engineering-webots-arm-v1"]')).toBeEnabled();
 
  await openScenarioPicker(page);await page.getByRole('button',{name:'Webots · coffee with a 3D arm'}).click();
- await expect(page.getByTestId('preflight').locator('li',{hasText:'Runtime readiness'})).toHaveClass(/ok/,{timeout:180000});
+ // polled with its text: a readiness that never becomes ok fails with the runtime's own reasons
+ await expect.poll(async()=>{const li=page.getByTestId('preflight').locator('li',{hasText:'Runtime readiness'});return await li.getAttribute('class')==='ok'?'ok':await li.innerText();},{timeout:180000,intervals:[1000]}).toBe('ok');
  await page.getByRole('button',{name:'Run Webots (arm)'}).click();
- await expect(page.getByTestId('mode-badge')).toHaveText('Simulation · not calibrated');// the page is in English hereawait expect(page.getByTestId('mode-badge')).toHaveAttribute('data-mode','simulation');
+ await expect(page.getByTestId('mode-badge')).toHaveText('Simulation · not calibrated');/* the page is in English here */await expect(page.getByTestId('mode-badge')).toHaveAttribute('data-mode','simulation');
  await expect(page.getByTestId('run-identity')).toContainText('WB-BV01');
 
  // a step, then the arm: each joint block has two values (observed, commanded), the source row says which is which
