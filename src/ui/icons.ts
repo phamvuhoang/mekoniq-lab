@@ -4,6 +4,8 @@ const paths: Record<string, string> = {
   design: '<path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5m-18 5 9 5 9-5"/>',
   map: '<path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5Zm6-2v16m6-14v16"/>',
   play: '<path d="m8 4 12 8-12 8V4Z"/>',
+  pause: '<path d="M8 5v14m8-14v14"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="1"/>',
   result: '<path d="M4 3v18h18M8 16v-4m5 4V8m5 8V5"/>',
   deploy:
     '<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/>',

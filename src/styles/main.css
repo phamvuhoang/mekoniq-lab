@@ -2256,9 +2256,13 @@ label.button:has(+ input:focus-visible) {
 main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8px}
 .twin-shell{flex:1;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:6px}
 .twin-runbar{position:relative;z-index:6;display:flex;align-items:center;justify-content:space-between;gap:6px 14px;padding:2px 8px;background:var(--panel);border-radius:10px}
-.twin-runbar-left,.twin-runbar-right{display:flex;align-items:center;gap:6px 12px;min-width:0}
+/* I3: the bar wraps instead of clipping: each group starts at its one-row width and the right group goes to a second row when both do not fit;
+   inside a group, items wrap too (phones). The scenario name keeps a readable width (its full name is its title and accessible name). */
+.twin-runbar{flex-wrap:wrap}
+.twin-runbar-left,.twin-runbar-right{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;min-width:0}
 .twin-runbar-left{flex:1 1 auto}
-.twin-runbar-right{flex:none}
+.twin-runbar-right{flex:1 1 auto;justify-content:flex-end}
+.twin-runbar .twin-scenario{flex:0 1 auto;min-width:min(100%,calc(14ch + 48px))}
 .twin-runbar .twin-bar-item small{text-transform:none;letter-spacing:0}
 .twin-runbar .twin-mode{flex:none}
 .twin-scenario,.twin-runtime-chip{display:inline-flex;align-items:center;gap:8px;min-width:0;min-height:44px;padding:0 12px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;text-align:left}
@@ -2352,7 +2356,6 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
  .twin-transport .button{position:relative}
  .twin-transport .button:not([data-action="twin-step"])>span,.twin-speed>span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 }
-@media (max-width:1023px){.twin-runbar,.twin-runbar-left,.twin-runbar-right{flex-wrap:wrap}.twin-runbar-right{flex:1 1 auto}}
 /* U07: 1024-1279 px (the app sidebar stays): the run bar and the transport keep one row; shortened texts stay in the accessible name */
 .twin-runbar .twin-runtime-chip{flex:none}
 @media (max-width:1279px){

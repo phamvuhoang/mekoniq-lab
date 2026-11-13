@@ -101,3 +101,11 @@ test('I5: the runtime word says what the page knows: not tried yet, trying, fail
  expect(w('ok',{link:'runtime_lost'})).toEqual({state:'lost',label:'Mất kết nối'});
  for(const s of ['idle','failed','mismatch'])expect(runBar(bar({runtime:{state:s as never,label:'x',detail:''}}))).toContain(`data-state="${s}"`);
 });
+test('I4: Stop auto-run, Pause simulation and Cancel run carry three different icons; every transport button has a title equal to its label',()=>{
+ const svg=(html:string,action:string)=>new RegExp(`data-action="${action}"[^>]*>(<svg[^]*?</svg>)`).exec(html)?.[1];
+ const html=transportBar(transport({playing:true,canPause:true}));
+ const icons=['twin-stop','twin-pause','twin-cancel'].map(a=>svg(html,a));
+ expect(icons.every(Boolean)).toBe(true);expect(new Set(icons).size).toBe(3);
+ for(const m of html.matchAll(/<button[^>]*>/g))expect(m[0]).toMatch(/title="[^"]+"/);
+ expect(html).toMatch(/data-action="twin-stop"[^>]*title="Tạm dừng tự chạy"/);
+});
