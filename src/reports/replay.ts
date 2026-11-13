@@ -4,7 +4,7 @@ import {pose3dOf} from '../twin/pose3d';
 import {reportClock} from './clock';
 import {validVerification} from './verification';
 import type {RunReport,RunView,AmrView,CoffeeJobView,CupView,ArmCollisionView,ArmCollisionScene,ArmStopView} from '../scenarios/controls';
-import type {TwinSample} from '../twin/store';
+import type {Held,TwinSample} from '../twin/store';
 type Event=RunReport['businessEvents'][number];
 export interface TraceRow {tick:number;layer:'command'|'observation'|'business'|'effect'|'telemetry';type:string;id:string;entityId?:string;sequence?:string;detail?:string}
 const COMMAND=/^(RobotCommandIssued|RobotGoalAssigned|CellCommandIssued|Coffee(StepStarted|JobStarted)|CupTransferRequested)$/;
@@ -88,7 +88,10 @@ export function openReplayV2(report:RunReport,o:{maxGapTicks?:number}={}){
   /** Recorded state at a cursor: business events up to it, latest sample per entity, telemetry gaps that cover it. */
   seek,
   /** Rebuild display state from journal snapshots and time-bounded traces. The final view supplies identity only. */
-  project(base:RunView,t:number):{view:RunView;report:RunReport;seen:Record<string,number>}{
+  /** `samples`: per entity, the latest recorded sample at or before the cursor (as the live store holds one; its receipt clock is its sim time, `nowMs` the
+   * cursor's), drawn by the live code; none inside a recorded gap that covers the cursor. `unrecorded`: the entities other than AMRs (whose poses are
+   * projected above) that have recorded samples but none drawn at this cursor (before their first one, or in a gap). */
+  project(base:RunView,t:number):{view:RunView;report:RunReport;seen:Record<string,number>;samples:Record<string,Held>;nowMs:number;unrecorded:string[]}{
    const f=seek(t),states=new Map<string,Map<string,Record<string,unknown>>>(),seen:Record<string,number>={},owners=new Map<string,string>();
    for(const e of f.events){
     if(!e.state)continue;
@@ -117,7 +120,13 @@ export function openReplayV2(report:RunReport,o:{maxGapTicks?:number}={}){
     ...report.telemetry?{telemetry:{...structuredClone(report.telemetry),samples:telemetrySamples,sampleCounts,gaps:report.telemetry.gaps.filter(g=>g.toTick<=f.tick)}}:{},
     ...report.coffee?{coffee:{jobs:jobs as unknown as NonNullable<RunReport['coffee']>['jobs'],cups:cups as unknown as NonNullable<RunReport['coffee']>['cups'],plantLog:structuredClone((report.coffee.plantLog??[]).filter(e=>typeof e.tick==='number'&&Number.isFinite(e.tick)&&e.tick<=f.tick)),armTrace:{...report.coffee.armTrace,collision,stop:stopAt(report,f.tick),samples:report.coffee.armTrace.samples.filter(s=>s.tick<=f.tick)}}}:{}
    };
-   return {seen,report:projectedReport,view:{...base,tick:f.tick,simTimeNs:f.simTimeNs,served,entities,attention,awaiting,
+   const held:Record<string,Held>={},unrecorded:string[]=[],tickNs=BigInt(tickMs)*1000000n;
+   for(const [id,list] of byEntity){
+    const s=f.gaps.length?undefined:f.entities[id];
+    if(s)held[id]={...s,receivedAtMs:Number(s.simTimeNs!==null?BigInt(s.simTimeNs):BigInt(tickOfSample(s))*tickNs)/1e6,epochResetAtMs:null};
+    else if(!list.every(x=>typeof x.observed?.xM==='number'))unrecorded.push(id);
+   }
+   return {seen,samples:held,nowMs:Number(f.simTimeNs)/1e6,unrecorded:unrecorded.sort(),report:projectedReport,view:{...base,tick:f.tick,simTimeNs:f.simTimeNs,served,entities,attention,awaiting,
     run:{...base.run,status,ageMs:0,eventCursor:f.events.at(-1)?.sequence??null,telemetryCursor:telemetrySamples.at(-1)?.seq??null},
     workload:base.workload.map(w=>({...w,status:states.get('mission')?.has(w.missionId??'')?'placed':'planned',missionId:states.get('mission')?.has(w.missionId??'')?w.missionId:undefined})),
     coffee:report.coffee?{jobs:jobs as unknown as CoffeeJobView[],cups:cups as unknown as CupView[]}:null}};

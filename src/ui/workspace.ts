@@ -294,7 +294,10 @@ export class TwinWorkspace {
   return `<div class="twin-objects" id="twin-objects">${cycleQueue(ops)}${f.view?`<p class="twin-bar-item"><small>${tr('Cốc hiện tại','現在のカップ','Current cup')}${cup?` ${esc(cup.cupId)}`:''}</small><b data-testid="cup-owner">${cup?esc(nameOf(f.preset,cup.ownerId)):'—'}</b></p>`:''}</div>`;
  }
  /** A run that is simply running needs no person: its next step stays on the run bar. */
- private strip(f:TwinFrame){const n=nextAction(this.ops(f)),v=f.view;return `<div class="twin-next" id="twin-next">${nextStrip(this.problems(f),v?.run.status==='running'&&!v.attention.length?{title:n.title,detail:n.detail}:n)}</div>`;}
+ private strip(f:TwinFrame){const n=nextAction(this.ops(f)),v=f.view,u=this.replay?f.unrecorded??[]:[];
+  // replay: an object with recorded samples but none at this cursor is drawn without them, and that is said
+  const none=u.length?`<p class="source-note" data-testid="replay-unrecorded" role="status">${icon('info',15)}${tr('Không có mẫu ghi lại tại thời điểm này (trước mẫu đầu tiên hoặc trong khoảng trống telemetry) cho','この時点の記録サンプルがありません(最初のサンプルより前、またはテレメトリ欠落中):','No recorded sample at this point (before the first one, or in a telemetry gap) for')} ${esc(u.map(id=>nameOf(f.preset,id)).join(', '))}: ${tr('vẽ như khi không có telemetry.','テレメトリがない場合と同じく描画します。','drawn as without telemetry.')}</p>`:'';
+  return `<div class="twin-next" id="twin-next">${none}${nextStrip(this.problems(f),v?.run.status==='running'&&!v.attention.length?{title:n.title,detail:n.detail}:n)}</div>`;}
  private transport(f:TwinFrame):TransportState{
   // a runtime that paces steps accepts exactly these factors; an older one keeps the clock's own list
   const v=f.view,c=runControls(this.ops(f)),r=this.replay,speeds=this.health?.features?.pacedStep?PACE_FACTORS:this.clock()?.speeds.length?this.clock()!.speeds:[1,4,16,64];

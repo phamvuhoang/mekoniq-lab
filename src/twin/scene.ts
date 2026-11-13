@@ -15,7 +15,8 @@ import {layerProvenance} from './overlays';
 import {plantCupPose} from './arm/arm-telemetry';
 export interface TwinFrame {preset:TwinPreset;view:RunView|null;report:RunReport|null;seen?:Record<string,number>;/** latest telemetry per entity from the browser store (plan 03: arm joints) */samples?:Record<string,Held>;nowMs?:number;
  /** IR-SIM 2D runs: the run bundle's compiled navigation scene (footprints, sensors, obstacles) and, for imported evidence only, scans with their own-tick poses. */
- navigation?:NavigationSceneV1|null;scans?:{scans:ScanSample[]}}
+ navigation?:NavigationSceneV1|null;scans?:{scans:ScanSample[]};
+ /** Replay: entities with recorded samples but none drawn at the cursor (before their first one, or in a recorded gap); drawn as without telemetry. */unrecorded?:string[]}
 export interface ViewState {view:'2d'|'3d';layers:Layers;selected:string|null}
 export interface SceneEntity {id:string;kind:string;name:string;x:number;y:number;/** AMR only, from a 3D plant: base height, roll and pitch */pose3d?:{z:number;rollRad:number;pitchRad:number};yawRad?:number;source:'observed'|'modeled'|'derived'|'unknown';status?:string;
  /** Cup only: its pose in the map as the MuJoCo plant reports it (drawn there instead of at its custodian) */plant?:{positionM:[number,number,number];quaternionXyzw:[number,number,number,number]}}

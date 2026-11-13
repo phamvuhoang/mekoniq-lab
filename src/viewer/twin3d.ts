@@ -47,12 +47,14 @@ export function overlayShapes(f:TwinFrame,vs:ViewState):OverlayShape[]{
 }
 /** The model revision the run reports (its arm trace, else the run project's arm profile, which the runtime checks against its fixture). */
 const runRevision=(f:TwinFrame)=>f.report?.coffee?.armTrace?.modelRevision??f.preset.project.armCollisionProfile?.modelRevision??null;
-/** What the scene draws: placed entities (no jobs), and for an arm the joints it shows (observed, else commanded; frozen while stale), the model its
- * provider runs and whether that model is drawn from meshes (the xArm, when the Lab's fixture revision is the run's). */
+/** What the scene draws: placed entities (no jobs), and for an arm the joints it shows (observed, else commanded; frozen while stale), the model it runs
+ * (the report's arm plant when the report names one, else its samples' provider) and whether that model is drawn from meshes (the xArm, when the Lab's
+ * fixture revision is the run's). */
 function drawn(f:TwinFrame){
+ const plant=f.report?.arm?.armPlant.engine;
  return sceneEntities(f).filter(e=>Number.isFinite(e.x)&&e.kind!=='job').map(e=>{
   if(e.kind!=='arm')return {e,arm:null};
-  const s=f.samples?.[e.id],v=s?armJointsView(s,f.nowMs??s.receivedAtMs):null,model=armModelFor(s?.providerId??''),run=runRevision(f);
+  const s=f.samples?.[e.id],v=s?armJointsView(s,f.nowMs??s.receivedAtMs):null,model=plant?(plant==='mujoco_3d'?XARM:'arm-ref-3d-v1'):armModelFor(s?.providerId??''),run=runRevision(f);
   return {e,arm:{...displayJoints(null,v),gripperOpeningM:v?.gripperOpeningM??null,model,mesh:model===XARM&&(run===null||run===xarmManifest.modelRevision)}};
  });
 }
