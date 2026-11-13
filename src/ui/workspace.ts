@@ -510,7 +510,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
    if(this.pausing&&this.view&&['running','awaiting_confirmation'].includes(this.view.run.status)){
     await this.act('pause');this.pausing=false;// landed: the next render shows Resume
     // the pause control the user pressed becomes Resume: focus goes there, not to the page
-    const a=typeof document.querySelector==='function'?document.activeElement as HTMLElement|null:null;if(!a||a===document.body||a.dataset?.action==='twin-pause')this.focusTo='#twin-transport [data-action="twin-resume"]';
+    const a=typeof document.querySelector==='function'?document.activeElement as HTMLElement|null:null;if(!a||a===document.body||a.dataset?.action==='twin-pause')this.focusTo='#transport-twin-resume';
    }
   });
   this.playing=false;this.pausing=false;this.rerender();
