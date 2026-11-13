@@ -3,7 +3,7 @@
 // tests/e2e/mujoco-mesh-fallback.spec.ts): the pairing code is one-use and a same-origin session lives in the page, while the parsed meshes are cached per page, so the
 // blocked load needs a page of its own that has never loaded them.
 import {test,expect} from '@playwright/test';
-import {openProblems,openScenarioPicker} from '../support/twin';
+import {openInspector,openProblems,openScenarioPicker} from '../support/twin';
 const token=process.env.LAB_TEST_PAIRING_TOKEN,dir=process.env.LAB_EVIDENCE_DIR??process.env.LAB_IRSIM_SCREENSHOTS;
 
 test('MJ-BV01 with the arm meshes unavailable: joint chain, one ARM_MESH_UNAVAILABLE note (not a problem), and the run completes',async({browser})=>{
@@ -26,7 +26,13 @@ test('MJ-BV01 with the arm meshes unavailable: joint chain, one ARM_MESH_UNAVAIL
  await page.getByTestId('notes-count').click();await expect(page.getByTestId('problems-panel')).toBeVisible();await openProblems(page);
  const row=page.getByTestId('problem-row');await expect(row).toHaveCount(1);await expect(row).toHaveAttribute('data-severity','notice');await expect(row).toContainText('ARM_MESH_UNAVAILABLE');
  await expect(page.getByTestId('problems-panel').locator('h3')).toHaveText('Lưu ý');
- await expect(page.getByTestId('run-served')).toContainText('2');expect(await ds('armModel')).toBe('chain');
+ await expect(page.getByTestId('run-served').locator('b')).toHaveText('2');expect(await ds('armModel')).toBe('chain');
+ // the report agrees: the run completed with both cups served (the panel is closed first: it lies over the inspector's tabs)
+ await page.getByTestId('notes-count').click();await expect(page.getByTestId('problems-panel')).toBeHidden();
+ await openInspector(page,'engineering');const id=(await page.getByTestId('run-id').textContent())!.trim();
+ const r=await page.evaluate(async x=>(await fetch(`/lab/v2/runs/${x}/report`,{credentials:'same-origin'})).json(),id) as {outcome:{status:string;served:string}};
+ expect(r.outcome).toMatchObject({status:'completed',served:'2'});
+ await page.locator('[data-action="twin-inspector-toggle"]').click();
  if(dir)await page.screenshot({path:`${dir}/U06-mesh-fallback-notes.png`});
  await context.close();
 });

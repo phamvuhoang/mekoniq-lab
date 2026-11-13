@@ -27,7 +27,7 @@ type Pose7={positionM:[number,number,number];quaternionXyzw:[number,number,numbe
  * measured gripper opening. `cups`: the cups drawn where the plant reports them (map frame, cup centre). */
 export interface TwinPoses {arms:Record<string,{jointsRad:number[];gripperOpeningM:number|null}>;bodies:Record<string,Pose7>;cups?:Record<string,Pose7>}
 export interface Twin3d {canvas:HTMLCanvasElement;/** Move into a re-rendered stage and size from it. */attach(host:HTMLElement):void;update(f:TwinFrame,vs:ViewState):void;pose(p:TwinPoses):void;
- /** Camera back to the view of the whole floor it starts with. */home():void;/** Frame one object, or the whole scene for null or an object not drawn. */fit(entityId:string|null):void;dispose():void}
+ /** Camera back to the preset's home framing: its arm cell (homeRegion), else the whole floor. */home():void;/** Frame one object, or the whole scene for null or an object not drawn. */fit(entityId:string|null):void;dispose():void}
 const LIME=0xb4f375,NAVY=0x182a33;
 const COLOR:Record<string,number>={footprint:0x9dccff,safety:0xf0b45a,observed:0x5ad1c6};
 export interface OverlayShape {layer:'path'|'footprint'|'safety'|'observed';entityId:string;loop:boolean;z:number;points:[number,number][]}
@@ -57,6 +57,14 @@ function drawn(f:TwinFrame){
  });
 }
 const armBase=(f:TwinFrame)=>f.preset.project.armCollisionProfile?.baseInMap;
+/** The home framing of a preset that asks for its arm cell (`view: 'arm_cell'`), as boxes in the map frame (m), derived from the scene, never written into the preset:
+ * the arm over its base (0.45 m around it: the stand and the tray beside it; from 0.1 m below the base to 0.8 m above it, the arm standing up) and the docked robot at
+ * each coffee pickup (0.45 m around it, for its 0.4 m radius; from the floor to 0.6 m, its cups on the tray). Null for any other preset (home shows the whole floor). Pure. */
+export function homeRegion(f:TwinFrame):{min:[number,number,number];max:[number,number,number]}[]|null{
+ const b=armBase(f)?.position;if(f.preset.view!=='arm_cell'||!b)return null;
+ const M=0.45,around=(x:number,y:number,z0:number,z1:number)=>({min:[x-M,y-M,z0] as [number,number,number],max:[x+M,y+M,z1] as [number,number,number]});
+ return [around(b[0]!,b[1]!,Math.max(0,b[2]!-0.1),b[2]!+0.8),...f.preset.project.world.points.filter(p=>p.kind==='coffee_pickup').map(p=>around(p.x,p.y,0,0.6))];
+}
 /** One mesh load per model per page: the parsed geometry is kept and shared by every drawing of it. */
 interface MeshLoad {set:ArmMeshSet|null;error:string|null;ms:number|null;done:Promise<void>}
 const loads=new Map<string,MeshLoad>();
@@ -138,7 +146,13 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
  const mat=(color:number,o:{wire?:boolean;emissive?:boolean}={})=>new THREE.MeshStandardMaterial({color,wireframe:!!o.wire,emissive:o.emissive?LIME:0x000000,emissiveIntensity:o.emissive?0.6:0,roughness:0.7});
  /** A dataset attribute is written only when its value changed (pose() runs every animation frame). */
  const put=(k:string,v:string)=>{if(canvas.dataset[k]!==v)canvas.dataset[k]=v;};
- const render=()=>{renderer.render(scene,camera);put('camera',camera.position.toArray().map(v=>v.toFixed(3)).join(','));put('geometries',String(renderer.info.memory.geometries));};
+ /** For tests and evidence: the share of the viewport's height the arm takes (its bounding box projected), and whether the whole floor is in view. */
+ const framing=()=>{
+  const ndc=(p:THREE.Vector3)=>p.clone().project(camera),arm=[...objs.values()].find(o=>o.arm)?.obj;
+  if(arm){const b=new THREE.Box3().setFromObject(arm);if(!b.isEmpty()){const ys=[0,1,2,3,4,5,6,7].map(i=>ndc(new THREE.Vector3(i&1?b.max.x:b.min.x,i&2?b.max.y:b.min.y,i&4?b.max.z:b.min.z)).y);put('armFrac',((Math.min(1,Math.max(...ys))-Math.max(-1,Math.min(...ys)))/2).toFixed(3));}}
+  const w=lf?.preset.project.world;if(w)put('floorInView',String([[0,0],[w.width,0],[0,w.height],[w.width,w.height]].every(([x,y])=>{const q=ndc(at(x!,y!));return Math.abs(q.x)<=1&&Math.abs(q.y)<=1;})));
+ };
+ const render=()=>{renderer.render(scene,camera);put('camera',camera.position.toArray().map(v=>v.toFixed(3)).join(','));put('geometries',String(renderer.info.memory.geometries));framing();};
  // size from wherever the canvas lives now: the stage element is replaced on every workspace render
  const resize=()=>{const p=canvas.parentElement,w=p?.clientWidth||640,h=p?.clientHeight||420;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();render();};
  const ro=new ResizeObserver(resize);ro.observe(host);controls.addEventListener('change',render);
@@ -246,7 +260,16 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
   for(const [id,c] of Object.entries(p.cups??{})){const o=objs.get(id);if(o?.obj.userData.plant){const pl=placeBody(c.positionM,c.quaternionXyzw,0);o.obj.position.set(...pl.position);o.obj.quaternion.set(...pl.quaternion);}}
   status();render();
  };
- const home=()=>{if(!lf)return;const w=lf.preset.project.world,m=Math.max(w.width,w.height);camera.position.set(w.width/2,m*0.9,w.height*0.4+m*0.6);controls.target.set(w.width/2,0,-w.height/2);controls.update();render();};
+ const home=()=>{if(!lf)return;const w=lf.preset.project.world,m=Math.max(w.width,w.height);camera.position.set(w.width/2,m*0.9,w.height*0.4+m*0.6);controls.target.set(w.width/2,0,-w.height/2);
+  const r=homeRegion(lf);
+  if(r){// the same viewing direction, moved in until every corner of the region's boxes just fits (98 % of the viewport)
+   const corners=r.flatMap(q=>[0,1,2,3,4,5,6,7].map(i=>at(i&1?q.max[0]:q.min[0],i&2?q.max[1]:q.min[1],i&4?q.max[2]:q.min[2])));
+   const box=new THREE.Box3().setFromPoints(corners),c=box.getCenter(new THREE.Vector3()),dir=camera.position.clone().sub(controls.target).normalize();
+   const fits=(d:number)=>{camera.position.copy(c).addScaledVector(dir,d);camera.lookAt(c);camera.updateMatrixWorld();return corners.every(p=>{const q=p.clone().project(camera);return Math.abs(q.x)<=0.98&&Math.abs(q.y)<=0.98&&q.z<1;});};
+   let lo=0.5,hi=box.getBoundingSphere(new THREE.Sphere()).radius/Math.sin(THREE.MathUtils.degToRad(camera.fov)/2)*2;for(let i=0;i<30;i++){const mid=(lo+hi)/2;if(fits(mid))hi=mid;else lo=mid;}
+   fits(hi);controls.target.copy(c);
+  }
+  controls.update();render();};
  return {canvas,pose,home,
   attach(next){if(canvas.parentElement!==next)next.replaceChildren(canvas);ro.disconnect();ro.observe(next);resize();},
   update(f,vs){
@@ -259,7 +282,8 @@ export function mountTwin3d(host:HTMLElement,onSelect:(id:string)=>void,onFail:(
      for(const d of drawn(f))if(changed.includes(d.e.id)){drawOne(d,f,vs);objs.get(d.e.id)?.obj.traverse(m=>{if((m as THREE.Mesh).isMesh){m.castShadow=true;m.receiveShadow=true;}});}
      canvas.dataset.redraws=String(redraws+=changed.length);fallback();status();}
    }
-   const w=f.preset.project.world,size=`${w.width}x${w.height}`;if(size!==floor){floor=size;home();}
+   // the home framing on a new floor or a preset that frames something else (its arm cell)
+   const w=f.preset.project.world,size=`${w.width}x${w.height} ${f.preset.view??''}`;if(size!==floor){floor=size;home();}
    // objects without a pose of their own (cups, a cylinder arm, machines) move with the frame
    for(const {e} of drawn(f)){const o=objs.get(e.id);if(o&&e.kind!=='amr'&&!o.arm&&!e.plant)o.obj.position.copy(at(e.x,e.y,heightOf(e)));}
    drawOverlays(f,vs);pose(posesOf(f));

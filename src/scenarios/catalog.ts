@@ -11,8 +11,9 @@ import type {AssetRevision,LabProjectV2} from '../shared/types';
 import {tr} from '../i18n';
 /** Present only on an engineering preset: the exact draft that was compiled and the receipt for it. */
 export interface EngineeringPresetInput {project:import('../shared/engineering').EngineeringProject;receipt:import('../shared/engineering').BundleReceipt|null}
-/** `speed`: the auto-run factor set when the preset is chosen (absent: the current speed stays). */
-export interface TwinPreset {engineering?:EngineeringPresetInput;speed?:number;mode?:'mock'|'simulation';id:string;title:()=>string;summary:()=>string;scenarioId:string;scenarioRevision:number;backendSetId:string;seed:number;
+/** `speed`: the auto-run factor set when the preset is chosen (absent: the current speed stays). `view`: what the 3D view's home framing shows (absent: the whole floor;
+ * `arm_cell`: the arm cell, derived from the scene by viewer/twin3d homeRegion). */
+export interface TwinPreset {engineering?:EngineeringPresetInput;speed?:number;view?:'arm_cell';mode?:'mock'|'simulation';id:string;title:()=>string;summary:()=>string;scenarioId:string;scenarioRevision:number;backendSetId:string;seed:number;
  project:LabProjectV2;assets:AssetRevision[];names:Record<string,string>;roles:{entities:LabProjectV2['entities'][number]['kind'][];points:string[]};}
 export const presets:TwinPreset[]=[
  {id:'coffee',title:()=>tr('Cà phê sữa đá','アイスミルクコーヒー','Iced milk coffee'),summary:()=>tr('BV01 · espresso + cà phê sữa đá · máy pha → arm → khay robot → bàn','BV01 · エスプレッソ + アイスミルクコーヒー · マシン → アーム → ロボットトレイ → テーブル','BV01 · espresso + iced milk coffee · machine → arm → robot tray → table'),
@@ -56,7 +57,7 @@ presets.push({...presets[0]!,id:'webots-coffee',mode:'simulation',scenarioId:'WB
 /** MJ-BV01: the coffee cell with the xArm 6 and its Gripper G2 as a MuJoCo plant (R2a). The runtime builds the cell from this project (no engineering bundle); the arm grips by
  * simulated contact, masses and limits are manufacturer nominal values, everything else is assumed, nothing is calibrated. It starts at 1× so the motion is seen at its own pace. */
 export const MUJOCO_ARM_SET='engineering-mujoco-arm-v1';
-presets.push({...presets[0]!,id:'mujoco-coffee',mode:'simulation',scenarioId:'MJ-BV01',backendSetId:MUJOCO_ARM_SET,seed:42,speed:1,project:structuredClone(xarmCell) as LabProjectV2,assets:[],
+presets.push({...presets[0]!,id:'mujoco-coffee',mode:'simulation',scenarioId:'MJ-BV01',backendSetId:MUJOCO_ARM_SET,seed:42,speed:1,view:'arm_cell',project:structuredClone(xarmCell) as LabProjectV2,assets:[],
  title:()=>tr('MuJoCo · cà phê với tay máy xArm 6','MuJoCo · xArm 6でコーヒー','MuJoCo · coffee with the xArm 6'),summary:()=>tr('BV01 · xArm 6 với kẹp G2 là plant MuJoCo (bộ truyền động vị trí, gắp bằng tiếp xúc mô phỏng) · khối lượng và giới hạn danh định của nhà sản xuất, còn lại giả định, chưa hiệu chuẩn · không phải phần cứng','BV01 · グリッパーG2付きxArm 6はMuJoCoのプラント(位置アクチュエータ、把持は模擬接触) · 質量と制限はメーカー公称値、他は仮定で未校正 · 実機ではない','BV01 · the xArm 6 with its G2 gripper is a MuJoCo plant (position actuators, grip by simulated contact) · manufacturer nominal masses and limits, everything else assumed, not calibrated · not hardware')});
 export const presetById=(id:string)=>presets.find(p=>p.id===id);
 /** Display name of an entity, point, cup or job; unknown ids are shown as-is, never invented. */

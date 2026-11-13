@@ -14,22 +14,39 @@ interface Report {outcome:{status:string;served:string;tick:number};coverage:Rec
 test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to completed, the mesh arm and cups, both joint columns and the plant report',async({browser})=>{
  expect(token,'Run scripts/test-irsim-e2e.mjs --provider mujoco tests/e2e/mujoco-coffee.spec.ts: it starts lab:mujoco with the real MuJoCo worker and supplies the one-use pairing code').toBeTruthy();
  test.setTimeout(900000);
- const context=await browser.newContext({viewport:{width:1440,height:900}}),page=await context.newPage();
+ const context=await browser.newContext({viewport:{width:1440,height:900}});
+ // 0. a page from the web (not this machine's loopback; its requests are served from the launcher's UI): "Máy này" is the runtime on the user's machine
+ const web=await context.newPage();
+ await web.route('http://lab.example.test/**',async r=>{const u=new URL(r.request().url());if(u.pathname.startsWith('/lab/'))return r.fulfill({status:404,contentType:'application/json',body:'{"error":"NO_RUNTIME_ON_THIS_ORIGIN"}'});return r.fulfill({response:await r.fetch({url:`http://127.0.0.1:4175${u.pathname}${u.search}`})});});
+ await web.goto('http://lab.example.test/#twin');
+ await expect(web.getByTestId('runtime-popover')).toBeVisible();await expect(web.locator('#twin-runtime-here')).toBeChecked();await expect(web.locator('#twin-runtime-url')).toHaveValue('http://127.0.0.1:4176');
+ await shot(web,'box-web-page-initial');await web.close();
+ const page=await context.newPage();
  const box=page.getByTestId('runtime-popover'),url=page.locator('#twin-runtime-url');
  await page.goto('/#twin');
  // 1. this machine: chosen by default, the pinned commit and the runtime's (the page's own runtime answered the automatic probe) are shown
  await expect(box).toBeVisible();await expect(page.locator('#twin-runtime-here')).toBeChecked();
  await expect(box.getByTestId('runtime-pin-commit')).not.toHaveText('—');await expect(box.getByTestId('runtime-commit')).toHaveText(await box.getByTestId('runtime-pin-commit').textContent()??'');
  await shot(page,'box-this-machine');
- // 2. another address whose runtime runs another commit: both commits, runs blocked (a route stands in for that runtime)
- await page.route('https://rt.example/**',r=>r.fulfill({status:200,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'http://127.0.0.1:4175'},body:JSON.stringify({protocolMajors:[2],sourceCommit:'b'.repeat(40),schemaHash:'s',scenarioIds:[],backends:[],backendSets:[],features:{bearer:true,pacedStep:true}})}));
+ // 2. another address whose runtime runs another commit (a route stands in for it): pairing goes through, both commits are shown, no run can be created
+ const cors={'Access-Control-Allow-Origin':'http://127.0.0.1:4175','Access-Control-Allow-Headers':'content-type, authorization','Access-Control-Allow-Methods':'GET, POST'};
+ await page.route('https://rt.example/**',r=>{const path=new URL(r.request().url()).pathname;
+  if(r.request().method()==='OPTIONS')return r.fulfill({status:204,headers:cors});
+  if(path.endsWith('/sessions'))return r.fulfill({status:201,contentType:'application/json',headers:cors,body:JSON.stringify({sessionToken:'fake-session',principal:'p'})});
+  return r.fulfill({status:200,contentType:'application/json',headers:cors,body:JSON.stringify({protocolMajors:[2],sourceCommit:'b'.repeat(40),schemaHash:'s',scenarioIds:[],backends:[],backendSets:[],features:{bearer:true,pacedStep:true}})});});
  await page.locator('label',{hasText:'Địa chỉ khác'}).click();await url.fill('https://rt.example');await expect(page.locator('#twin-runtime-other')).toBeChecked();
- await page.locator('#twin-pair-token').fill('not-used');await page.getByRole('button',{name:'Ghép nối runtime'}).click();
+ await page.locator('#twin-pair-token').fill('fake-code');await page.getByRole('button',{name:'Ghép nối runtime'}).click();
+ await expect(box.getByTestId('runtime-address')).toHaveText('https://rt.example');// paired
  await expect(box.getByTestId('runtime-pin-mismatch')).toContainText('bbbbbbb');await expect(box.getByTestId('runtime-pin-mismatch')).toContainText((await box.getByTestId('runtime-pin-commit').textContent())!);
  await shot(page,'box-pin-mismatch');
- // 3. a loopback address the browser cannot reach: the box says what to do
+ await openInspector(page,'setup');await expect(page.locator('#inspector-panel-setup [data-action="twin-run"]')).toBeDisabled();
+ await page.locator('[data-action="twin-inspector-toggle"]').click();
+ if(!await box.isVisible())await page.getByTestId('runtime-chip').click();
+ await expect(box).toBeVisible();await box.locator('[data-action="twin-disconnect"]').click();await expect(url).toHaveValue('https://rt.example');
+ // 3. a loopback address the browser cannot reach: said once, in the box, with the whole checklist
  await url.fill('http://127.0.0.1:4179');await page.locator('#twin-pair-token').fill('not-used');await page.getByRole('button',{name:'Ghép nối runtime'}).click();
  await expect(box.getByTestId('runtime-error')).toContainText('LOOPBACK_BLOCKED');await expect(box.getByTestId('runtime-error')).toContainText('Trình duyệt chặn kết nối tới 127.0.0.1 từ trang này');
+ await expect(box.getByTestId('runtime-error')).toContainText('--allow-origin http://127.0.0.1:4175');await expect(page.locator('.notice')).toHaveCount(0);
  await shot(page,'box-loopback-blocked');
  // back to this machine, then pair with the launcher's code
  await page.locator('label',{hasText:'Máy này'}).click();await expect(url).toHaveValue('');
@@ -42,17 +59,21 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  await expect(primary).toHaveText('Chạy MuJoCo (tay máy)',{timeout:180000});await expect(primary).toBeEnabled();
  await primary.click();
  await expect(page.getByTestId('mode-badge')).toContainText('SIMULATION');await expect(page.getByTestId('mode-badge')).toContainText('chưa hiệu chuẩn');
- await openInspector(page,'engineering');await expect(page.getByTestId('run-identity')).toContainText('MJ-BV01');
+ // identity: each backend with its own model; the run tag only as the mock parts' tag
+ await openInspector(page,'engineering');const identity=page.getByTestId('run-identity');
+ await expect(identity).toContainText('MJ-BV01');await expect(identity).toContainText('mujoco_arm@');await expect(identity).toContainText('thẻ mô hình của phần mock');await expect(identity).not.toContainText('model mock_kinematic');
+ await shot(page,'engineering-identity');
+ await page.locator('[data-action="twin-inspector-toggle"]').click();
 
- // the arm is drawn from its meshes once its first sample arrives
+ // the arm is drawn from its meshes once its first sample arrives; the preset opens on the arm cell
  const canvas=page.locator('#twin-stage canvas'),ds=(k:string)=>canvas.evaluate((c,key)=>(c as HTMLCanvasElement).dataset[key]??'',k);
  await expect.poll(()=>ds('armModel'),{timeout:60000}).toBe('mesh');expect(await ds('armMeshLinks')).toBe('14');expect(await ds('armFallback')).toBe('');
- // both joint columns, labelled
- await openInspector(page,'objects');await page.getByTestId('entity-list').getByRole('button',{name:/Cánh tay 1/}).click();
- await openInspector(page,'engineering');
- const q1=page.getByTestId('eng-joint-1');await expect(q1.locator('dd').nth(0)).toContainText(/-?\d/);await expect(q1.locator('dd').nth(1)).toContainText(/-?\d/);
- await expect(page.getByTestId('eng-arm-source')).toContainText('thực (MuJoCo) · lệnh');
- await shot(page,'engineering-joints');
+ await expect.poll(async()=>Number(await ds('armFrac')),{message:'the arm takes at least a third of the viewport height'}).toBeGreaterThanOrEqual(1/3);
+ expect(await ds('floorInView')).toBe('false');
+ const cell=await ds('camera'),armFrac0=await ds('armFrac');
+ const fit=page.locator('[data-action="twin-camera-fit"]'),home=page.locator('[data-action="twin-camera-home"]');
+ await fit.click();await expect.poll(()=>ds('floorInView'),{message:'one press of fit shows the whole floor'}).toBe('true');
+ await home.click();await expect.poll(()=>ds('camera')).toBe(cell);
 
  // paced steps as the browser sees them: how long each took against its due time (20 ticks x 20 ms / factor)
  const steps:{factor:number;ms:number}[]=[];
@@ -66,9 +87,12 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  const started=Date.now();
  await btn('twin-play').click();await expect(btn('twin-stop')).toBeVisible();
  const s0=await simS(page),w0=Date.now();expect(await remember()).toBeGreaterThan(8);
- await page.waitForTimeout(10000);
+ // the runtime box opened and closed with real clicks while steps land: in place, the controls keep their elements
+ await page.waitForTimeout(2000);await page.getByTestId('runtime-chip').click();await expect(box).toBeVisible();await page.waitForTimeout(1000);
+ await page.getByTestId('runtime-chip').click();await expect(box).toBeHidden();
+ await page.waitForTimeout(Math.max(0,10000-(Date.now()-w0)));
  const s1=await simS(page),w1=Date.now(),measured=(s1-s0)/((w1-w0)/1000);
- expect(await allKept(),'controls kept their elements at 1×').toBe(true);
+ expect(await allKept(),'controls kept their elements at 1×, the runtime box opened and closed').toBe(true);
  expect(measured,'1× runs at about real time').toBeGreaterThan(0.5);expect(measured).toBeLessThan(1.25);
  expect(await ds('plantCupsDropped')).toBe('0');
  // Pause with one real pointer click, then Resume
@@ -79,16 +103,27 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  await expect.poll(async()=>Math.abs(Number(await ds('gripperRad'))),{timeout:120000,intervals:[200]}).toBeGreaterThan(0.01);
  const holding=JSON.parse(await ds('cups')||'{}') as Record<string,number[]>;
  await shot(page,'mujoco-1x-holding');
+ // the same moment with the whole floor (fit, nothing selected), then back to the cell
+ await fit.click();await expect.poll(()=>ds('floorInView')).toBe('true');await shot(page,'mujoco-1x-holding-fit');await home.click();await expect.poll(()=>ds('camera')).toBe(cell);
+ const rebuildsBeforeSelect=await ds('rebuilds');
+ expect(rebuildsBeforeSelect,'the scene was not rebuilt while the run went on').toBe(rebuilds0);
+ // both joint columns, labelled (selecting the arm is the user's change of the scene: one rebuild, counted apart)
+ await openInspector(page,'objects');await page.getByTestId('entity-list').getByRole('button',{name:/Cánh tay 1/}).click();
+ await openInspector(page,'engineering');
+ const q1=page.getByTestId('eng-joint-1');await expect(q1.locator('dd').nth(0)).toContainText(/-?\d/);await expect(q1.locator('dd').nth(1)).toContainText(/-?\d/);
+ await expect(page.getByTestId('eng-arm-source')).toContainText('thực (MuJoCo) · lệnh');
+ await shot(page,'engineering-joints');
+ const rebuildsSelected=await ds('rebuilds');
  // then 16× to completed
  await page.locator('#twin-run-speed').selectOption('16');
  await expect(status).toContainText('Hoàn thành',{timeout:600000});
  const total=(Date.now()-started)/1000;
  await expect(page.getByTestId('report-pending')).toHaveCount(0,{timeout:60000});
  const rebuilds1=await ds('rebuilds'),redraws1=await ds('redraws');
- await expect(page.getByTestId('run-served')).toContainText('2');
+ await expect(page.getByTestId('run-served').locator('b')).toHaveText('2');
  await expect(page.getByTestId('problems-count')).toHaveCount(0);await expect(page.getByTestId('notes-count')).toHaveCount(0);
  expect(await ds('armModel')).toBe('mesh');expect(await ds('armFallback')).toBe('');expect(await ds('plantCupsDropped')).toBe('0');
- expect(rebuilds1,'the scene was not rebuilt while the run went on').toBe(rebuilds0);
+ expect(rebuilds1,'the scene was not rebuilt while the run went on').toBe(rebuildsSelected);
 
  // the completed run with the details closed (the brief's screens/mujoco-coffee.png)
  await page.locator('[data-action="twin-inspector-toggle"]').click();await expect(page.getByTestId('twin-inspector')).toBeHidden();
@@ -111,6 +146,6 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  expect(r.coverage.armSceneCollision,'the docked robot was in the arm\'s collision check').toBe(true);
  const late=steps.filter(s=>s.ms>20*20/s.factor+250);
  console.log(`MJ-BV01 ${JSON.stringify({measured1x:Number(measured.toFixed(3)),simS:[s0,s1],wallS:(w1-w0)/1000,totalWallS:Number(total.toFixed(1)),finalTick:r.outcome.tick,
-  steps:steps.length,maxStepMs:{1:Math.max(0,...steps.filter(s=>s.factor===1).map(s=>Math.round(s.ms))),16:Math.max(0,...steps.filter(s=>s.factor===16).map(s=>Math.round(s.ms)))},late:late.length,rebuilds:[rebuilds0,rebuilds1],redraws:[redraws0,redraws1],cupsWhileHolding:holding})}`);
+  steps:steps.length,maxStepMs:{1:Math.max(0,...steps.filter(s=>s.factor===1).map(s=>Math.round(s.ms))),16:Math.max(0,...steps.filter(s=>s.factor===16).map(s=>Math.round(s.ms)))},late:late.length,rebuilds:[rebuilds0,rebuildsBeforeSelect,rebuildsSelected,rebuilds1],armFrac:armFrac0,redraws:[redraws0,redraws1],cupsWhileHolding:holding})}`);
  await context.close();
 });

@@ -64,3 +64,27 @@ test('an arm the plant stopped: the stop reason and its detail, as the runtime r
  const stop=/data-testid="arm-stop"[^]*?<\/p>/.exec(html)?.[0]??'';
  expect(stop).toContain('PLANT_UNSTABLE');expect(stop).toContain('the engine reported a bad state (BADQACC) and reset itself');
 });
+
+// Fix round 1: the identity names each backend's model; the run-level tag is the scenario runner's tag for the mock parts, said as such when a plant backend is present.
+import {identityItems} from '../../src/twin/inspector';
+import type {RunView} from '../../src/scenarios/controls';
+const runView=(backends:string[],model='mock_kinematic')=>({run:{backendSetId:'set',backends,scenarioId:'S',scenarioRevision:1,seed:42,sourceCommit:'8543765aaaa'},model,coffee:null} as unknown as RunView);
+const manifest=(backends:{id:string;version:string;model:string}[])=>({manifest:{backends,project:{id:'p',revision:1},world:{revision:1}},coffee:null} as unknown as RunReport);
+test('identity of a mock run: unchanged (backends with versions, then model <tag>)',()=>{
+ const items=identityItems(runView(['mock_amr','mock_coffee']),manifest([{id:'mock_amr',version:'1',model:'mock_kinematic'},{id:'mock_coffee',version:'1',model:'mock_process'}]));
+ expect(items.slice(0,3)).toEqual(['set','mock_amr@1, mock_coffee@1','model mock_kinematic']);
+});
+for(const [plant,model] of [['mujoco_arm','xarm6-g2-v1'],['webots_arm','arm-ref-3d-v1']] as const)test(`identity of a ${plant} run: each backend with its own model; the run tag only as the mock parts' tag`,()=>{
+ const items=identityItems(runView(['mock_amr',plant]),manifest([{id:'mock_amr',version:'1',model:'mock_kinematic'},{id:plant,version:'3.17.0',model}]));
+ expect(items).toContain(`mock_amr@1 · mock_kinematic, ${plant}@3.17.0 · ${model}`);
+ expect(items).not.toContain('model mock_kinematic');
+ expect(items).toContain('thẻ mô hình của phần mock|モック部分のモデルタグ|model tag of the mock parts: mock_kinematic');
+ // no report yet: the backends without a model, never the run tag as the run's model
+ expect(identityItems(runView(['mock_amr',plant]),null)).not.toContain('model mock_kinematic');
+});
+test('the arm note without a live sample follows the report\'s plant engine; a mock run keeps its note',()=>{
+ const note=(arm?:Record<string,unknown>)=>inspect({preset,report:arm?{manifest:{clock:{tickMs:20}},arm:{armPlant:arm}}:null,view:{tick:1,run:{},entities:[],coffee:null},samples:{},nowMs:1100} as unknown as TwinFrame,'arm-1')!.note;
+ expect(note({engine:'mujoco_3d'})).toContain('MuJoCo');expect(note({engine:'mujoco_3d'})).not.toContain('mock_kinematic');
+ expect(note({engine:'webots_3d'})).toContain('Webots R2025a');
+ expect(note()).toBe('Góc khớp là quỹ đạo lệnh của mock_kinematic; không có encoder hay lực kẹp.|関節角はmock_kinematicの指令軌道。エンコーダ・把持力なし。|Joint angles are the mock_kinematic commanded trace; no encoder or grip force.');
+});

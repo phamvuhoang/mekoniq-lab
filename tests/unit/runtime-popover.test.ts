@@ -47,7 +47,7 @@ test('a pin mismatch disables every run button of the page; a matching runtime d
 });
 
 test('connection errors say what to do, in three languages',()=>{
- expect(box({error:'LOOPBACK_BLOCKED'})).toContain('Trình duyệt chặn kết nối tới 127.0.0.1 từ trang này. Dùng Chrome, Edge hoặc Firefox và cho phép khi được hỏi, hoặc chạy <code>pnpm lab:mujoco</code> rồi mở http://127.0.0.1:4175.|');
+ expect(box({error:'LOOPBACK_BLOCKED'})).toContain('Trình duyệt chặn kết nối tới 127.0.0.1 từ trang này. Dùng Chrome, Edge hoặc Firefox và cho phép khi được hỏi, hoặc chạy <code>pnpm lab:mujoco</code> rồi mở http://127.0.0.1:4175. Kiểm tra thêm');
  expect(box({error:'LOOPBACK_BLOCKED'})).toMatch(/\|[^|]*127\.0\.0\.1[^|]*\|The browser blocked the connection to 127\.0\.0\.1 from this page\./);
  expect(box({error:'PAIRING_RATE_LIMITED'})).toMatch(/PAIRING_RATE_LIMITED[^]*một phút[^|]*\|[^|]*1分[^|]*\|[^|]*a minute/);
  // a page with no runtime of its own (not on this machine's loopback): the help points to the address field, never to "start a runtime here"
@@ -89,4 +89,56 @@ test('the preset\'s speed is applied when it is chosen; a later choice of the us
  w.change('twin-run-speed','16');expect(speed()).toBe(16);
  w.click('twin-preset','coffee');expect(speed()).toBe(16);
  w.leave();
+});
+
+// Fix round 1
+const {THIS_MACHINE}=await import('../../src/ui/run-bar');
+const {TwinRuntimeError}=await import('../../src/scenarios/controls');
+type H={notice:string;runtimeError:string|null;pinExpected:string;tokenDraft:string;html():string};
+/** A workspace on a page served from `host`, over a fake runtime that records what is asked of it. */
+function page(host:string,o:{health?:()=>Promise<unknown>;target?:{base:string;kind:string}}={}){
+ vi.stubGlobal('location',{hostname:host,origin:host==='127.0.0.1'?'http://127.0.0.1:4175':`https://${host}`});
+ const calls:string[]=[];let paired=false,target=o.target??{base:'/lab/v2',kind:'same_origin'};
+ const rt={get paired(){return paired;},get target(){return target;},retarget(t:typeof target){calls.push(`retarget ${t.base}`);target=t;},forget(){paired=false;},
+  health:async()=>{calls.push('health');return o.health?o.health():health();},pair:async(code:string)=>{calls.push(`pair ${code}`);paired=true;},readiness:async()=>{throw new Error('x');}} as unknown as TwinRuntime;
+ const w=new TwinWorkspace(()=>{},rt),h=w as unknown as H;return {w,h,calls};
+}
+const settle=()=>new Promise(r=>setTimeout(r,20));
+test('a page from the web: "Máy này" is the runtime on the user\'s machine (127.0.0.1:4176), what the box starts with and what Connect uses; the empty address is never sent',async()=>{
+ const {w,h,calls}=page('mekoniq-lab.vercel.app');
+ const html=h.html();expect(radio(html,'here')).toContain('checked');expect(html).toContain(`id="twin-runtime-url" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="${THIS_MACHINE}" value="${THIS_MACHINE}"`);
+ h.tokenDraft='code-1';w.click('twin-connect');await settle();
+ expect(calls[0]).toBe(`retarget ${THIS_MACHINE}/lab/v2`);
+ // "another address" with an empty field: nothing is sent, the box says to enter an address
+ const b=page('mekoniq-lab.vercel.app');b.w.change('twin-runtime-other','other');(b.w as unknown as {addressDraft:string}).addressDraft='';b.w.click('twin-connect');await settle();
+ expect(b.calls).toEqual([]);expect(b.h.runtimeError).toBe('NO_RUNTIME_ON_THIS_PAGE');expect(radio(b.h.html(),'other')).toContain('checked');
+ w.leave();b.w.leave();
+});
+test('a page served from this machine: "Máy này" is the page\'s own runtime (the empty address)',()=>{
+ const {w,h}=page('127.0.0.1');const html=h.html();
+ expect(radio(html,'here')).toContain('checked');expect(html).toContain(`placeholder="${THIS_MACHINE}" value=""`);w.leave();
+});
+test('a pin mismatch does not block pairing: the code is sent, both commits are shown, the run button is disabled with the reason',async()=>{
+ const {w,h,calls}=page('127.0.0.1',{health:async()=>health({sourceCommit:OTHER})});h.pinExpected=PIN;h.tokenDraft='code-2';
+ w.click('twin-connect');await settle();
+ expect(calls).toContain('pair code-2');
+ const html=h.html();
+ expect(/data-testid="runtime-pin-mismatch"[^]*?<\/p>/.exec(html)?.[0]).toContain(OTHER.slice(0,7));
+ for(const b of html.matchAll(/<button[^>]*data-action="twin-run"[^>]*>/g))expect(b[0]).toContain('disabled');
+ expect(html).toContain('RUNTIME_PIN_MISMATCH');w.leave();
+});
+test('a failed connect is said once, in the box, with the whole LOOPBACK_BLOCKED checklist; no page notice',async()=>{
+ const {w,h}=page('mekoniq-lab.vercel.app',{health:async()=>{throw new TwinRuntimeError('LOOPBACK_BLOCKED',[],0);}});h.tokenDraft='c';
+ w.click('twin-connect');await settle();
+ expect(h.notice).toBe('');expect(h.runtimeError).toBe('LOOPBACK_BLOCKED');
+ const e=/data-testid="runtime-error"[^]*?<\/p>/.exec(h.html())?.[0]??'';
+ expect(e).toContain('--allow-origin https://mekoniq-lab.vercel.app');expect(e).toContain('Safari');w.leave();
+});
+test('the box\'s connect control carries twin-connect in every state that can connect; the sentence about the address is a description of the field, not a second label',()=>{
+ expect(box()).toMatch(/<button[^>]*type="submit"[^>]*data-action="twin-connect"[^>]*>[^]*?Ghép nối runtime/);
+ const none=box({error:'NO_RUNTIME_ON_THIS_PAGE'});
+ expect(none.match(/for="twin-runtime-url"/g)).toHaveLength(1);expect(none).toMatch(/id="twin-runtime-url"[^>]*aria-describedby="twin-runtime-help"/);
+ expect(none).toContain('もう一度');
+ // the radio follows the state the page keeps, not the field
+ expect(radio(box({where:'other',draftUrl:''}),'other')).toContain('checked');expect(radio(box({where:'here',draftUrl:THIS_MACHINE}),'here')).toContain('checked');
 });

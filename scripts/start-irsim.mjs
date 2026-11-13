@@ -14,8 +14,8 @@
 import {execFile,spawn} from 'node:child_process';
 import {homedir} from 'node:os';
 import {mkdir,readFile,writeFile,access,constants,stat} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
-import {mkdtempSync} from 'node:fs';
+import {basename,dirname,join,resolve} from 'node:path';
+import {mkdtempSync,realpathSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {promisify} from 'node:util';
@@ -125,12 +125,16 @@ export async function prepareWebots(o,launch_,lock,track=()=>{}){
   args:['--engineering-catalog',catalog,'--engineering-simulation',simulation,'--engineering-python',o.irsimPython,'--webots-python',o.webotsPython,'--webots-worker',root('webots_worker'),
    '--webots-lock',join(o.source,tool('webots_worker').lock.path),'--webots-home',o.webotsHome]};
 }
+/** The real path of `p`: its nearest existing ancestor resolved through symbolic links, the rest appended as given. */
+const realish=(p)=>{const parts=[];let d=resolve(p);for(;;){try{return join(realpathSync(d),...parts.reverse());}catch{const up=dirname(d);if(up===d)return resolve(p);parts.push(basename(d));d=up;}}};
 /** Every check before a process is spawned, for the MuJoCo arm provider: the pinned closure, .venv-mujoco against its lock, and a data directory outside every tool root
  * (the worker runs in a run directory under it, and the engine writes MUJOCO_LOG.TXT into its working directory when it warns). No engineering catalog. */
 export async function prepareMujoco(o,launch_,lock,track=()=>{}){
- const {p,tool,root}=await verifiedTools(o,launch_,lock,'mujoco_worker','the pinned runtime predates the MuJoCo arm provider; import an export that carries the mujoco_worker tool.',[['mujoco_worker',o.mujocoPython,'MUJOCO']],track);
- const data=resolve(launch_.dataDir),inside=p.tools.map(t=>resolve(o.source,t.root)).find(r=>data===r||data.startsWith(`${r}/`));
+ // first, before any probe: compared as real paths (a symbolic link into a tool root is inside it), the missing tail of a directory not created yet kept as given
+ const tools=(await installedManifest(launch_.root,lock)).portableSimulationTools?.tools??[],data=realish(launch_.dataDir);
+ const inside=tools.map(t=>realish(join(o.source,t.root))).find(r=>data===r||data.startsWith(`${r}/`));
  if(inside)throw new Error(`DATA_DIR_IN_TOOL_ROOT: ${data} is inside the pinned tool root ${inside}; choose a --data-dir outside the source tools (the launcher never writes into them).`);
+ const {tool,root}=await verifiedTools(o,launch_,lock,'mujoco_worker','the pinned runtime predates the MuJoCo arm provider; import an export that carries the mujoco_worker tool.',[['mujoco_worker',o.mujocoPython,'MUJOCO']],track);
  return {readyMs:60000,backends:[...MOCK_BACKENDS,MUJOCO_BACKEND].join(', '),env:{MEKONIQ_LAB_MUJOCO:'1'},
   args:['--mujoco-python',o.mujocoPython,'--mujoco-worker',root('mujoco_worker'),'--mujoco-lock',join(o.source,tool('mujoco_worker').lock.path)]};
 }

@@ -2,7 +2,7 @@
 // objects, a source, the arm's display source) redraws that object (sceneKey, objectKeys; structureKey covers both). A new pose or joint angle never does either.
 import {expect,test,vi} from 'vitest';
 vi.hoisted(()=>{(globalThis as Record<string,unknown>).localStorage={getItem:()=>'en',setItem:()=>{}};});
-import {anchoredOverlays,objectKeys,posesOf,sceneKey,structureKey} from '../../src/viewer/twin3d';
+import {anchoredOverlays,homeRegion,objectKeys,posesOf,sceneKey,structureKey} from '../../src/viewer/twin3d';
 import type {TwinFrame,ViewState} from '../../src/twin/scene';
 import {defaultLayers} from '../../src/twin/overlays';
 import {presets} from '../../src/scenarios/catalog';
@@ -42,4 +42,15 @@ test('sceneKey: a layer or the selection rebuilds; a new object or a stale arm o
  expect(sceneKey(frame({cups:1}),vs)).toBe(k);expect(sceneKey(frame({joints:null}),vs)).toBe(k);expect(sceneKey(frame({x:3}),vs)).toBe(k);
  expect(objectKeys(frame({cups:1})).has('cup-0')).toBe(true);expect(objectKeys(frame({joints:null})).get('arm-1')).not.toBe(o.get('arm-1'));
  expect([...objectKeys(frame({x:3,joints:[0.3,-0.2,1,0.1,0.5,0.2]}))]).toEqual([...o]);
+});
+test('U06 fix 1: the arm-cell preset opens on the cell: boxes derived from the scene (the arm over its base; the docked robot at each coffee pickup); other presets frame the floor',()=>{
+ const mj=presets.find(p=>p.id==='mujoco-coffee')!,base=mj.project.armCollisionProfile!.baseInMap.position,pick=mj.project.world.points.find(p=>p.kind==='coffee_pickup')!;
+ const boxes=homeRegion({preset:mj,report:null,view:null} as unknown as TwinFrame)!;
+ expect(boxes).toHaveLength(2);
+ const has=(x:number,y:number,z:number)=>boxes.some(b=>x>=b.min[0]&&x<=b.max[0]&&y>=b.min[1]&&y<=b.max[1]&&z>=b.min[2]&&z<=b.max[2]);
+ expect(has(base[0]!,base[1]!,base[2]!+0.7),'the arm standing up over its base').toBe(true);
+ for(const [dx,dy] of [[-0.4,-0.4],[0.4,0.4],[-0.4,0.4],[0.4,-0.4]])expect(has(pick.x+dx,pick.y+dy,0),'the docked robot on the floor').toBe(true);
+ expect(has(pick.x,pick.y,0.45)).toBe(true);
+ for(const b of boxes)expect(b.max[0]-b.min[0]).toBeLessThan(mj.project.world.width/2);// a cell, not the floor
+ expect(homeRegion({preset:presets.find(p=>p.id==='coffee')!,report:null,view:null} as unknown as TwinFrame)).toBeNull();
 });
