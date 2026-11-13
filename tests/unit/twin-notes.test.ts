@@ -3,7 +3,7 @@
 import {expect,test,vi} from 'vitest';
 vi.mock('../../src/i18n',()=>({tr:(vi:string,ja:string,en:string)=>`${vi}|${ja}|${en}`}));
 import {runBar,type RunBarState} from '../../src/ui/run-bar';
-import {armMeshProblems,nextStrip,problemCounts,type Problem} from '../../src/ui/problems';
+import {armMeshProblems,nextStrip,problemCounts,problemsPanel,type Problem} from '../../src/ui/problems';
 const bar=(o:Partial<RunBarState>={}):RunBarState=>({scenarioTitle:'BV01',runtime:{state:'live',label:'SSE',detail:''},mode:'MOCK',status:'running',simTimeS:1,served:'0',problems:0,primary:null,inspectorOpen:false,...o});
 const button=(html:string)=>/<button[^>]*data-action="twin-problems-toggle"[^>]*>[^]*?<\/button>/.exec(html)?.[0]??null;
 const problem:Problem={id:'p',severity:'attention',text:'x',codes:['CUP_MISSING']},note:Problem={id:'n',severity:'notice',text:'y',codes:['ARM_MESH_UNAVAILABLE']};
@@ -41,4 +41,11 @@ test('the two arm-mesh notes: the unusable blob named; a revision mismatch namin
  const [m]=armMeshProblems([{entityId:'arm-1',code:'ARM_MODEL_REVISION_MISMATCH',lab,run}]);
  expect(m).toMatchObject({severity:'notice',codes:['ARM_MODEL_REVISION_MISMATCH']});
  expect(m!.text.split('|')).toHaveLength(3);for(const t of m!.text.split('|')){expect(t).toContain('a'.repeat(12));expect(t).toContain('b'.repeat(12));}
+});
+
+test('U06: the panel is headed by what it holds: problems, notes, or both (label and heading alike)',()=>{
+ const head=(rows:Problem[])=>{const h=problemsPanel(rows,true);return {label:/aria-label="([^"]*)"/.exec(h)?.[1],h3:/<h3>([^<]*)<\/h3>/.exec(h)?.[1]};};
+ expect(head([problem])).toEqual({label:'Vấn đề|問題|Problems',h3:'Vấn đề|問題|Problems'});
+ expect(head([note])).toEqual({label:'Lưu ý|注意|Notes',h3:'Lưu ý|注意|Notes'});
+ expect(head([problem,note])).toEqual({label:'Vấn đề và lưu ý|問題と注意|Problems and notes',h3:'Vấn đề và lưu ý|問題と注意|Problems and notes'});
 });

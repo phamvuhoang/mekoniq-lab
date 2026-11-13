@@ -9,7 +9,7 @@ import {tr} from '../../i18n';
 import type {ArmJointsView} from './arm-telemetry';
 export function armTelemetryRows(v:ArmJointsView|null):Row[] {
  if(!v)return [];
- const src=v.provenance==='physics_sim'?tr('thực (Webots) · lệnh','実測(Webots) · 指令','actual (Webots) · commanded'):v.provenance==='controller_sim'?tr('controller mô phỏng','コントローラ模擬','controller sim'):v.provenance==='mock'?tr('mock','モック','mock'):v.provenance;
+ const src=v.providerId==='mujoco_arm'?tr('thực (MuJoCo) · lệnh','実測(MuJoCo) · 指令','actual (MuJoCo) · commanded'):v.provenance==='physics_sim'?tr('thực (Webots) · lệnh','実測(Webots) · 指令','actual (Webots) · commanded'):v.provenance==='controller_sim'?tr('controller mô phỏng','コントローラ模擬','controller sim'):v.provenance==='mock'?tr('mock','モック','mock'):v.provenance;
  const rows:Row[]=Array.from({length:6},(_,i)=>({key:`joint-${i+1}`,label:`q${i+1}`,observed:v.jointsActualRad?`${fmt(v.jointsActualRad[i]!,4)} (${fmt(v.jointsActualRad[i]!*180/Math.PI,2)}°)`:tr('không có','なし','none'),
   commanded:v.jointsCommandedRad?`${fmt(v.jointsCommandedRad[i]!,4)} (${fmt(v.jointsCommandedRad[i]!*180/Math.PI,2)}°)`:'—',unit:'rad',source:v.jointsActualRad?(v.stale?'unknown':'observed'):v.jointsCommandedRad?'commanded':'unknown',ageMs:v.ageMs}));
  if(v.tcpM)rows.push({key:'tcp',label:'TCP x, y, z',observed:v.tcpM.map(x=>fmt(x,3)).join(', '),commanded:'—',unit:'m',source:v.stale?'unknown':'observed',ageMs:v.ageMs});

@@ -7,6 +7,7 @@ import type {TwinHealth} from '../scenarios/controls';
 import type {LinkState} from '../runtime/stream';
 import type {Freshness} from '../twin/freshness';
 import type {TwinPreset} from '../scenarios/catalog';
+import {targetAddress,type RuntimeTarget} from '../runtime/target';
 import {businessSimulationNote,illustrativeNote} from './labels';
 /** `mode` is the simulation label's text (`simLabel`). */
 export type RuntimeState='none'|'connecting'|'live'|'slow'|'lost'|'recorded';
@@ -54,7 +55,39 @@ export function scenarioPicker(items:readonly PickerItem[],currentId:string,open
 export function caveatPopover(mode:string,limitations:readonly string[],open:boolean):string{
  return `<div class="twin-popover twin-caveat" id="twin-caveat" data-testid="caveat-detail"${open?'':' hidden'}><h3>${tr('Đây là mô phỏng','これはシミュレーションです','This is a simulation')}</h3><p><small>${tr('Chế độ','モード','Mode')}</small> <b class="small-code">${esc(mode)}</b></p><p class="source-note">${icon('info',15)}${esc(illustrativeNote())} · ${esc(businessSimulationNote())}</p>${limitations.length?`<h3>${tr('Giới hạn theo báo cáo','レポート記載の制約','Limitations from the report')}</h3><ul class="caveat-limitations" data-testid="caveat-limitations">${limitations.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}</div>`;
 }
-/** `telemetry`: the link detail of the open run (repainted in place as #twin-telemetry-box), null without a run. */
-export function runtimePopover(s:{open:boolean;pairFormHtml:string;sourceCommit:string|null;telemetry:string|null}):string{
- return `<div class="twin-popover twin-runtime-box" id="twin-runtime-box" data-testid="runtime-popover"${s.open?'':' hidden'}><h3>Runtime</h3>${s.pairFormHtml}${s.telemetry===null?'':`<p class="twin-telemetry" id="twin-telemetry-box">${esc(s.telemetry)}</p>`}${s.sourceCommit?`<p class="field-help">source <code>${esc(s.sourceCommit.slice(0,7))}</code></p>`:''}</div>`;
+/** The launcher's runtime on this machine, as typed from a page elsewhere. */
+export const THIS_MACHINE='http://127.0.0.1:4176';
+const short=(c:string)=>esc(c.slice(0,7));
+/** What a connection error means for the user (codes stay visible for diagnosis); an unknown code is shown as it is. */
+function errorText(code:string):string{
+ const t:Record<string,()=>string>={
+  LOOPBACK_BLOCKED:()=>tr('Trình duyệt chặn kết nối tới 127.0.0.1 từ trang này. Dùng Chrome, Edge hoặc Firefox và cho phép khi được hỏi, hoặc chạy <code>pnpm lab:mujoco</code> rồi mở http://127.0.0.1:4175.','このページから127.0.0.1への接続をブラウザがブロックしました。Chrome、EdgeまたはFirefoxを使い、確認されたら許可してください。または<code>pnpm lab:mujoco</code>を実行してhttp://127.0.0.1:4175を開いてください。','The browser blocked the connection to 127.0.0.1 from this page. Use Chrome, Edge or Firefox and allow it when asked, or run <code>pnpm lab:mujoco</code> and open http://127.0.0.1:4175.'),
+  PAIRING_RATE_LIMITED:()=>tr('Đã thử mã quá nhiều lần: chờ một phút rồi thử lại.','コードの試行が多すぎます。1分待ってから再試行してください。','Too many code attempts: wait a minute, then try again.'),
+  PAIRING_INVALID:()=>tr('Mã sai, đã dùng hoặc đã hết hạn: lấy mã mới trong terminal của runtime.','コードが違う、使用済み、または期限切れです。ランタイムの端末で新しいコードを取得してください。','The code is wrong, used or expired: take a new one from the runtime\'s terminal.'),
+  SESSION_LIMIT:()=>tr('Runtime không nhận thêm phiên ghép nối: khởi động lại runtime để có mã mới.','ランタイムはこれ以上のセッションを受け付けません。再起動して新しいコードを取得してください。','The runtime accepts no more sessions: restart it for a new code.'),
+  RUNTIME_UNREACHABLE:()=>tr('Không thấy runtime /lab/v2. Chạy runtime trên máy phát triển; Lab không tự báo hoàn thành khi thiếu runner.','/lab/v2が見つかりません。開発機でランタイムを起動してください。','No /lab/v2 runtime found. Start the runtime on your development machine; the Lab never reports completion without a runner.'),
+  // a page with no runtime of its own (served from the web): the way on is the address field, never "start a runtime here"
+  NO_RUNTIME_ON_THIS_PAGE:()=>tr(`Trang này không có runtime riêng. Nhập địa chỉ runtime vào <label for="twin-runtime-url">ô Địa chỉ runtime</label> ở trên, ví dụ ${THIS_MACHINE} cho runtime trên máy này, rồi bấm lại.`,`このページには専用のランタイムがありません。上の<label for="twin-runtime-url">ランタイムのアドレス欄</label>にアドレスを入力してください(このマシンなら ${THIS_MACHINE})。`,`This page has no runtime of its own. Enter the runtime's address in the <label for="twin-runtime-url">runtime address field</label> above, for example ${THIS_MACHINE} for a runtime on this machine, then try again.`),
+  NO_PAIRING_CODE:()=>tr('Nhập mã ghép nối một lần in trong terminal của runtime.','ランタイムの端末に表示されたワンタイムコードを入力してください。','Enter the one-time pairing code printed by the runtime\'s terminal.'),
+ };
+ return `${esc(code)}${t[code]?`: ${t[code]!()}`:''}`;
+}
+/** The runtime box (D52, SX-47): where the runtime is (this machine or another address), its address, the one-use code, Connect, and the commit the
+ * Lab is pinned to beside the commit the runtime reports; a different commit blocks runs. `telemetry`: the open run's link detail (#twin-telemetry-box). */
+export function runtimePopover(s:{open:boolean;target:RuntimeTarget;draftUrl:string;paired:boolean;busy:boolean;health:TwinHealth|null;pin:{expected:string;actual:string|null};error:string|null},telemetry:string|null=null):string{
+ const d=s.draftUrl.trim().replace(/\/(lab\/v2\/?)?$/,''),here=!d||d===THIS_MACHINE,urlError=s.error==='INVALID_RUNTIME_URL',address=targetAddress(s.target);
+ const other=s.target.kind!=='same_origin',connect=`<button class="button secondary" type="button" data-action="twin-connect"${s.busy?' disabled':''}>${icon('link',16)}${tr('Kết nối','接続','Connect')}</button>`;
+ const disconnect=`<button class="button quiet" type="button" data-action="twin-disconnect"${s.busy?' disabled':''}>${icon('cross',16)}${tr('Ngắt kết nối','切断','Disconnect')}</button>`;
+ const body=s.paired
+  // paired: no code needed (a bearer survives a reload); reaching another origin is still a click (Connect)
+  ?`<div class="twin-pair"><p class="field-help">${other?`Runtime <code data-testid="runtime-address">${esc(address)}</code>`:tr('Máy này · runtime của trang này','このマシン · このページのランタイム','This machine · this page\'s runtime')}</p><div class="pair-row">${other&&!s.health?connect:''}${disconnect}</div></div>`
+  :`<form id="twin-pair-form" class="twin-pair"><fieldset class="twin-where"><legend>${tr('Runtime chạy ở','ランタイムの場所','Where the runtime runs')}</legend>
+<label><input type="radio" name="twin-runtime-where" id="twin-runtime-here" value="here"${here?' checked':''}>${tr('Máy này','このマシン','This machine')}</label><label><input type="radio" name="twin-runtime-where" id="twin-runtime-other" value="other"${here?'':' checked'}>${tr('Địa chỉ khác','別のアドレス','Another address')}</label></fieldset>
+<label for="twin-runtime-url">${tr('Địa chỉ runtime (để trống: runtime của trang này)','ランタイムのアドレス(空欄:このページのランタイム)','Runtime address (empty: this page\'s runtime)')}</label><input id="twin-runtime-url" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="${THIS_MACHINE}" value="${esc(s.draftUrl)}"${urlError?' aria-invalid="true" aria-describedby="twin-runtime-url-error"':''}>${urlError?`<p class="field-error" id="twin-runtime-url-error" data-testid="runtime-address-error" role="alert">${tr('Địa chỉ không hợp lệ: dùng https://… hoặc http://127.0.0.1:<cổng>, http://localhost:<cổng>, http://[::1]:<cổng>, chỉ origin.','無効なアドレス:https://… または http://127.0.0.1:<ポート>、http://localhost:<ポート>、http://[::1]:<ポート>(オリジンのみ)を使ってください。','Invalid address: use https://… or http://127.0.0.1:<port>, http://localhost:<port>, http://[::1]:<port>, origin only.')}</p>`:''}
+<label for="twin-pair-token">${tr('Mã ghép nối một lần từ terminal runtime','ランタイム端末のワンタイムペアリングコード','One-time pairing code from the runtime terminal')}</label><div class="pair-row"><input id="twin-pair-token" type="password" autocomplete="off" required><button class="button secondary"${s.busy?' disabled':''}>${icon('link',16)}${tr('Ghép nối runtime','ランタイムをペアリング','Pair runtime')}</button></div></form>`;
+ const help=s.error&&!urlError&&!(s.error==='RUNTIME_PIN_MISMATCH'&&s.pin.actual)?`<p class="field-error" id="twin-runtime-help" data-testid="runtime-error" role="alert">${errorText(s.error)}</p>`
+  :!s.health&&other&&!urlError?`<p class="field-help" id="twin-runtime-help">${tr('Lab chỉ kết nối tới địa chỉ này khi bạn bấm.','このアドレスへはクリックしたときだけ接続します。','The Lab contacts this address only when you click.')}</p>`:'';
+ const mismatch=!!s.pin.actual&&!!s.pin.expected&&s.pin.actual!==s.pin.expected;
+ const commits=`<dl class="twin-commits"><div><dt>${tr('Lab ghim','Labの固定','Lab pinned to')}</dt><dd><code data-testid="runtime-pin-commit">${s.pin.expected?short(s.pin.expected):'—'}</code></dd></div><div><dt>${tr('Runtime chạy','ランタイムの版','Runtime runs')}</dt><dd><code data-testid="runtime-commit">${s.pin.actual?short(s.pin.actual):'—'}</code></dd></div></dl>${mismatch?`<p class="field-error" data-testid="runtime-pin-mismatch" role="alert">RUNTIME_PIN_MISMATCH: ${tr(`runtime chạy source ${short(s.pin.actual!)}, Lab ghim ${short(s.pin.expected)}: không tạo lần chạy. Dùng runtime đúng bản ghim.`,`ランタイムのソースは ${short(s.pin.actual!)}、Labの固定は ${short(s.pin.expected)}。実行は作成しません。固定版のランタイムを使ってください。`,`the runtime runs source ${short(s.pin.actual!)}; the Lab is pinned to ${short(s.pin.expected)}. No run is created: use the pinned runtime.`)}</p>`:''}`;
+ return `<div class="twin-popover twin-runtime-box" id="twin-runtime-box" data-testid="runtime-popover"${s.open?'':' hidden'}><h3>Runtime</h3>${body}${help}${commits}${telemetry===null?'':`<p class="twin-telemetry" id="twin-telemetry-box">${esc(telemetry)}</p>`}</div>`;
 }

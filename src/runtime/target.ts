@@ -38,4 +38,6 @@ export function requestInit(t:RuntimeTarget,token:string):RequestInit{
  return {credentials:'omit',headers:token?{Authorization:`Bearer ${token}`}:{},...t.kind==='loopback'?{targetAddressSpace:'loopback'}:{}} as RequestInit;
 }
 /** Trang không phải loopback chỉ được gửi request tới runtime sau một thao tác của người dùng. A loopback page probes only its own origin by itself. */
-export const mayAutoProbe=(t:RuntimeTarget,pageHost:string):boolean=>t.kind==='same_origin'&&LOOPBACK.includes(pageHost);
+export const mayAutoProbe=(t:RuntimeTarget,pageHost:string):boolean=>t.kind==='same_origin'&&loopbackPage(pageHost);
+/** A page served from this machine's loopback (a launcher's UI): its own origin may have a runtime; a page from the web has none. */
+export const loopbackPage=(pageHost:string):boolean=>LOOPBACK.includes(pageHost);

@@ -2381,6 +2381,13 @@ main:has(>.twin-shell){display:flex;flex-direction:column;min-height:0;padding:8
 .twin-pair label{display:block;font-size: 12px;color:var(--muted);margin-bottom:6px}
 .twin-pair > input{display:block;width:100%;max-width:380px;margin-bottom:10px}
 .twin-pair .field-error{margin:-6px 0 10px;color:var(--danger);font-size: 12px}
+.twin-where{border:0;margin:0 0 10px;padding:0;display:flex;flex-wrap:wrap;gap:6px 16px}
+.twin-where legend{font-size:12px;color:var(--muted);margin-bottom:6px;padding:0}
+.twin-pair .twin-where label{display:inline-flex;align-items:center;gap:6px;margin:0;font-size:13px;color:var(--ink)}
+.twin-runtime-box .field-error{color:var(--danger);font-size:12px;margin:8px 0 0}
+.twin-runtime-box .field-error label{display:inline;color:inherit;text-decoration:underline;cursor:pointer}
+.twin-commits{display:flex;gap:16px;margin:10px 0 0;font-size:12px}
+.twin-commits dt{color:var(--muted)}.twin-commits dd{margin:0}
 .twin-layers{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
 .twin-layers button{min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--muted)}
 .twin-layers button[aria-pressed="true"]{color:var(--accent-ink);background:var(--accent);border-color:var(--accent)}

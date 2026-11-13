@@ -1,5 +1,5 @@
 import {test,expect,type Page,type Request} from '@playwright/test';
-import {openScenarioPicker} from '../support/twin';
+import {openDisplayMenu,openScenarioPicker} from '../support/twin';
 // N03 / RT04: the Lab on another origin (http://localhost:4177, no /lab of its own) reaches the runtime at http://127.0.0.1:4176 with a bearer
 // session and fetch-based streams. Run with scripts/test-mock-e2e.mjs remote-origin.spec.ts: the launcher starts the runtime with
 // --allow-origin http://localhost:4177 and serves the Lab again on --extra-ui-port 4177. One spec per launcher (one-use pairing code).
@@ -14,7 +14,7 @@ test('a Lab on another origin sends nothing to the runtime before the click, the
  await page.setViewportSize({width:1440,height:900});
  const toRuntime:Request[]=[];page.on('request',r=>{if(r.url().startsWith(RUNTIME))toRuntime.push(r);});
  await page.goto(`${LAB}/#twin`);
- const address=page.locator('#twin-runtime-address');
+ const address=page.locator('#twin-runtime-url');
  await expect(address).toBeVisible();await expect(address).toHaveValue('');
  // the page's own origin has no runtime: the automatic probe (own origin only) finds none, and nothing went to 127.0.0.1:4176
  await expect(page.getByTestId('runtime-popover')).toContainText('Không thấy runtime /lab/v2');
@@ -80,6 +80,16 @@ test('a Lab on another origin sends nothing to the runtime before the click, the
   if(speed==='1')await shot(page,'paused');
   await btn('twin-resume').click();await expect(status).toContainText('Đang chạy');
  }
+ // U06: the 2D plan is updated in place while paced steps land: a scene entity keeps its node, and one real pointer click on it selects it
+ await openDisplayMenu(page);await page.getByRole('button',{name:'2D',exact:true}).click();await page.locator('[data-action="twin-display-toggle"]').click();
+ const amr=page.locator('#twin-stage [data-action="twin-pick"][data-value="amr-1"]');await expect(amr).toHaveAttribute('aria-pressed','false');
+ await page.locator('#twin-run-speed').selectOption('1');await btn('twin-play').click();await expect(btn('twin-stop')).toBeVisible();
+ await amr.evaluate(n=>{(window as unknown as {amr:Element}).amr=n;});const t2=await tick.textContent();await page.waitForTimeout(1300);
+ await expect(tick).not.toHaveText(t2!);expect(await page.evaluate(()=>(window as unknown as {amr:Element}).amr.isConnected),'the 2D entity kept its element').toBe(true);
+ await amr.click();await expect(amr).toHaveAttribute('aria-pressed','true');
+ await shot(page,'paced-2d-click');
+ await btn('twin-stop').click();await expect(btn('twin-play')).toBeVisible();
+ await openDisplayMenu(page);await page.getByRole('button',{name:'3D',exact:true}).click();await page.locator('[data-action="twin-display-toggle"]').click();
  // the speed changes through the select while a run is going, and the next steps take it
  await page.locator('#twin-run-speed').selectOption('1');await btn('twin-play').click();await expect(btn('twin-stop')).toBeVisible();
  await page.waitForTimeout(600);await remember();
@@ -120,6 +130,6 @@ test('a Lab on another origin sends nothing to the runtime before the click, the
  expect(foreign.some(r=>r.endsWith('/health'))).toBe(true);
  // disconnect drops the bearer from this tab
  await chip.click();await page.locator('[data-action="twin-disconnect"]').click();
- await expect(page.locator('#twin-pair-token')).toBeVisible();await expect(page.locator('#twin-runtime-address')).toHaveValue(RUNTIME);
+ await expect(page.locator('#twin-pair-token')).toBeVisible();await expect(page.locator('#twin-runtime-url')).toHaveValue(RUNTIME);
  expect(await page.evaluate(()=>Object.keys(sessionStorage).filter(k=>k.startsWith('mekoniq-lab-session:')))).toEqual([]);
 });

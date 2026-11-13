@@ -1,8 +1,10 @@
 // The Assembly page must compile with the session paired on the Twin page. The runtime here is a route-level fake that enforces the CSRF header exactly
 // like the real gateway, so two independent clients (the old wiring) fail with 403 CSRF_INVALID.
 import {test,expect,type Page} from '@playwright/test';
+import {readFileSync} from 'node:fs';
 
-const health={protocolMajors:[2],sourceCommit:'c'.repeat(40),schemaHash:'d'.repeat(64),scenarioIds:[],backends:[],backendSets:[],capabilities:['engineering_bundle_v1']};
+// the fake reports the Lab's pin: the runtime box compares every runtime's commit with it before pairing (U06)
+const health={protocolMajors:[2],sourceCommit:(JSON.parse(readFileSync('config/source-runtime.lock.json','utf8')) as {sourceCommit:string}).sourceCommit,schemaHash:'d'.repeat(64),scenarioIds:[],backends:[],backendSets:[],capabilities:['engineering_bundle_v1']};
 async function fakeRuntime(page:Page){
   const seen:{path:string;csrf:string|undefined;status:number}[]=[];
   await page.route('**/lab/v2/**',async route=>{

@@ -426,3 +426,27 @@ test('a previous run the runtime no longer has (404) does not block a new one: n
   w.leave();
  }
 });
+
+test('U06: only a not-found answer for the run from the report step means the previous run was lost; a 404 from archive keeps its saved evidence and record',async()=>{
+ vi.stubGlobal('indexedDB',{});
+ const settle=async(fail:{report?:TwinRuntimeError;archive?:TwinRuntimeError})=>{
+  const {w,h,saved}=await loop({completeAt:1,reportMs:1});
+  w.click('twin-play');await vi.waitFor(()=>expect(h.busy).toBe(false),{timeout:3000});
+  const rt=(w as unknown as {rt:Record<string,unknown>}).rt;
+  if(fail.report){Object.assign(h,{report:null});rt.report=async()=>{throw fail.report;};}
+  rt.archive=async()=>{if(fail.archive)throw fail.archive;};
+  w.click('twin-reset');await vi.waitFor(()=>expect(h.busy).toBe(false),{timeout:3000});
+  w.leave();return {h,saved};
+ };
+ // archive answers 404 after the evidence was saved: the evidence and the comparison record stand, the new run is created, the notice says what happened
+ const a=await settle({archive:new TwinRuntimeError('RUN_NOT_FOUND',[],404)});
+ expect(a.saved).toHaveLength(1);expect(a.h.previous?.manifest.runId).toBe('r1');expect(a.h.view.run.id).toBe('r2');
+ expect(a.h.notice).toContain('đã lưu');expect(a.h.notice).not.toContain('không lưu được');
+ // a 404 whose body is not the runtime's (not JSON: INVALID_RUNTIME_RESPONSE) or another not-found is no proof the run is gone: it blocks
+ for(const e of [new TwinRuntimeError('INVALID_RUNTIME_RESPONSE',[],404),new TwinRuntimeError('NOT_FOUND',[],404)]){
+  const b=await settle({report:e});expect(b.h.view.run.id).toBe('r1');expect(b.h.notice).toContain(e.code);expect(b.saved).toEqual([]);
+ }
+ // the report step says the run is not found: lost, no evidence, the notice says so, the new run is created
+ const c=await settle({report:new TwinRuntimeError('RUN_NOT_FOUND',[],404)});
+ expect(c.h.view.run.id).toBe('r2');expect(c.saved).toEqual([]);expect(c.h.previous).toBeNull();expect(c.h.notice).toContain('không còn trên runtime');
+});
