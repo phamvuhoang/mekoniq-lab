@@ -3,7 +3,7 @@
 // tests/e2e/mujoco-mesh-fallback.spec.ts): the pairing code is one-use and a same-origin session lives in the page, while the parsed meshes are cached per page, so the
 // blocked load needs a page of its own that has never loaded them.
 import {test,expect} from '@playwright/test';
-import {openInspector,openProblems,openScenarioPicker} from '../support/twin';
+import {barLayout,openInspector,openProblems,openScenarioPicker,WIDTHS} from '../support/twin';
 const token=process.env.LAB_TEST_PAIRING_TOKEN,dir=process.env.LAB_EVIDENCE_DIR??process.env.LAB_IRSIM_SCREENSHOTS;
 
 test('MJ-BV01 with the arm meshes unavailable: joint chain, one ARM_MESH_UNAVAILABLE note (not a problem), and the run completes',async({browser})=>{
@@ -36,5 +36,11 @@ test('MJ-BV01 with the arm meshes unavailable: joint chain, one ARM_MESH_UNAVAIL
  expect(r.outcome).toMatchObject({status:'completed',served:'2'});
  await page.locator('[data-action="twin-inspector-toggle"]').click();
  if(dir)await page.screenshot({path:`${dir}/U06-mesh-fallback-notes.png`});
+ // I3: the flagship end state (simulation label, completed, "run again", one note) at three widths: the scenario readable on one line, the label whole,
+ // nothing overlapping, no horizontal scroll (the bar wraps instead)
+ await expect(page.getByTestId('mode-badge')).toHaveText('Mô phỏng · chưa hiệu chuẩn');await expect(page.getByTestId('primary-action')).toHaveText('Chạy lại cùng đầu vào');
+ for(const [w,h] of WIDTHS){await page.setViewportSize({width:w,height:h});await page.waitForTimeout(200);
+  expect(await barLayout(page),`completed + note ${w}`).toEqual({oneLine:true,twelve:true,label:true,overlaps:[],inside:true,noScroll:true,title:true});
+  if(dir)await page.screenshot({path:`${dir}/final-I3-mujoco-completed-note-${w}x${h}.png`});}
  await context.close();
 });

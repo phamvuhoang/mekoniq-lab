@@ -177,5 +177,28 @@ test('MJ-BV01 from the Lab UI: runtime box, mujoco-coffee at 1× then 16× to co
  const maxLateness=Math.round(Math.max(0,...steps.map(s=>s.ms-due(s.factor))));
  console.log(`MJ-BV01 ${JSON.stringify({measured1x:Number(measured.toFixed(3)),simS:[s0,s1],wallS:(w1-w0)/1000,totalWallS:Number(total.toFixed(1)),finalTick:r.outcome.tick,
   steps:steps.length,maxStepMs:{1:Math.max(0,...steps.filter(s=>s.factor===1).map(s=>Math.round(s.ms))),16:Math.max(0,...steps.filter(s=>s.factor===16).map(s=>Math.round(s.ms)))},late:late.length,late1x:lateBy(1),late16x:lateBy(16),maxLatenessMs:maxLateness,rebuilds:[rebuilds0,rebuildsBeforeSelect,rebuildsSelected,rebuilds1],armFrac:armFrac0,armFracFresh,redraws:[redraws0,redraws1],cupsWhileHolding:holding})}`);
+ // I6: replay draws what was recorded: the arm from its meshes, and mid-pick a cup at the pose the plant recorded; a saved report reopened draws the same
+ const rr=await page.evaluate(async x=>(await fetch(`/lab/v2/runs/${x}/report`,{credentials:'same-origin'})).json(),id) as {manifest:{clock:{tickMs:number}};telemetry:{samples:{entityId:string;providerId:string;frameId:string;simTimeNs:string;observed:{positionM?:number[]}|null}[]}};
+ const cupSamples=rr.telemetry.samples.filter(s=>s.providerId==='mujoco_arm'&&s.frameId==='map'&&Array.isArray(s.observed?.positionM));
+ expect(cupSamples.length,'the report records the plant\'s cup poses').toBeGreaterThan(0);
+ const tickOf=(s:{simTimeNs:string})=>Number(s.simTimeNs)/1e6/rr.manifest.clock.tickMs,mid=cupSamples[cupSamples.length>>1]!,cursorTick=Math.ceil(tickOf(mid)/5)*5;
+ const expected=cupSamples.filter(s=>tickOf(s)<=cursorTick&&s.entityId===mid.entityId).at(-1)!;
+ const replayAt=async(name:string)=>{
+  const cursor=page.locator('#twin-replay-cursor');await expect(cursor).toBeVisible();
+  await expect.poll(()=>ds('armModel'),{timeout:20000}).toBe('mesh');expect(await ds('armSupports')).toBe('2');
+  await cursor.fill(String(cursorTick));await expect(page.getByTestId('replay-time')).toContainText(`tick ${cursorTick}`);
+  const want=expected.observed!.positionM!;
+  await expect.poll(async()=>{const p=(JSON.parse(await ds('cups')||'{}') as Record<string,number[]>)[mid.entityId];return p?Math.max(...p.map((v,i)=>Math.abs(v-want[i]!))):Infinity;},{timeout:10000}).toBeLessThan(1e-3);
+  if(dir)await page.screenshot({path:`${dir}/final-I6-${name}.png`});
+ };
+ await openInspector(page,'report');await page.getByRole('button',{name:'Xem lại (chỉ đọc)'}).click();
+ await page.locator('[data-action="twin-inspector-toggle"]').click();
+ await replayAt('replay-mid-pick');
+ await openInspector(page,'report');await page.locator('[data-action="twin-save-evidence"]').click();
+ await expect(page.locator('[data-action="twin-open-evidence"]')).not.toHaveCount(0);
+ await page.locator('#twin-transport [data-action="twin-replay-exit"]').click();
+ await page.locator('[data-action="twin-open-evidence"]').first().click();await expect(page.getByTestId('recorded-tag')).toBeVisible();
+ await page.locator('[data-action="twin-inspector-toggle"]').click();
+ await replayAt('saved-report-mid-pick');
  await context.close();
 });
