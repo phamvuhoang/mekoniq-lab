@@ -63,14 +63,14 @@ ${n?`<p class="field-help">tick 0–${esc(n.clock.tickHorizon)} · ${esc(n.contr
 }
 /** `report` may be the replay cursor's projection (streams, verification at the cursor); `full` is the report itself: the navigation evidence verdict is a property of
  * the whole recorded run and is always derived from it, never from a cursor projection. */
-export function reportPanel(report:RunReport|null,o:{replay:ReplayState|null;previous:RunReport|null;selected:string|null;business:number;full?:RunReport|null}):string{
+export function reportPanel(report:RunReport|null,o:{replay:ReplayState|null;previous:RunReport|null;selected:string|null;business:number;full?:RunReport|null;/** an action holds the page: replay waits */busy?:boolean}):string{
  if(!report)return '';
  const s=summarizeReportV2(report),cmp=!o.replay&&o.previous?compareRuns(o.previous,report):null;
  const streams=reportSummary(report,o.business);
  const verification=controllerVerificationHtml(report,o.replay?.tick??report.outcome.tick);
  const r=o.replay;
  const replay=r?`<div class="replay" data-testid="replay-panel"><p class="source-note">${icon('lock',14)}${tr('Chỉ đọc: xem lại không gửi lệnh, không nội suy qua khoảng trống.','読み取り専用:再生はコマンドを送らず、欠落を補間しません。','Read-only: replay sends no command and never interpolates across gaps.')}</p><div id="twin-replay-body">${replayBody(r,o.selected)}</div></div>`
-  :`<button class="button secondary" data-action="twin-replay">${icon('play',16)}${tr('Xem lại (chỉ đọc)','再生(読み取り専用)','Replay (read-only)')}</button>`;
+  :`<button class="button secondary" data-action="twin-replay"${o.busy?' disabled':''}>${icon('play',16)}${tr('Xem lại (chỉ đọc)','再生(読み取り専用)','Replay (read-only)')}</button>`;
  const compare=cmp?`<div class="compare" data-testid="compare-panel"><h3>${tr('So sánh với lần chạy trước','前回の実行と比較','Compare with the previous run')}</h3><p><b>${cmp.comparable?tr('So sánh được','比較可能','Comparable'):tr('Không so sánh được','比較不可','Not comparable')}</b>${cmp.reasons.length?`: ${esc(cmp.reasons.join(', '))}`:''} · ${esc(cmp.note)}</p>
 ${cmp.inputs.length?`<p class="field-help">${tr('Đầu vào khác','異なる入力','Changed inputs')}: ${cmp.inputs.map(i=>`${esc(i.field)} ${esc(String(i.a).slice(0,12))} → ${esc(String(i.b).slice(0,12))}`).join(' · ')}</p>`:''}
 <table class="eng-table"><thead><tr><th scope="col">KPI</th><th scope="col">${tr('Trước','前回','Previous')}</th><th scope="col">${tr('Lần này','今回','This run')}</th><th scope="col">Δ</th><th scope="col">${tr('Đơn vị','単位','Unit')}</th></tr></thead><tbody>${cmp.kpis.map(k=>`<tr><th scope="row" title="${esc(k.definition)}">${esc(k.id)}</th><td>${k.a===null?`<span class="unknown-text">${tr('không có','なし','n/a')}</span>`:fmt(k.a)}</td><td>${k.b===null?`<span class="unknown-text">${tr('không có','なし','n/a')}</span>`:fmt(k.b)}</td><td>${k.delta===null?'—':fmt(k.delta)}</td><td>${esc(k.unit)}</td></tr>`).join('')}</tbody></table></div>`:'';

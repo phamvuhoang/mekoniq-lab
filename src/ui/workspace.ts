@@ -30,7 +30,7 @@ import {LivePlayback} from '../twin/live-playback';
 import {icon,esc} from './icons';
 import {TwinStore} from '../twin/store';
 import {freshness,type Link} from '../twin/freshness';
-import {openRunStreams,type LinkState} from '../runtime/stream';
+import {openRunStreams,type LinkState,type StreamHandlers} from '../runtime/stream';
 import {morph} from './morph';
 import {loopbackPage,mayAutoProbe,parseTarget,saveTarget,targetAddress,type RuntimeTarget} from '../runtime/target';
 import {openReplayV2} from '../reports/replay';
@@ -57,7 +57,16 @@ const morphInner=(el:Element|null,html:string)=>{if(!el)return;if(typeof el.clon
 const SCROLL_BOXES=['inspector-panel-objects','inspector-panel-engineering','inspector-panel-report','inspector-panel-setup','twin-display-menu','twin-picker','twin-problems','twin-caveat'];
 /** The boxes the run bar and the viewport open: one at a time. */
 const BOXES={'twin-display-toggle':'displayOpen','twin-runtime-toggle':'runtimeOpen','twin-picker-toggle':'pickerOpen','twin-problems-toggle':'problemsOpen','twin-caveat-toggle':'caveatOpen'} as const;
+/** An answer asked under a generation the page has left behind (I2). */
+const STALE='STALE_ANSWER',stale=(e:unknown)=>e instanceof TwinRuntimeError&&e.code===STALE;
 export class TwinWorkspace {
+ /** What the page shows: bumped when that changes under an answer in flight (the runtime dropped or retargeted, saved evidence opened, a run created or
+  * reclaimed, replay of an opened report left). An answer asked under an older generation is dropped, never applied or rendered (current()). */
+ private gen=0;
+ private current<T>(p:Promise<T>):Promise<T>{const g=this.gen;return p.then(v=>{if(g!==this.gen)throw new TwinRuntimeError(STALE,[],0);return v;});}
+ /** Another page is shown (leave() until mounted()): a completion updates the state for when the page is shown again and renders nothing now. */
+ private left=false;
+ private rerender(){if(!this.left)this.render();}
  private readiness:ReadinessSnapshot|null=null;private readinessRequest=0;private readinessExpiry:ReturnType<typeof setTimeout>|undefined;
  private health:TwinHealth|null=null;private healthChecked=false;private probing=false;
  private preset:TwinPreset=presets[0]!;
@@ -80,7 +89,7 @@ export class TwinWorkspace {
  /** An open IR-SIM report: its navigation layers are drawn, or the reason they are not is shown (never silently absent). */
  private irsimReport(){return !!this.report&&(this.report.navigation2d!==undefined||this.report.manifest.backends.some(b=>b.id==='irsim_2d'||b.id==='webots_3d'));}
  /** Replace the scene with the one of `bundle` (or none); a later load or create() wins over an earlier one. */
- private loadScene(bundle:string|undefined){this.navigation=null;const token=++this.sceneLoad;if(bundle)void loadNavigationScene(this.rt,bundle).catch(()=>null).then(s=>{if(token===this.sceneLoad){this.navigation=s;this.rerender();}});}
+ private loadScene(bundle:string|undefined){this.navigation=null;const token=++this.sceneLoad;if(bundle)void this.current(loadNavigationScene(this.rt,bundle).catch(()=>null)).then(s=>{if(token===this.sceneLoad){this.navigation=s;this.rerender();}},()=>{/* asked for another page state */});}
  /** Which boxes and inspector tab are open: view state only (`inspectorOpen` and `tab` survive a reload). `focusTo`: where focus goes after the next render. */
  private ui=loadUi();private scrolls:Record<string,number>={};private helpOpen=false;private keys=false;private focusTo:string|null=null;private helpReturn:string|null=null;
  /** Keys (D66) while the page is shown: registered in mounted() (the same listener is added once), removed in leave(). */
@@ -113,7 +122,7 @@ export class TwinWorkspace {
  private tokenDraft='';private busy=false;private playing=false;private notice='';private fault='cup-removed';private confirming:string|null=null;private confirmationKind:'reconcile'|'restoreCup'='reconcile';private reconcileTargets:string[]=[];
  /** `engineeringProjectDigest` is the digest of the engineering design the Assembly page holds now; saved engineering evidence is current only while it matches. */
  /** `engineeringInput` is the Assembly page's current design and receipt; an engineering preset runs from it only when its profile matches (re-checked against the receipt). */
- constructor(private rerender:()=>void,private rt:TwinRuntime=httpTwinRuntime(),private engineeringProjectDigest:()=>string|undefined=()=>undefined,private engineeringInput:()=>EngineeringPresetInput|undefined=()=>undefined){
+ constructor(private render:()=>void,private rt:TwinRuntime=httpTwinRuntime(),private engineeringProjectDigest:()=>string|undefined=()=>undefined,private engineeringInput:()=>EngineeringPresetInput|undefined=()=>undefined){
   // not paired, or a runtime on another origin that is reached only after a click: the runtime box is open from the start
   this.ui.runtimeOpen=!rt.paired||this.target().kind!=='same_origin';
   // "this machine": the page's own runtime on a page from this machine, else the launcher's runtime on the user's machine (a page from the web has none of its own)
@@ -172,23 +181,26 @@ export class TwinWorkspace {
  private openStreams(v:RunView){
   if(this.streamRun===v.run.id&&this.streams&&!['session_lost','run_lost','closed'].includes(this.streams.state))return;
   this.streams?.close();this.store=new TwinStore();this.playback.clear();this.business=0;this.streamRun=v.run.id;this.link={state:'connecting',lastHeartbeatMs:null,paused:false};
-  this.streams=openRunStreams<RunView,Parameters<TwinStore['apply']>[0]>(v.run.id,v.run.eventCursor,{
+  // a stream of an older page state (a poll answer landing after close) says nothing about what is shown now
+  const handlers:StreamHandlers<RunView,Parameters<TwinStore['apply']>[0]>={
    onSample:s=>{const r=this.store.apply(s);if(r==='applied'||r==='epoch_reset'){this.playback.feed(this.store.entity(s.entityId)!,r==='epoch_reset');if(!this.raf&&this.exact&&this.animating(performance.now()))this.raf=requestAnimationFrame(this.loop);}},onGap:g=>{this.store.gap(g as never);this.playback.clear();},
    onHeartbeat:h=>{this.link={...this.link,lastHeartbeatMs:performance.now(),paused:h.paused};if(!this.busy&&!this.refreshing&&this.view&&h.runRevision!==this.view.run.runRevision)void this.refresh();},
    onBusiness:e=>{this.business++;const c=this.view?.run.eventCursor;if(!this.busy&&!this.refreshing&&this.view&&(c==null||BigInt(e.sequence)>BigInt(c)))void this.refresh();},
-   onReset:(snap,reason)=>{this.notice=`${tr('Đồng bộ lại từ snapshot','スナップショットから再同期','Resynchronised from a snapshot')}: ${reason}`;if(!this.busy)void this.apply(snap).then(()=>this.rerender());},
-   onSnapshot:snap=>{if(!this.busy&&snap.run.runRevision!==this.view?.run.runRevision)void this.apply(snap).then(()=>this.rerender());},
+   onReset:(snap,reason)=>{this.notice=`${tr('Đồng bộ lại từ snapshot','スナップショットから再同期','Resynchronised from a snapshot')}: ${reason}`;if(!this.busy)void this.apply(snap).then(()=>this.rerender(),()=>{});},
+   onSnapshot:snap=>{if(!this.busy&&snap.run.runRevision!==this.view?.run.runRevision)void this.apply(snap).then(()=>this.rerender(),()=>{});},
    onState:st=>{this.link={...this.link,state:st};
     // telemetry is not replayed after a drop: the hole is recorded as an explicit local gap
     if(st==='reconnecting'||st==='runtime_lost'){this.store.gap({reason:`LINK_${st.toUpperCase()}`});this.playback.clear();}
     if(st==='session_lost'){this.rt.forget();this.playing=false;this.ui.runtimeOpen=true;this.notice=tr('Runtime đã mất phiên (khởi động lại?). Ghép nối lại; lần chạy trong bộ nhớ không mở lại được, báo cáo cuối vẫn xem được.','ランタイムのセッションが失われました(再起動?)。再ペアリングしてください。メモリ上の実行は再開できませんが、最後のレポートは閲覧できます。','The runtime lost the session (restarted?). Pair again; the in-memory run cannot be reopened, the last report stays viewable.');this.rerender();}
     else if(st==='run_lost'||st==='runtime_lost'){this.playing=false;this.rerender();}
-    else this.tick();}},
+    else this.tick();}};
+  const g=this.gen,mine=Object.fromEntries(Object.entries(handlers).map(([k,f])=>[k,(...a:unknown[])=>{if(g===this.gen)(f as (...a:unknown[])=>void)(...a);}])) as typeof handlers;
+  this.streams=openRunStreams(v.run.id,v.run.eventCursor,mine,
    {...this.rt.streamDeps?.()??{EventSource:globalThis.EventSource},...this.health?.features?.sse===false?{EventSource:undefined}:{}});
   clearInterval(this.ticker);this.ticker=setInterval(()=>this.tick(),100);
  }
  /** Durable events arrived that this view does not reflect yet (e.g. another tab acted): re-read the snapshot. */
- private async refresh(){this.refreshing=true;try{if(this.view)await this.apply(await this.rt.get(this.view.run.id));this.rerender();}catch{/* keep the last snapshot */}finally{this.refreshing=false;}}
+ private async refresh(){this.refreshing=true;try{if(this.view)await this.apply(await this.current(this.rt.get(this.view.run.id)));this.rerender();}catch{/* keep the last snapshot; an answer for another page state is dropped */}finally{this.refreshing=false;}}
  /** Evidence is the report of the run as shown, never an older one (finalReport). */
  private async saveEvidence(){if(!this.runPreset||typeof indexedDB==='undefined'||!this.report&&!this.view)return;const report=await this.finalReport();await this.evidenceStore.save(captureEvidence(report,this.runPreset.project));this.saved=await this.evidenceStore.list();}
  /** Does this report describe the run exactly as the view shows it (same run, tick and status)? */
@@ -222,7 +234,7 @@ export class TwinWorkspace {
   morph(shell,next,el=>el.id==='twin-stage'&&this.vs.view==='3d'&&!!this.viewer);
  }
  private evidenceHtml(){
-  return `<section class="panel" data-testid="saved-evidence"><h3>${tr('Báo cáo đã lưu','保存済みレポート','Saved reports')}</h3><p class="field-help">${tr('Báo cáo được giữ nguyên. Phạm vi cũ cần chạy lại khi đầu vào đổi.','レポートは不変。入力変更時は該当範囲を再実行。','Reports stay unchanged. Changed inputs require new evidence for the affected scope.')}</p><label for="twin-import-evidence">${tr('Nhập thư mục bằng chứng (chỉ đọc)','検証フォルダを読み込む(読み取り専用)','Import evidence folder (read-only)')}</label><input id="twin-import-evidence" type="file" multiple webkitdirectory ${this.busy||this.playing?'disabled':''}>${this.saved.map(s=>{const state=evidenceStatus(s,this.resolve(this.preset).project,this.report?.manifest.scenario.id===s.report.manifest.scenario.id?this.report:null,{engineeringProjectDigest:this.engineeringProjectDigest()});return `<p><button class="text-button" data-action="twin-open-evidence" data-value="${esc(s.id)}">${s.origin==='imported'?tr('Đã nhập','インポート済み','Imported')+' · ':''}${esc(s.report.manifest.scenario.id)} · ${esc(s.report.manifest.runId.slice(0,8))} · tick ${esc(s.report.outcome.tick)}</button> <span data-testid="evidence-status">${state.stale?`${tr('bằng chứng cũ','古い検証記録','stale evidence')}: ${state.scopes.join(', ')}`:tr('khớp đầu vào','入力一致','inputs match')}${!state.runtimeChecked?` · ${tr('chưa so runtime','ランタイム未比較','runtime not compared')}`:''}</span></p>`;}).join('')||'<p>—</p>'}</section>`;
+  return `<section class="panel" data-testid="saved-evidence"><h3>${tr('Báo cáo đã lưu','保存済みレポート','Saved reports')}</h3><p class="field-help">${tr('Báo cáo được giữ nguyên. Phạm vi cũ cần chạy lại khi đầu vào đổi.','レポートは不変。入力変更時は該当範囲を再実行。','Reports stay unchanged. Changed inputs require new evidence for the affected scope.')}</p><label for="twin-import-evidence">${tr('Nhập thư mục bằng chứng (chỉ đọc)','検証フォルダを読み込む(読み取り専用)','Import evidence folder (read-only)')}</label><input id="twin-import-evidence" type="file" multiple webkitdirectory ${this.busy||this.playing?'disabled':''}>${this.saved.map(s=>{const state=evidenceStatus(s,this.resolve(this.preset).project,this.report?.manifest.scenario.id===s.report.manifest.scenario.id?this.report:null,{engineeringProjectDigest:this.engineeringProjectDigest()});return `<p><button class="text-button" data-action="twin-open-evidence" data-value="${esc(s.id)}"${this.busy?' disabled':''}>${s.origin==='imported'?tr('Đã nhập','インポート済み','Imported')+' · ':''}${esc(s.report.manifest.scenario.id)} · ${esc(s.report.manifest.runId.slice(0,8))} · tick ${esc(s.report.outcome.tick)}</button> <span data-testid="evidence-status">${state.stale?`${tr('bằng chứng cũ','古い検証記録','stale evidence')}: ${state.scopes.join(', ')}`:tr('khớp đầu vào','入力一致','inputs match')}${!state.runtimeChecked?` · ${tr('chưa so runtime','ランタイム未比較','runtime not compared')}`:''}</span></p>`;}).join('')||'<p>—</p>'}</section>`;
  }
  private runSettings(){const speed=this.preset.project.entities.find(e=>e.kind==='amr')?.speedLimitMps??0.5;return `<label>${tr('Môi trường cho lần chạy mới','新しい実行の環境','Environment for new run')}<select id="twin-backend-set" ${this.busy||this.playing||this.replay||this.archived?'disabled':''}>${(this.health?backendSetOptions(this.health):[{id:this.preset.backendSetId,mode:this.preset.mode??'mock',selectable:true,reasons:[]}]).map(s=>`<option value="${esc(s.id)}" ${s.id===this.preset.backendSetId?'selected':''} ${s.selectable||s.id===this.preset.backendSetId?'':'disabled'}>${esc(s.id)} · ${esc(s.mode)}${s.reasons.length?` · ${tr('không khả dụng','利用不可','unavailable')}: ${esc(s.reasons.join(', '))}`:''}</option>`).join('')}</select></label>${faultScheduleEditor(this.preset.project,this.scheduleDraft,this.busy||this.playing||!!this.replay||this.archived,this.preset.mode??'mock',this.scheduleOpen)}<div class="twin-settings"><label for="twin-speed-limit">${tr('Giới hạn AMR cho lần chạy mới (m/s)','新しい実行のAMR速度上限(m/s)','AMR limit for new runs (m/s)')}</label><input id="twin-speed-limit" type="number" min="0.01" max="0.5" step="0.01" value="${esc(speed)}"><button class="button quiet" data-action="twin-run" ${this.busy||this.playing||!!this.replay||this.archived||!this.rt.paired||this.pinBlock()?'disabled':''}>${tr('Chạy với đầu vào mới','変更した入力で実行','Run with edited inputs')}</button>${this.view?`<button class="button quiet" data-action="twin-reset" ${this.busy||this.playing||this.replay||this.pinBlock()?'disabled':''}>${icon('rotate',16)}${tr('Đặt lại (lần chạy mới)','リセット(新しい実行)','Reset (new run)')}</button>`:''}${this.rt.paired?(this.rt.recoverableRunIds??[]).map(id=>`<button class="text-button" data-action="twin-reclaim" data-value="${esc(id)}" ${this.busy?'disabled':''}>${tr('Mở lại chỉ xem/đối soát','表示・照合のみで再開','Reopen for view/reconcile')} · ${esc(id.slice(0,8))}</button>`).join(''):''}</div>`;}
  private readinessPreset(){return this.view?.run.status==='ready'&&this.runPreset?this.runPreset:this.resolve(this.preset);}
@@ -235,9 +247,9 @@ export class TwinWorkspace {
   const request=++this.readinessRequest;this.readiness=null;this.watchReadinessExpiry();
   if(!this.health?.features?.readiness||!this.rt.paired||!this.rt.readiness)return;
   const ref=this.refOf(p);if(ref===null)return;// an engineering preset without a receipt for this exact draft: preflight already says why
-  try{const answer=await (ref?this.rt.readiness(p.scenarioId,p.backendSetId,undefined,ref):this.rt.readiness(p.scenarioId,p.backendSetId,p.project));if(request===this.readinessRequest&&p.id===this.readinessPreset().id&&p.backendSetId===this.readinessPreset().backendSetId){this.readiness=answer;this.watchReadinessExpiry();}}catch{/* the unknown state keeps Start disabled */}
+  try{const answer=await this.current(ref?this.rt.readiness(p.scenarioId,p.backendSetId,undefined,ref):this.rt.readiness(p.scenarioId,p.backendSetId,p.project));if(request===this.readinessRequest&&p.id===this.readinessPreset().id&&p.backendSetId===this.readinessPreset().backendSetId){this.readiness=answer;this.watchReadinessExpiry();}}catch{/* the unknown state keeps Start disabled */}
  }
- async checkHealth(){try{this.health=await this.rt.health();}catch{this.health=null;}await this.checkReadiness();this.healthChecked=true;this.probing=false;this.rerender();}
+ async checkHealth(){const g=this.gen;let h:TwinHealth|null=null;try{h=await this.rt.health();}catch{/* not there */}this.probing=false;if(g!==this.gen)return;this.health=h;await this.checkReadiness();this.healthChecked=true;this.rerender();}
  private ops(f:TwinFrame):OpsState{const clock=this.clock();return {paired:this.rt.paired,ready:!this.pinBlock()&&ready(preflight(this.readinessPreset(),this.health,this.rt.paired,this.readiness)),busy:this.busy||!!this.replay,playing:this.playing,view:f.view,preset:f.preset,...clock&&!this.replay?{clock}:{}};}
  /** Preflight matters until a run starts; afterwards the run's own state does. */
  private showChecks(){return !this.view||this.view.run.status==='ready';}
@@ -318,7 +330,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   const panels={
    objects:`${this.objects(f)}<div class="panel-heading"><h3 id="ent-title">${tr('Đối tượng trong twin','ツイン内の対象','Twin objects')}</h3><span class="pill">${ents.length}</span></div>${list}`,
    engineering:`${f.view?telemetryLine(this.linkText(),this.replay?'recorded':this.fresh().f.state):''}${this.identity(f)}${engineeringPanel(insp,{hasRun:!!this.view,busy:this.busy||this.playing||!!this.replay,fault:this.fault,coffee:!!f.view?.coffee})}`,
-   report:`${reportPanel(f.report,{replay:this.replay,previous:this.previous,selected:sel,business:this.business,full:this.report})||`<p class="empty-inline">${tr('Chưa có báo cáo: báo cáo xuất hiện khi một lần chạy bắt đầu.','レポートなし:実行を開始すると表示されます。','No report yet: it appears once a run starts.')}</p>`}${this.evidenceHtml()}`,
+   report:`${reportPanel(f.report,{replay:this.replay,previous:this.previous,selected:sel,business:this.business,full:this.report,busy:this.busy})||`<p class="empty-inline">${tr('Chưa có báo cáo: báo cáo xuất hiện khi một lần chạy bắt đầu.','レポートなし:実行を開始すると表示されます。','No report yet: it appears once a run starts.')}</p>`}${this.evidenceHtml()}`,
    setup:`${this.runSettings()}${this.showChecks()?this.checks():''}`};
   const selection=this.reconcileTargets.length>1?`<label for="twin-reconcile-target">${tr('Chọn đối tượng đối soát','照合対象を選択','Choose reconciliation target')}</label><select id="twin-reconcile-target"><option value="">${tr('Chọn đối tượng','対象を選択','Select a target')}</option>${this.reconcileTargets.map(id=>`<option value="${esc(id)}" ${this.confirming===id?'selected':''}>${esc(nameOf(p,id))} · ${esc(id)}</option>`).join('')}</select>`:'';
   const dialog=this.confirming||this.reconcileTargets.length?`<dialog id="twin-confirm" aria-labelledby="twin-confirm-title"><h2 id="twin-confirm-title">${this.confirmationKind==='restoreCup'?tr('Xác nhận đã đặt đúng cốc','カップ位置の修正を確認','Confirm cup correction'):tr('Xác nhận đối soát','照合の確認','Confirm reconciliation')}</h2>${selection}<p>${!this.confirming?tr('Chọn đúng đối tượng đã kiểm tra trước khi xác nhận.','確認した対象を選んでから実行してください。','Select the target you checked before confirming.'):this.confirmationKind==='restoreCup'?tr('Đã đặt đúng cốc rỗng dưới vòi? Runtime sẽ kiểm trạng thái chưa rót và nhận quan sát mới từ cảm biến mock.','正しい空のカップをノズル下に置きましたか。ランタイムが未抽出状態を確認し、新しいモックセンサー観測を受け取ります。','Confirm the correct empty cup is under the nozzle. The runtime checks that no dispensing started and receives a fresh mock sensor observation.'):this.view?.run.mode==='simulation'?tr('Ghi lại yêu cầu đối soát. Cần kiểm tra controller bên ngoài; lần chạy vẫn giữ và không tiếp tục chuyển động.','照合要求を記録します。外部コントローラーの確認が必要です。実行は保持され、動作は再開しません。','Record the reconciliation request. External controller checks are still required; the run stays held and motion does not resume.'):tr(`Đối soát ${esc(this.confirming)}: Lab yêu cầu runtime hỏi thiết bị theo command id và ghi lại câu trả lời. Lab không gửi lại lệnh; kết quả là những gì runtime báo về sau đó. Chỉ xác nhận sau khi đã kiểm tra tại chỗ.`,`${esc(this.confirming)} を照合:LabはランタイムにコマンドIDで機器へ問い合わせ、回答を記録するよう依頼します。Labはコマンドを再送しません。結果はその後ランタイムが報告する内容です。現場確認後のみ確認してください。`,`Reconcile ${esc(this.confirming)}: the Lab asks the runtime to query the device by command id and record the answer. The Lab resends nothing; the outcome is whatever the runtime then reports. Confirm only after checking on site.`)}</p><div class="dialog-actions"><button class="button quiet" data-action="twin-confirm-cancel">${tr('Hủy','キャンセル','Cancel')}</button><button class="button primary" data-action="twin-confirm-ok" ${!this.confirming?'disabled':''}>${icon('check',16)}${tr('Xác nhận đã kiểm tra','確認済みとして実行','Confirm checked')}</button></div></dialog>`:'';
@@ -326,6 +338,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
  }
  /** After the host HTML is replaced: modal dialog, optional 3D view. The 2D plan is already in the DOM and stays the fallback. */
  mounted(){
+  this.left=false;
   if(!this.keys){document.addEventListener('keydown',this.onKey);this.keys=true;}
   const to=this.focusTo;this.focusTo=null;if(to)queueMicrotask(()=>(document.querySelector(to) as HTMLElement|null)?.focus());// after the app restores focus (its render ends after mounted())
   for(const [id,top] of Object.entries(this.scrolls)){const el=document.getElementById(id);if(el)el.scrollTop=top;}
@@ -355,7 +368,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   },()=>{this.mounting=false;this.fallback();});
  }
  private fallback(){this.viewer?.dispose();this.viewer=null;this.webglFailed=true;this.vs={...this.vs,view:'2d'};this.rerender();}
- leave(){if(this.raf)cancelAnimationFrame(this.raf);if(this.hiddenStop){this.hiddenStop=false;document.removeEventListener('visibilitychange',this.onVisible);}this.raf=0;if(this.keys){document.removeEventListener('keydown',this.onKey);this.keys=false;}this.ui.watch=false;this.helpOpen=false;this.playing=false;this.viewer?.dispose();this.viewer=null;this.streams?.close();this.streams=null;clearInterval(this.ticker);clearTimeout(this.readinessExpiry);this.stopReplay();}
+ leave(){this.left=true;if(this.raf)cancelAnimationFrame(this.raf);if(this.hiddenStop){this.hiddenStop=false;document.removeEventListener('visibilitychange',this.onVisible);}this.raf=0;if(this.keys){document.removeEventListener('keydown',this.onKey);this.keys=false;}this.ui.watch=false;this.helpOpen=false;this.playing=false;this.viewer?.dispose();this.viewer=null;this.streams?.close();this.streams=null;clearInterval(this.ticker);clearTimeout(this.readinessExpiry);this.stopReplay();}
  private stopReplay(){clearInterval(this.replayTimer);this.replayTimer=undefined;if(this.replay)this.replay.playing=false;}
  private track(v:RunView){for(const c of v.coffee?.cups??[]){const k=`${c.cupId}:${c.ownerKind}:${c.ownerId}`;if(!(k in this.seen))this.seen[k]=v.tick;}}
  private async call(task:()=>Promise<void>){
@@ -363,6 +376,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   try{await task();}
   catch(e){
    this.playing=false;
+   if(stale(e))return;// asked for a page state that is gone: nothing to say, nothing to re-read
    if(e instanceof TwinRuntimeError&&e.code==='RUNTIME_PIN_MISMATCH')this.pinMismatch=e.reasonCodes;
    // LOOPBACK_BLOCKED: the browser gives the same TypeError for every cause, so the notice names them all and claims none
    const o=typeof location==='undefined'?'':location.origin;// this page's origin, for --allow-origin
@@ -373,10 +387,10 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
    // a refused action leaves the run as the runtime has it: re-read instead of guessing
    // (the run first; its report follows off this path, so a failed report never holds the page twice)
    // after a report that timed out, no new report is asked by itself (the user's next action asks)
-   if(this.view)try{this.applyView(await this.rt.get(this.view.run.id));if(!(e instanceof TwinRuntimeError&&e.code==='REPORT_TIMEOUT'))this.refreshReport(true);}catch{/* keep the last snapshot */}
+   if(this.view)try{this.applyView(await this.current(this.rt.get(this.view.run.id)));if(!(e instanceof TwinRuntimeError&&e.code==='REPORT_TIMEOUT'))this.refreshReport(true);}catch{/* keep the last snapshot */}
   }finally{this.busy=false;this.rerender();}
  }
- private async apply(v:RunView){this.applyView(v);const seq=++this.reportSeq;let r:RunReport|null=null;try{r=await this.fetchReport(v.run.id);}catch{/* shown as no report */}this.takeReport(v.run.id,seq,r,false);}
+ private async apply(v:RunView){this.applyView(v);const seq=++this.reportSeq;let r:RunReport|null=null;try{r=await this.fetchReport(v.run.id);}catch(e){if(stale(e))throw e;/* shown as no report */}this.takeReport(v.run.id,seq,r,false);}
  /** The run snapshot only (the action receipt is the pause acknowledgement; heartbeats only refresh it between receipts, e.g. another tab). */
  private applyView(v:RunView){this.view=v;this.track(v);this.link={...this.link,paused:v.run.status==='paused'};}
  /** The report (trail, summary, caveats) may lag the live picture, which comes from the streams. Never on the paced loop's path:
@@ -393,9 +407,9 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
  private fetchReport(id:string):Promise<RunReport>{
   const c=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
   const timeout=new Promise<never>((_r,reject)=>{timer=setTimeout(()=>{c.abort();reject(new TwinRuntimeError('REPORT_TIMEOUT',[],0));},STEP_TIMEOUT_MS);});
-  return Promise.race([this.rt.report(id,c.signal),timeout]).finally(()=>clearTimeout(timer));
+  return this.current(Promise.race([this.rt.report(id,c.signal),timeout]).finally(()=>clearTimeout(timer)));
  }
- private act(kind:Parameters<TwinRuntime['action']>[1],payload?:Record<string,unknown>){return this.rt.action(this.view!,kind,payload).then(v=>this.apply(v));}
+ private act(kind:Parameters<TwinRuntime['action']>[1],payload?:Record<string,unknown>){return this.current(this.rt.action(this.view!,kind,payload)).then(v=>this.apply(v));}
  /** Recover display metadata from the recorded input; catalog entries provide labels/assets only. */
  private reclaimedPreset(v:RunView):TwinPreset {
   const input=v.lockedInput;
@@ -449,9 +463,9 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
    if(!ready(preflight(p,this.health,this.rt.paired,snapshot)))throw new TwinRuntimeError('RUNTIME_NOT_READY',snapshot.checks.flatMap(c=>c.reasonCodes),422);
   }
   await this.settlePrevious();
-  this.archived=false;this.view=null;this.report=null;this.seen={};this.runPreset={...p,project:structuredClone(p.project)};this.stopReplay();this.replay=null;this.navigation=null;const token=++this.sceneLoad;
+  this.gen++;this.archived=false;this.view=null;this.report=null;this.seen={};this.runPreset={...p,project:structuredClone(p.project)};this.stopReplay();this.replay=null;this.navigation=null;const token=++this.sceneLoad;
   const ref=this.refOf(p);if(ref){const s=await loadNavigationScene(this.rt,ref.bundleDigest).catch(()=>null);if(token===this.sceneLoad)this.navigation=s;}
-  const v=await this.rt.create(requestForPreset(p),{sourceCommit:this.health.sourceCommit,schemaHash:this.health.schemaHash});this.pinMismatch=null;
+  const v=await this.current(this.rt.create(requestForPreset(p),{sourceCommit:this.health.sourceCommit,schemaHash:this.health.schemaHash}));this.pinMismatch=null;
   await this.apply(v);this.openStreams(v);if(start){await this.act('start');if(this.clock()?.step)await this.act('step',{ticks:STEP_TICKS});}
  }
  private async play(){
@@ -484,11 +498,11 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
  /** A step with no answer after STEP_TIMEOUT_MS is aborted and reported as lost (PACED_STEP_TIMEOUT). */
  private async stepOnce(v:RunView,payload:Record<string,unknown>,actionId:string){
   const c=new AbortController(),t=setTimeout(()=>c.abort(),STEP_TIMEOUT_MS);
-  try{return await this.rt.action(v,'step',payload,actionId,c.signal);}catch(e){if(c.signal.aborted)throw new TwinRuntimeError('PACED_STEP_TIMEOUT',[],0);throw e;}finally{clearTimeout(t);}
+  try{return await this.current(this.rt.action(v,'step',payload,actionId,c.signal));}catch(e){if(c.signal.aborted)throw new TwinRuntimeError('PACED_STEP_TIMEOUT',[],0);throw e;}finally{clearTimeout(t);}
  }
  private async pacedStep(){
   const v=this.view!,payload={ticks:PACED_TICKS,pace:{factor:this.runSpeed}},actionId=crypto.randomUUID();
-  let next:RunView;try{next=await this.stepOnce(v,payload,actionId);}catch(e){if(!lostResponse(e))throw e;next=await this.stepOnce(v,payload,actionId);}
+  let next:RunView;try{next=await this.stepOnce(v,payload,actionId);}catch(e){if(stale(e)||!lostResponse(e))throw e;next=await this.stepOnce(v,payload,actionId);}
   // the receipt is the view; the next step goes at once (the runtime re-anchors after 250 ms idle) and the report follows off this path
   this.applyView(next);this.refreshReport();
   // measured rate: simulated time advanced over wall time in the last 2 s (a slow plant or link shows here, never hidden behind the factor)
@@ -524,8 +538,8 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   if(action==='twin-connect'){if(document.getElementById('twin-pair-form'))return;return this.connect(this.rt.paired?targetAddress(this.target()):this.addressDraft,this.tokenDraft);}
   if(action==='twin-disconnect'&&!this.busy&&!this.playing){this.rt.forget();this.dropRuntime();this.runtimeError=null;this.ui={...this.ui,runtimeOpen:true};return this.rerender();}
   if(action==='twin-reclaim'&&value&&this.rt.reclaim)return void this.call(async()=>{
-   const reclaimed=await this.rt.reclaim!(value);
-   this.stopReplay();this.replay=null;this.archived=false;this.streams?.close();this.streams=null;clearInterval(this.ticker);
+   const reclaimed=await this.current(this.rt.reclaim!(value));
+   this.gen++;this.stopReplay();this.replay=null;this.archived=false;this.streams?.close();this.streams=null;clearInterval(this.ticker);
    this.view=null;this.report=null;this.runPreset=null;this.seen={};
    this.runPreset=this.reclaimedPreset(reclaimed);this.loadScene(reclaimed.lockedInput?.engineering?.ref.bundleDigest);await this.apply(reclaimed);this.openStreams(reclaimed);
    this.notice=tr('Đã mở lại để xem và đối soát. Không phát lại chuyển động.','表示と照合のみで再開しました。動作は再送されません。','Reopened for viewing and reconciliation. Motion is not replayed.');
@@ -538,15 +552,15 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
    if(action==='twin-project-export'){const url=URL.createObjectURL(new Blob([JSON.stringify(this.preset.project,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='lab-project.json';a.click();URL.revokeObjectURL(url);return;}
   }
   if(action==='twin-save-evidence')return void this.call(()=>this.saveEvidence());
-  if(action==='twin-open-evidence'&&value){const saved=this.saved.find(s=>s.id===value);if(!saved)return;this.playing=false;this.streams?.close();this.streams=null;clearInterval(this.ticker);this.stopReplay();this.archived=true;this.report=structuredClone(saved.report);const preset=presets.find(p=>p.scenarioId===saved.report.manifest.scenario.id)??this.preset;this.runPreset={...preset,project:structuredClone(saved.project)};const m=saved.report.manifest;this.loadScene(m.engineering?.bundleDigest);this.view={run:{schemaVersion:2,id:m.runId,mode:m.mode==='simulation'?'simulation':'mock',access:m.access,backendSetId:m.backendSetId,backends:m.backends.map(b=>b.id),status:saved.report.outcome.status as RunView['run']['status'],runRevision:0,eventCursor:null,telemetryCursor:null,fidelity:'modeled',ageMs:0,sourceCommit:m.sourceCommit,scenarioId:m.scenario.id,scenarioRevision:m.scenario.revision,seed:m.seed},tick:saved.report.outcome.tick,simTimeNs:saved.report.outcome.simTimeNs,model:m.backends[0]?.model??'unknown',entities:saved.project.entities.filter(e=>e.kind==='amr').map(e=>({id:e.id,kind:'amr',pose:{x:NaN,y:NaN,yawRad:NaN},quality:'stale',moving:false,hold:null,goal:null,path:[],distanceM:NaN})),workload:[],awaiting:[],attention:[],served:saved.report.outcome.served,coffee:null};this.replay={rp:openReplayV2(this.report),tick:saved.report.outcome.tick,playing:false};return this.rerender();}
+  if(action==='twin-open-evidence'&&value){const saved=this.saved.find(s=>s.id===value);if(!saved||this.busy)return;this.gen++;this.playing=false;this.streams?.close();this.streams=null;clearInterval(this.ticker);this.stopReplay();this.archived=true;this.report=structuredClone(saved.report);const preset=presets.find(p=>p.scenarioId===saved.report.manifest.scenario.id)??this.preset;this.runPreset={...preset,project:structuredClone(saved.project)};const m=saved.report.manifest;this.loadScene(m.engineering?.bundleDigest);this.view={run:{schemaVersion:2,id:m.runId,mode:m.mode==='simulation'?'simulation':'mock',access:m.access,backendSetId:m.backendSetId,backends:m.backends.map(b=>b.id),status:saved.report.outcome.status as RunView['run']['status'],runRevision:0,eventCursor:null,telemetryCursor:null,fidelity:'modeled',ageMs:0,sourceCommit:m.sourceCommit,scenarioId:m.scenario.id,scenarioRevision:m.scenario.revision,seed:m.seed},tick:saved.report.outcome.tick,simTimeNs:saved.report.outcome.simTimeNs,model:m.backends[0]?.model??'unknown',entities:saved.project.entities.filter(e=>e.kind==='amr').map(e=>({id:e.id,kind:'amr',pose:{x:NaN,y:NaN,yawRad:NaN},quality:'stale',moving:false,hold:null,goal:null,path:[],distanceM:NaN})),workload:[],awaiting:[],attention:[],served:saved.report.outcome.served,coffee:null};this.replay={rp:openReplayV2(this.report),tick:saved.report.outcome.tick,playing:false};return this.rerender();}
   // export and replay are records of the run as shown: they wait for its matching report (finalReport)
   const current=!this.view||this.reportFits();// a matching report acts at once, as before; otherwise the action waits for the fetch
   if(action==='twin-export'&&this.report)return current?this.download(value??'json',this.report):void this.call(async()=>{this.download(value??'json',await this.finalReport());});
-  if(action==='twin-replay'&&this.report){
+  if(action==='twin-replay'&&this.report&&!this.busy){
    if(current){this.playing=false;this.replay={rp:openReplayV2(this.report),tick:0,playing:false};return this.rerender();}
    return void this.call(async()=>{const r=await this.finalReport();this.playing=false;this.replay={rp:openReplayV2(r),tick:0,playing:false};});
   }
-  if(action==='twin-replay-exit'){this.stopReplay();this.replay=null;if(this.archived){this.archived=false;this.view=null;this.report=null;this.runPreset=null;}this.painted='';return this.rerender();}
+  if(action==='twin-replay-exit'){this.stopReplay();this.replay=null;if(this.archived){this.gen++;this.archived=false;this.view=null;this.report=null;this.runPreset=null;}this.painted='';return this.rerender();}
   if(action==='twin-replay-play'&&this.replay){
    if(this.replay.playing){this.stopReplay();return this.rerender();}
    this.replay.playing=true;if(this.replay.tick>=this.replay.rp.range.toTick)this.replay.tick=0;
@@ -576,7 +590,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
  }
  /** Leaving a runtime (Disconnect, another address): its streams close and its run goes with it; that run can be reclaimed after reconnecting to it. */
  private dropRuntime(){
-  this.streams?.close();this.streams=null;this.streamRun='';clearInterval(this.ticker);this.stopReplay();this.replay=null;this.archived=false;this.playing=false;this.hiddenStop=false;
+  this.gen++;this.streams?.close();this.streams=null;this.streamRun='';clearInterval(this.ticker);this.stopReplay();this.replay=null;this.archived=false;this.playing=false;this.hiddenStop=false;
   this.view=null;this.report=null;this.runPreset=null;this.seen={};this.link={state:'closed',lastHeartbeatMs:null,paused:false};
   this.health=null;this.healthChecked=false;this.readiness=null;this.pinMismatch=null;
  }
@@ -624,7 +638,7 @@ ${this.notice?`<div class="notice" role="status">${icon('info',17)}<span>${esc(t
   this.addressDraft=targetAddress(t);
   void this.call(async()=>{
    try{
-    if(!this.health)try{this.health=await net(this.rt.health());}finally{this.healthChecked=true;}
+    if(!this.health)try{this.health=await this.current(net(this.rt.health()));}finally{this.healthChecked=true;}
     if(t.kind!=='same_origin')this.pinExpected=await pinnedCommit().catch(()=>this.pinExpected);
     // a commit that is not the pin blocks creating runs (pinBlock), never pairing, viewing, reclaiming or reading reports: the box stays open and shows both commits
     if(!this.rt.paired){if(!token)throw new TwinRuntimeError('NO_PAIRING_CODE',[],0);await net(this.rt.pair(token));this.notice=tr('Runtime v2 đã ghép nối.','ランタイムv2とペアリングしました。','Runtime v2 paired.');}
