@@ -1,5 +1,5 @@
 import {test,expect,type Page} from '@playwright/test';
-import {barLayout,openScenarioPicker,WIDTHS} from '../support/twin';
+import {barLayout,openInspector,openScenarioPicker,WIDTHS} from '../support/twin';
 // I3: the run bar never clips the scenario or the label and never overflows: it wraps onto a second row. I4: at phone width the transport's icon-only
 // controls are told apart by their icons and named. I5: the chip's word in the states a mock run reaches. On real pixels, against the mock launcher:
 // node scripts/test-mock-e2e.mjs twin-runbar-layout.spec.ts. The MuJoCo run (simulation label, one note) is asserted in mujoco-coffee.spec.ts with the same `barLayout`.
@@ -13,6 +13,7 @@ async function eachWidth(page:Page,state:string){
  }
  await page.setViewportSize({width:1440,height:900});
 }
+test.use({actionTimeout:15000});
 const chip=(page:Page)=>page.getByTestId('runtime-chip');
 
 test('run bar layout in every state at three widths; the transport at phone width; the runtime chip\'s words',async({page})=>{
@@ -30,8 +31,8 @@ test('run bar layout in every state at three widths; the transport at phone widt
  await expect(page.getByTestId('runtime-popover')).toBeHidden();
  await expect(chip(page)).toHaveAttribute('data-state','live');await expect(chip(page)).toContainText('Sẵn sàng');await shot(page,'I5-chip-ready');
  // item 11: a press outside an open box closes it; a press inside it, or on the button that opened it, is not outside
- await openScenarioPicker(page);await page.locator('#twin-picker h3, #twin-picker ul').first().click({position:{x:4,y:4}});await expect(page.locator('#twin-picker')).toBeVisible();
- await page.locator('#twin-stage').click({position:{x:20,y:20}});await expect(page.locator('#twin-picker')).toBeHidden();
+ await openScenarioPicker(page);{const b=(await page.locator('#twin-picker').boundingBox())!;await page.mouse.click(b.x+3,b.y+3);}await expect(page.locator('#twin-picker')).toBeVisible();
+ {const b=(await page.locator('#twin-stage').boundingBox())!;await page.mouse.click(b.x+b.width-30,b.y+b.height-30);}// a real press on the viewport (the open box lies over its top)await expect(page.locator('#twin-picker')).toBeHidden();
  await page.getByTestId('mode-badge').click();await expect(page.getByTestId('caveat-detail')).toBeVisible();
  await page.getByTestId('scenario-picker').click();await expect(page.getByTestId('caveat-detail')).toBeHidden();await expect(page.locator('#twin-picker')).toBeVisible();// another box's button: this one opens, that one closes
  await page.getByTestId('scenario-picker').click();await expect(page.locator('#twin-picker')).toBeHidden();
@@ -56,9 +57,15 @@ test('run bar layout in every state at three widths; the transport at phone widt
  await expect(page.locator('#twin-transport [data-action="twin-play"]')).toBeVisible();
  await page.setViewportSize({width:1440,height:900});
 
+ // item 4: the run's report cannot be fetched (the request fails): the Report tab says so and offers one Reload report
+ await page.route('**/lab/v2/runs/*/report',r=>r.abort());
  await page.locator('#twin-run-speed').selectOption('64');
  await page.locator('#twin-transport [data-action="twin-play"]').click();
  await expect(page.getByTestId('run-status')).toContainText('Hoàn thành',{timeout:180000});
+ await openInspector(page,'report');await expect(page.getByTestId('report-missing')).toBeVisible();await shot(page,'item4-report-reload');
+ await page.unroute('**/lab/v2/runs/*/report');await page.locator('[data-action="twin-report-reload"]').click();
+ await expect(page.getByTestId('report-panel')).toBeVisible();await expect(page.getByTestId('report-missing')).toHaveCount(0);
+ await page.locator('[data-action="twin-inspector-toggle"]').click();
  await expect(page.getByTestId('primary-action')).toHaveText('Chạy lại cùng đầu vào');
  await eachWidth(page,'completed');
 });
