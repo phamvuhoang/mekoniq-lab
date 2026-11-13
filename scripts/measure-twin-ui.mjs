@@ -9,7 +9,7 @@ import {validateUiCapture} from './ui-performance-validation.mjs';
 const arg=name=>{const i=process.argv.indexOf(name);return i<0?null:process.argv[i+1];};
 const durationMs=Number(arg('--duration-ms')??60000),output=resolve(arg('--output')??'docs/implementation/evidence/digital-twin-v2/plan01-ui-performance.json');
 if(!Number.isFinite(durationMs)||durationMs<60000)throw new Error('INVALID_CAPTURE_DURATION: at least 60000 ms required');
-const server=await createServer({configFile:false,plugins:[{name:'benchmark-entry',configureServer(server){server.middlewares.use('/benchmark.html',(_req,res)=>{res.setHeader('Content-Type','text/html');res.end('<!doctype html><html><head><link rel="stylesheet" href="/src/styles/main.css"></head><body></body></html>');});}}],server:{host:'127.0.0.1',port:0,strictPort:true},logLevel:'error'});
+const server=await createServer({configFile:false,plugins:[{name:'benchmark-entry',configureServer(server){server.middlewares.use('/benchmark.html',(_req,res)=>{res.setHeader('Content-Type','text/html');res.end('<!doctype html><html><head><link rel="stylesheet" href="/src/styles/main.css"></head><body><div id="app"><div class="app-layout"><aside class="sidebar"></aside><main id="workspace"></main></div></div></body></html>');});}}],server:{host:'127.0.0.1',port:0,strictPort:true},logLevel:'error'});
 let browser;
 try{
  await server.listen();const address=server.httpServer.address(),url=`http://127.0.0.1:${address.port}`;
@@ -24,7 +24,9 @@ try{
    const original=presetById('coffee'),project=structuredClone(original.project),amr=project.entities.find(e=>e.kind==='amr');
    project.world.width=12;project.world.height=8;project.entities.push({...structuredClone(amr),id:'amr-2'});
    project.world.points=project.world.points.filter(p=>p.kind!=='table');for(let i=0;i<6;i++)project.world.points.push({id:`table-${i+1}`,name:`T${i+1}`,kind:'table',x:6+(i%3)*2,y:2+Math.floor(i/3)*3});
-   const workspace=new TwinWorkspace(()=>{}, {paired:false}),root=document.createElement('main');document.body.replaceChildren(root);
+   // inside the app's own frame (#app > .app-layout > main), which gives the twin page its height since the viewport-first layout (U01): on a bare <main>
+   // the viewport row is 0 px high and the 3D canvas is never visible
+   const workspace=new TwinWorkspace(()=>{}, {paired:false}),root=document.querySelector('#app main');
    Object.assign(workspace,{runPreset:{...original,project,names:{...original.names,'amr-2':'AMR-2'}},healthChecked:true,vs:{...workspace.vs,view:profile.view},store:new TwinStore(),view:{run:{schemaVersion:2,id:'visual-benchmark',mode:'mock',access:'simulated',backendSetId:'mock-default',backends:['mock_amr','mock_arm','mock_coffee'],status:'running',runRevision:1,eventCursor:null,telemetryCursor:null,fidelity:'modeled',ageMs:0,sourceCommit:'0'.repeat(40),scenarioId:'BV01',scenarioRevision:1,seed:42},tick:0,simTimeNs:'0',model:'mock_kinematic',entities:['amr-1','amr-2'].map((id,i)=>({id,kind:'amr',pose:{x:1+i,y:1,yawRad:0},quality:'valid',moving:true,hold:null,goal:null,path:[],distanceM:0})),workload:[],awaiting:[],attention:[],served:'0',coffee:{jobs:[],cups:[]}}});
    root.innerHTML=workspace.html();workspace.mounted();window.__benchmark={workspace,root};
   },profile);
@@ -40,9 +42,11 @@ try{
    const feed=setInterval(()=>{seq++;const time=performance.now(),phase=seq/20;
     workspace.link={state:'live',lastHeartbeatMs:time,paused:false};
     for(let i=0;i<2;i++)workspace.store.apply({schemaVersion:2,runId:'visual-benchmark',entityId:`amr-${i+1}`,providerId:'mock_amr',bootId:'benchmark',seq:String(seq),simTimeNs:String(seq*100000000),observedAt:new Date().toISOString(),receivedMonotonicNs:String(Math.round(time*1e6)),frameId:'map',origin:'mock',quality:'valid',reasonCodes:[],commanded:null,observed:{xM:3+i*2+Math.sin(phase),yM:3+Math.cos(phase),yawRad:phase,moving:true,hold:null},estimated:null,causationId:null});
-    const previousSvg=document.querySelector('#twin-stage svg'),previousDraws=nativeDraws,before=performance.now();workspace.tick();const paintMs=performance.now()-before;
+    // 2D: the plan is updated in place (morph, N03), so a paint is the AMRs' drawn poses changing, not a new <svg> node
+    const poses=()=>['amr-1','amr-2'].map(id=>document.querySelector(`#twin-stage [data-entity="${id}"]`)?.getAttribute('transform')).join('|');
+    const previousPoses=poses(),previousDraws=nativeDraws,before=performance.now();workspace.tick();const paintMs=performance.now()-before;
     const svg=document.querySelector('#twin-stage svg');
-    if(canvas?nativeDraws===previousDraws||!canvas.width||!canvas.height:!svg||svg===previousSvg||!['amr-1','amr-2','arm-1'].every(id=>svg.querySelector(`[data-entity="${id}"]`)))throw new Error('NO_RENDERED_WORKSPACE_PAINT');
+    if(canvas?nativeDraws===previousDraws||!canvas.width||!canvas.height:!svg||poses()===previousPoses||!['amr-1','amr-2','arm-1'].every(id=>svg.querySelector(`[data-entity="${id}"]`)))throw new Error('NO_RENDERED_WORKSPACE_PAINT');
     renderedPaints++;draws.push(paintMs);
    },100);
    await new Promise(resolve=>setTimeout(resolve,durationMs));active=false;clearInterval(feed);observer.disconnect();
